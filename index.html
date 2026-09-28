@@ -1,0 +1,3739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zine Forge - Make and share zines</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="/js/zine-models.js"></script>
+  <script src="/js/zine-themes.js"></script>
+  <script src="/js/zine-library.js"></script>
+  <style>
+    :root {
+      --zf-blue: #005ea2;
+      --zf-blue-dark: #1a4480;
+      --zf-ink: #1b1b1b;
+      --zf-gray-light: #f0f0f0;
+      --zf-gray-mid: #71767a;
+      --zf-border: #dfe1e2;
+      --zf-red: #b50909;
+      --zf-font: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --zf-serif: "Source Serif Pro", Georgia, "Times New Roman", serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--zf-font); color: var(--zf-ink); background: #ffffff; }
+    button, input, textarea, select { font-family: inherit; }
+    a { color: var(--zf-blue); }
+    .zf-header { background: var(--zf-blue-dark); color: #ffffff; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .zf-header h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.02em; }
+    .zf-header .zf-sub { font-size: 0.8rem; opacity: 0.85; margin-left: 0.5rem; font-weight: 400; }
+    .zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .zf-btn { border: 1px solid transparent; border-radius: 4px; padding: 0.5rem 0.9rem; font-size: 0.9rem; cursor: pointer; background: #ffffff; color: var(--zf-blue-dark); }
+    .zf-btn:hover { background: var(--zf-gray-light); }
+    .zf-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-btn-secondary { background: transparent; color: #ffffff; border-color: rgba(255,255,255,0.6); }
+    .zf-btn-secondary:hover { background: rgba(255,255,255,0.12); }
+    .zf-btn-primary { background: #ffbe2e; color: var(--zf-ink); font-weight: 600; }
+    .zf-btn-primary:hover { background: #e5a000; }
+    .zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+    .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
+    .zf-error { color: var(--zf-red); font-size: 0.9rem; }
+    .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
+    .zf-editor { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; align-items: start; }
+    @media (max-width: 800px) { .zf-editor { grid-template-columns: 1fr; } }
+    .zf-page-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow: hidden; }
+    .zf-page-list li { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--zf-border); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem; }
+    .zf-page-list li:last-child { border-bottom: none; }
+    .zf-page-list li.active { background: var(--zf-blue); color: #ffffff; }
+    .zf-mini { font-size: 0.75rem; color: var(--zf-gray-mid); }
+    .zf-page-tools { display: flex; gap: 0.25rem; }
+
+    /* -------- Drag to reorder -------- */
+    .zf-page-list li.zf-draggable { cursor: grab; }
+    .zf-page-list li.zf-dragging { opacity: 0.4; }
+    .zf-page-list li.zf-drop-above {
+      box-shadow: inset 0 3px 0 0 var(--zf-blue);
+    }
+    .zf-page-list li.zf-drop-below {
+      box-shadow: inset 0 -3px 0 0 var(--zf-blue);
+    }
+    .zf-page-grip {
+      color: var(--zf-gray-mid);
+      font-size: 0.9rem;
+      cursor: grab;
+      user-select: none;
+      margin-right: 0.25rem;
+    }
+    .zf-page-list li.active .zf-page-grip { color: #ffffff; opacity: 0.85; }
+    .zf-icon-btn { border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px; width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 0.9rem; padding: 0; }
+    .zf-icon-btn:hover { background: var(--zf-gray-light); }
+    .zf-canvas-wrap { display: flex; justify-content: center; background: var(--zf-gray-light); padding: 1.5rem; border-radius: 6px; }
+    .zf-page { width: 480px; min-height: 640px; background: #ffffff; border: 1px solid var(--zf-border); box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .zf-page-heading { font-family: var(--zf-page-heading-font, var(--zf-serif)); font-size: 1.5rem; border: none; border-bottom: 2px solid var(--zf-page-accent, var(--zf-ink)); padding: 0.25rem 0; width: 100%; outline: none; background: transparent; color: inherit; }
+    .zf-page-body { flex: 1; border: none; resize: vertical; font-family: var(--zf-page-body-font, var(--zf-serif)); font-size: 1rem; line-height: 1.5; width: 100%; outline: none; background: transparent; color: inherit; }
+    .zf-page-image { max-width: 100%; border-radius: 4px; }
+    .zf-inline-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .zf-label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--zf-gray-mid); text-transform: uppercase; letter-spacing: 0.03em; }
+    .zf-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--zf-border); border-radius: 4px; font-size: 0.9rem; }
+    .zf-field { margin-bottom: 0.75rem; }
+
+    /* -------- Content budget meter -------- */
+    .zf-budget { margin-top: 0.5rem; font-size: 0.8rem; color: var(--zf-gray-mid); }
+    .zf-budget-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+    .zf-budget-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--zf-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .zf-budget-bar > div {
+      height: 100%;
+      background: #2e8540;
+      transition: width 0.15s ease, background 0.15s ease;
+    }
+    .zf-budget-bar.warn > div { background: #e5a000; }
+    .zf-budget-bar.over > div { background: var(--zf-red); }
+    .zf-budget-num { font-variant-numeric: tabular-nums; }
+    .zf-budget.over { color: var(--zf-red); }
+    .zf-budget.warn { color: #8a6d00; }
+
+    /* -------- Zine page number labels -------- */
+    .zf-page-num {
+      display: inline-block;
+      font-size: 0.7rem;
+      color: var(--zf-gray-mid);
+      font-variant-numeric: tabular-nums;
+      padding: 0 4px;
+      border: 1px solid var(--zf-border);
+      border-radius: 3px;
+      background: #ffffff;
+    }
+    .zf-page-num.cover {
+      background: var(--zf-blue);
+      color: #ffffff;
+      border-color: var(--zf-blue);
+    }
+    .zf-page-num.back {
+      background: var(--zf-ink);
+      color: #ffffff;
+      border-color: var(--zf-ink);
+    }
+    /* Printed corner number inside each mini-page on the sheet */
+    /* Printer safe-area guides (visual only, never printed) */
+    .zf-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      border-style: dashed;
+      border-color: rgba(181, 9, 9, 0.5);
+      border-width: 0;
+    }
+    /* Sheet-level: rectangle inset from the paper edge on every side. */
+    .zf-sheet-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      border: 1px dashed rgba(181, 9, 9, 0.5);
+      box-sizing: border-box;
+    }
+    /* Editor canvas: guide stripes along specific page edges. */
+    .zf-mini-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      background: transparent;
+      border: 0;
+      border-color: rgba(181, 9, 9, 0.5);
+    }
+    @media print {
+      .zf-safe-guide, .zf-sheet-safe-guide, .zf-mini-safe-guide { display: none !important; }
+    }
+    .zf-slot-page-num {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      font-family: var(--zf-font);
+      font-size: 0.6rem;
+      color: var(--zf-gray-mid);
+      z-index: 10;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      line-height: 1;
+    }
+
+    /* -------- Unified mini-page renderer --------
+       All three views (editor canvas, reader page, sheet slot) render the same
+       content inside a .zf-mini-page, so what you type matches what you read
+       and what you print. The --zf-page-scale variable scales typography from
+       physical inches to the on-screen size. */
+    .zf-mini-page {
+      background: var(--zf-page-paper, #ffffff);
+      color: var(--zf-page-ink, #1b1b1b);
+      font-family: var(--zf-page-body-font, var(--zf-serif));
+      /* Base body font size: 10pt physical, scaled by --zf-page-scale.
+         10pt = 13.333px CSS. */
+      font-size: calc(13.333px * var(--zf-page-scale, 1));
+      line-height: 1.3;
+      /* Margins are user-editable via --zf-page-margin (inches), scaled to
+         the current on-screen size by --zf-page-scale. Default 0.1in. */
+      padding: calc(var(--zf-page-margin, 0.1in) * var(--zf-page-scale, 1));
+      /* Clip anything that runs off the page. Images hanging off the edge
+         bleed out visually and are trimmed for print - the way zines work. */
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: calc(0.04in * var(--zf-page-scale, 1));
+      box-sizing: border-box;
+      /* So absolutely-positioned images anchor here, not the viewport. */
+      position: relative;
+    }
+    .zf-mini-page .zf-mini-heading {
+      font-family: var(--zf-page-heading-font, var(--zf-serif));
+      font-size: 1.6em;
+      line-height: 1.1;
+      margin: 0;
+      padding-bottom: 0.1em;
+      border-bottom: calc(0.015in * var(--zf-page-scale, 1)) solid var(--zf-page-accent, var(--zf-ink));
+      background: transparent;
+      color: inherit;
+      width: 100%;
+      outline: none;
+      border-top: 0;
+      border-left: 0;
+      border-right: 0;
+    }
+    .zf-mini-page .zf-mini-body {
+      font-family: var(--zf-page-body-font, var(--zf-serif));
+      flex: 1;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      width: 100%;
+      outline: none;
+      resize: none;
+      overflow: hidden;
+      white-space: pre-wrap;
+      font-size: 1em;
+      line-height: 1.35;
+      /* Small bottom padding for descenders (g, j, p, q, y). Without this
+         the last line's descending strokes get clipped by the mini-page's
+         overflow boundary. Kept tight so we don't waste space. */
+      padding: 0 0 0.1em 0;
+      word-wrap: break-word;
+    }
+    .zf-mini-body.zf-editable {
+      cursor: text;
+      min-height: 1em;
+    }
+    .zf-mini-body.zf-editable:empty:before {
+      content: attr(data-placeholder);
+      color: var(--zf-gray-mid);
+      font-style: italic;
+      pointer-events: none;
+    }
+    .zf-format-toolbar {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      background: var(--zf-gray-light);
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      width: fit-content;
+    }
+    .zf-image-dragging { cursor: grabbing; }
+    .zf-image-selected { outline: 2px dashed var(--zf-blue); outline-offset: 2px; }
+
+    /* -------- Image wrapper with resize/rotate handles -------- */
+    .zf-img-wrap {
+      position: absolute;
+      box-sizing: border-box;
+      z-index: 2;
+    }
+    .zf-img-wrap > img {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: grab;
+    }
+    .zf-img-wrap.zf-img-selected {
+      outline: 2px dashed var(--zf-blue);
+      outline-offset: 2px;
+    }
+    .zf-img-handle {
+      position: absolute;
+      display: none;
+      background: var(--zf-blue);
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1px var(--zf-blue);
+      cursor: pointer;
+      z-index: 3;
+      touch-action: none;
+    }
+    .zf-img-wrap.zf-img-selected .zf-img-handle { display: block; }
+    .zf-img-handle.zf-img-handle-resize {
+      width: 12px; height: 12px;
+      right: -7px; bottom: -7px;
+      border-radius: 2px;
+      cursor: nwse-resize;
+    }
+    .zf-img-handle.zf-img-handle-rotate {
+      width: 14px; height: 14px;
+      right: -8px; top: -8px;
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .zf-img-handle.zf-img-handle-rotate::after {
+      content: "";
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 4px; height: 4px;
+      background: #ffffff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* -------- Placed text boxes -------- */
+    .zf-textbox {
+      position: absolute;
+      box-sizing: border-box;
+      z-index: 3;
+      min-height: 1em;
+      padding: 0.15em 0.2em;
+      border: 1px dashed transparent;
+      border-radius: 2px;
+      cursor: move;
+      outline: none;
+    }
+    .zf-textbox:hover { border-color: rgba(0,94,162,0.35); }
+    .zf-textbox-selected {
+      border: 1px dashed var(--zf-blue) !important;
+      outline: 2px dashed var(--zf-blue);
+      outline-offset: 2px;
+    }
+    .zf-textbox .zf-textbox-content {
+      outline: none;
+      min-height: 1em;
+      cursor: text;
+    }
+    .zf-textbox .zf-img-handle {
+      display: none;
+    }
+    .zf-textbox-selected .zf-img-handle {
+      display: block;
+    }
+    .zf-mini-image.zf-positioned { cursor: grab; }
+    .zf-mini-image.zf-block-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+      max-width: 100%;
+      height: auto;
+      display: block;
+      flex-shrink: 0;
+    }
+    .zf-mini-body { position: relative; }
+    .zf-mini-body.zf-editable { cursor: text; min-height: 1em; }
+    .zf-mini-image.zf-flow-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+    }
+    .zf-mini-image.zf-flow-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+    }
+    .zf-image-controls {
+      margin-top: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      background: var(--zf-gray-light);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .zf-image-control-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .zf-image-control-label {
+      font-size: 0.8rem;
+      color: var(--zf-gray-mid);
+      min-width: 130px;
+    }
+    .zf-mini-page .zf-mini-image {
+      max-width: 100%;
+      max-height: 45%;
+      object-fit: contain;
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+      align-self: flex-start;
+    }
+    /* Positioned image: sits on top of text inside the printable area. */
+    .zf-mini-image.zf-positioned {
+      position: absolute;
+      max-width: none;
+      max-height: none;
+      transform-origin: center center;
+      user-select: none;
+      touch-action: none;
+    }
+    .zf-mini-page.zf-has-abs-image {
+      position: relative;
+    }
+
+    .zf-fill-hint {
+      margin: 0.5rem 0 0.5rem 0;
+      padding: 0.5rem 0.6rem;
+      border-left: 3px solid var(--zf-blue);
+      background: #e7f6ff;
+      font-size: 0.8rem;
+      border-radius: 3px;
+    }
+    .zf-fill-hint.complete { border-left-color: #2e8540; background: #ecf8ef; }
+    .zf-reader { max-width: 720px; margin: 0 auto; padding: 1.5rem; display: flex; flex-direction: column; align-items: center; }
+    .zf-reader-page { background: #ffffff; border: 1px solid var(--zf-border); border-radius: 6px; padding: 1.5rem; margin: 0 auto 1.5rem auto; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
+    .zf-reader-page h2 { font-family: var(--zf-serif); font-size: 1.75rem; margin-top: 0; border-bottom: 2px solid var(--zf-ink); padding-bottom: 0.25rem; }
+    .zf-reader-page .zf-reader-body { font-family: var(--zf-serif); line-height: 1.6; font-size: 1.05rem; white-space: pre-wrap; }
+    .zf-reader-page img { max-width: 100%; border-radius: 4px; margin: 0.75rem 0; }
+    .zf-pager { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
+
+    /* -------- Sheet view -------- */
+    .zf-sheet-view { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+    .zf-sheet {
+      position: relative;
+      background: #ffffff;
+      border: 1px solid var(--zf-border);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin: 0 auto;
+    }
+    .zf-sheet-guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .zf-sheet-guides .zf-fold-h,
+    .zf-sheet-guides .zf-fold-v,
+    .zf-sheet-guides .zf-cut {
+      position: absolute;
+      background: transparent;
+    }
+    .zf-sheet-guides .zf-fold-h {
+      left: 0; right: 0; top: 50%;
+      border-top: 2px dashed #b50909;
+    }
+    .zf-sheet-guides .zf-fold-v {
+      top: 0; bottom: 0; left: 50%;
+      border-left: 2px dashed #b50909;
+    }
+    .zf-slot {
+      position: absolute;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px dotted rgba(0,0,0,0.12);
+      background: #ffffff;
+    }
+    .zf-slot-rot { transform-origin: center center; }
+    /* Debug slot label removed from the template; keeping the CSS rule out
+       entirely so nothing accidentally picks it up later. */
+    .zf-slot-empty {
+      color: var(--zf-gray-mid);
+      font-size: 0.7rem;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .zf-instructions {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-left: 4px solid var(--zf-blue);
+      background: var(--zf-gray-light);
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    .zf-instructions h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; }
+    .zf-instructions ol { margin: 0; padding-left: 1.25rem; }
+    .zf-instructions li { margin-bottom: 0.25rem; }
+
+    /* -------- Visual fold guide -------- */
+    .zf-fold-guide {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    .zf-fold-guide h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+    .zf-fold-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .zf-fold-step {
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .zf-fold-step svg { width: 120px; height: auto; display: block; }
+    .zf-fold-caption {
+      font-size: 0.75rem;
+      color: var(--zf-gray-mid);
+      text-align: center;
+      line-height: 1.3;
+    }
+    .zf-fold-num {
+      display: inline-block;
+      width: 18px; height: 18px;
+      line-height: 18px;
+      text-align: center;
+      border-radius: 50%;
+      background: var(--zf-blue);
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+    }
+
+    /* -------- Library -------- */
+    .zf-library { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+    .zf-library-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .zf-library-header h2 { margin: 0; font-family: var(--zf-serif); }
+    .zf-library-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .zf-lib-card {
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      background: #ffffff;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.15s ease;
+    }
+    .zf-lib-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    .zf-lib-preview {
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--zf-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-align: center;
+      padding: 0.5rem;
+      overflow: hidden;
+      border-bottom: 1px solid var(--zf-border);
+    }
+    .zf-lib-preview span {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .zf-lib-body { padding: 0.6rem 0.75rem; }
+    .zf-lib-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .zf-lib-meta { font-size: 0.75rem; color: var(--zf-gray-mid); }
+    .zf-lib-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem 0.75rem 0.75rem;
+      border-top: 1px solid var(--zf-border);
+    }
+    .zf-lib-actions button {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.8rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+    }
+    .zf-lib-actions button:hover { background: var(--zf-gray-light); }
+    .zf-lib-actions button.danger { color: var(--zf-red); }
+    .zf-lib-actions button.primary {
+      background: var(--zf-blue);
+      color: #ffffff;
+      border-color: var(--zf-blue);
+    }
+    .zf-lib-actions button.primary:hover { background: var(--zf-blue-dark); }
+
+    @media print {
+      /* Reset page scale to 1 in print so padding and font sizes resolve to
+         their physical values (0.1in, 10pt, etc.) instead of the screen-scale
+         px values used on the on-screen preview. Without this, mini-pages
+         inside the printed sheet keep their screen-relative padding/sizing
+         and the content ends up too small for the paper.
+
+         We set it on the root so every element inheriting --zf-page-scale
+         gets the same physical scale. This keeps absolute positioning
+         origins consistent through the entire print layout. */
+      /* TEST: commented out the print-time scale reset to see if it's what's
+         distorting the print output. The screen-computed scale will be used
+         in print, which means print size is tied to the on-screen sheet size
+         instead of the physical paper. Aspect should still be correct. */
+      /* html, body { --zf-page-scale: 1 !important; } */
+      /* .zf-mini-page { --zf-page-scale: 1 !important; } */
+      /* .zf-slot-rot { --zf-page-scale: 1 !important; } */
+      /* Strip every wrapper's padding/margin/max-width so the sheet can
+         actually fill the paper edge to edge. Do NOT set width: 100% on
+         .zf-sheet -- its size is set to the paper dimensions (11in x 8.5in)
+         by the dynamically injected paperCss, and overriding it here would
+         force it to be the size of its parent and break the layout. */
+      #app, #app > div, .zf-main, .zf-sheet-view {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .zf-sheet {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      /* Keep the sheet's own coordinate origin at its top-left. The sheet is
+         position:relative already, so absolutely positioned descendants use
+         its padding box as their reference. This is the same origin used by
+         the on-screen preview, so positions match. */
+      .zf-sheet { position: relative !important; }
+      /* The mini-page inside each slot MUST have its padding-box origin at
+         the same relative position as on screen. Since --zf-page-scale is
+         now 1 everywhere in print, and the padding is 0.1in physical on
+         paper, the origin is 0.1in from the mini-page's edge - matching the
+         screen preview proportionally. */
+      /* Hide everything except the sheet itself */
+      html, body { margin: 0 !important; padding: 0 !important; background: #ffffff !important; }
+      /* The sheet must have no margin so the fold lines land on the exact
+         physical center of the paper. */
+      .zf-sheet-view, .zf-sheet, .zf-slot { margin: 0 !important; padding: 0 !important; }
+      body > *:not(#app) { display: none !important; }
+      #app > div > header,
+      #app .zf-main > div:not(:has(.zf-sheet-view)),
+      #app .zf-main > section:not(:has(.zf-sheet-view)),
+      #app .zf-main > section > *:not(.zf-sheet-view) {
+        display: none !important;
+      }
+      /* Show only the active sheet view */
+      .zf-sheet-view { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+      .zf-sheet-view > .zf-no-print { display: none !important; }
+      .zf-sheet {
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        page-break-inside: avoid;
+        page-break-after: avoid;
+      }
+      .zf-sheet-guides { display: none !important; }
+      .zf-slot { border: none !important; }
+      .zf-slot-label { display: none !important; }
+    }
+    @media print {
+      .zf-header, .zf-no-print, .zf-pager { display: none !important; }
+      body { background: #ffffff; margin: 0; padding: 0; }
+      .zf-reader-page { box-shadow: none; border: none; padding: 0; margin: 0; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <template id="zine-app-shell-template">
+    <div>
+      <header class="zf-header">
+        <h1>
+          Zine Forge
+          <span class="zf-sub">make + share zines</span>
+        </h1>
+        <div class="zf-header-actions">
+          <button class="zf-btn zf-btn-secondary" @click="goEditor">Editor</button>
+          <button class="zf-btn zf-btn-secondary" @click="goReader">Read</button>
+          <button class="zf-btn zf-btn-secondary" @click="goSheet">Sheet</button>
+          <button class="zf-btn zf-btn-secondary" @click="goLibrary">Library</button>
+          <button class="zf-btn zf-btn-secondary" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
+          <button class="zf-btn zf-btn-secondary" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+          <button class="zf-btn zf-btn-secondary" @click="onNew">New</button>
+        </div>
+      </header>
+
+      <main class="zf-main">
+        <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
+        <section v-show="store.view === 'editor'"><zine-editor></zine-editor></section>
+        <section v-show="store.view === 'reader'"><zine-reader></zine-reader></section>
+        <section v-show="store.view === 'sheet'"><zine-sheet></zine-sheet></section>
+        <section v-show="store.view === 'library'"><zine-library></zine-library></section>
+      </main>
+    </div>
+  </template>
+
+  <template id="zine-reader-template">
+    <div class="zf-reader">
+      <div class="zf-no-print" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <div>
+          <h2 style="margin:0;font-family:var(--zf-serif);">{{ store.title || 'Untitled Zine' }}</h2>
+          <div class="zf-muted" v-if="store.author">by {{ store.author }}</div>
+        </div>
+        <div class="zf-header-actions" style="gap:0.5rem;">
+          <button class="zf-btn zf-btn-primary" @click="shareLink">Share link</button>
+          <button class="zf-btn" style="border-color:var(--zf-border);" @click="printZine">Print / PDF</button>
+        </div>
+      </div>
+      <div v-if="shareStatus" class="zf-muted" role="status" aria-live="polite" style="margin-bottom:0.75rem;">{{ shareStatus }}</div>
+      <article class="zf-mini-page" v-if="page" :style="Object.assign({}, readerThemeStyle, readerPageStyle)">
+        <h2 class="zf-mini-heading" v-if="page.heading">{{ page.heading }}</h2>
+        <img v-if="page.image && (page.imageWrap === 'block' || !page.imageWrap)"
+             class="zf-mini-image zf-block-image" :src="page.image" alt="Page illustration"
+             :style="readerBlockImageStyle(page)" />
+        <div class="zf-mini-body" ref="bodyReader" v-html="bodyHtml"></div>
+        <img v-if="page.image && page.imageWrap === 'free'"
+             class="zf-mini-image zf-positioned" :src="page.image" alt="Page illustration"
+             :style="readerFreeImageStyle(page)" />
+      </article>
+      <div class="zf-pager zf-no-print">
+        <button class="zf-btn" style="border-color:var(--zf-border);" :disabled="currentIndex === 0" @click="prev">&larr; Previous</button>
+        <span class="zf-muted">Page {{ currentIndex + 1 }} of {{ total }}</span>
+        <button class="zf-btn" style="border-color:var(--zf-border);" :disabled="currentIndex >= total - 1" @click="next">Next &rarr;</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="zine-editor-template">
+    <div class="zf-editor">
+      <aside>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-model">Zine model</label>
+          <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="onModelChange">
+            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-theme">Theme</label>
+          <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="onThemeChange">
+            <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
+          <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
+                 :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>
+          <input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01"
+                 :value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />
+          <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can't reach. Content outside this area may be clipped.</div>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-title">Zine title</label>
+          <input id="zf-zine-title" class="zf-input" v-model="store.title" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-author">Author</label>
+          <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+        </div>
+        <div class="zf-muted" style="margin-bottom:0.5rem;">
+          {{ store.pages.length }} page<span v-if="store.pages.length !== 1">s</span> filled
+          <span v-if="activeModel"> &middot; this model uses {{ activeModel.pagesPerSheet }} per sheet
+            <span v-if="store.pagesNeeded() > store.pages.length"> (add {{ store.pagesNeeded() - store.pages.length }} more to fill a sheet)</span>
+          </span>
+        </div>
+        <div class="zf-fill-hint" v-if="needsToFill > 0">
+          This sheet needs <strong>{{ needsToFill }}</strong> more page<span v-if="needsToFill !== 1">s</span> before it will print as a complete zine.
+        </div>
+        <div class="zf-fill-hint complete" v-else>
+          This zine has enough pages for {{ Math.ceil(store.pages.length / activeModel.pagesPerSheet) || 1 }} printed sheet<span v-if="(Math.ceil(store.pages.length / activeModel.pagesPerSheet) || 1) !== 1">s</span>.
+        </div>
+        <div class="zf-label" style="margin-top:0.75rem;">Pages</div>
+        <ul class="zf-page-list">
+          <li v-for="(p, i) in store.pages" :key="p.id"
+              :class="[{ active: p.id === store.activePageId, 'zf-draggable': true }, dragClass(i)]"
+              draggable="true"
+              @click="selectPage(p.id)"
+              @dragstart="onDragStart($event, i)"
+              @dragover="onDragOver($event, i)"
+              @dragleave="onDragLeave($event, i)"
+              @drop="onDrop($event, i)"
+              @dragend="onDragEnd">
+            <span style="display:flex;align-items:center;gap:0.25rem;min-width:0;">
+              <span class="zf-page-grip" aria-hidden="true" title="Drag to reorder">&#x2261;</span>
+              <span class="zf-page-num" :class="{ cover: i === 0, back: i === store.pages.length - 1 && store.pages.length > 1 }">{{ i + 1 }}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageLabel(p, i) }}<span class="zf-mini" v-if="p.image"> (img)</span></span>
+            </span>
+            <span class="zf-page-tools">
+              <button class="zf-icon-btn" @click.stop="store.movePage(p.id, -1)">&uarr;</button>
+              <button class="zf-icon-btn" @click.stop="store.movePage(p.id, 1)">&darr;</button>
+              <button class="zf-icon-btn" @click.stop="store.duplicatePage(p.id)">+</button>
+              <button class="zf-icon-btn" @click.stop="store.deletePage(p.id)">&times;</button>
+            </span>
+          </li>
+        </ul>
+        <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
+          <button class="zf-btn zf-btn-primary" @click="store.addPage()">Add page</button>
+          <button class="zf-btn" style="border-color:var(--zf-border);" @click="fillAllWithLorem" title="Fill every page with sample text">Fill all with lorem</button>
+          <button class="zf-btn" style="border-color:var(--zf-border);" @click="clearAllText" title="Clear all page body text">Clear all</button>
+        </div>
+        <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
+          <button class="zf-btn" style="border-color:var(--zf-border);" @click="exportJson" title="Download this zine as a JSON file">Export .json</button>
+          <label class="zf-btn" style="border-color:var(--zf-border);cursor:pointer;" title="Load a previously exported .zine.json file">
+            Import .json
+            <input type="file" accept=".json,application/json" style="display:none;" @change="onImportFile" :key="'imp-' + fileInputKey" />
+          </label>
+        </div>
+      </aside>
+
+      <div>
+        <div class="zf-canvas-wrap">
+          <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)">
+            <template v-for="g in safeGuides" :key="g.key">
+              <div class="zf-mini-safe-guide" :style="g.style"></div>
+            </template>
+            <input class="zf-mini-heading" v-model="active.heading" placeholder="Page heading" maxlength="80" />
+            <template v-for="img in (active.images || [])" :key="'blk-' + img.id">
+              <img v-if="img.wrap === 'block'"
+                   class="zf-mini-image zf-block-image"
+                   :src="img.src" alt="Page illustration"
+                   :style="imageBlockStyle(img)" />
+            </template>
+            <div class="zf-mini-body zf-editable"
+                 ref="bodyEditor"
+                 :key="active.id"
+                 contenteditable="true"
+                 @input="onBodyInput"
+                 @paste="onBodyPaste"
+                 data-placeholder="Write your zine page here..."></div>
+
+            <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
+              <div class="zf-textbox"
+                   :class="{ 'zf-textbox-selected': active.activeTextBoxId === box.id }"
+                   :data-zf-text-id="box.id"
+                   :style="textStyle(box)"
+                   @mousedown="onTextBoxMouseDown($event, box)"
+                   @click.stop="selectTextBox(box)">
+                <div class="zf-textbox-content"
+                     :data-zf-text-content-id="box.id"
+                     contenteditable="true"
+                     @input="onTextBoxInput($event, box)"
+                     @mousedown.stop></div>
+                <span class="zf-img-handle zf-img-handle-resize"
+                      title="Drag to resize"
+                      @mousedown.stop.prevent="onTextBoxResizeStart($event, box)"></span>
+                <span class="zf-img-handle zf-img-handle-rotate"
+                      title="Drag to rotate"
+                      @mousedown.stop.prevent="onTextBoxRotateStart($event, box)"></span>
+              </div>
+            </template>
+
+            <template v-for="img in (active.images || [])" :key="'ovl-' + img.id">
+              <div v-if="img.wrap === 'free' || !img.wrap"
+                   class="zf-img-wrap"
+                   :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id }"
+                   :style="imageStyle(img)"
+                   @mousedown="onImageMouseDownItem($event, img)"
+                   @click.stop="selectImage(img)">
+                <img :src="img.src" alt="Page illustration" />
+                <span class="zf-img-handle zf-img-handle-resize"
+                      title="Drag to resize"
+                      @mousedown.stop.prevent="onResizeStart($event, img)"></span>
+                <span class="zf-img-handle zf-img-handle-rotate"
+                      title="Drag to rotate"
+                      @mousedown.stop.prevent="onRotateStart($event, img)"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="zf-budget" :class="budgetClass" v-if="budget">
+          <div class="zf-budget-row">
+            <span class="zf-budget-num">{{ wordCount }} / {{ budget.words }} words</span>
+            <span class="zf-budget-num">{{ lineCount }} / {{ budget.lines }} lines</span>
+            <span class="zf-budget-num">{{ charCount }} / {{ budget.chars }} chars</span>
+          </div>
+          <div class="zf-budget-bar" :class="barClass" style="margin-top:0.35rem;">
+            <div :style="{ width: barWidth }"></div>
+          </div>
+          <div v-if="worstPct >= 100" style="margin-top:0.25rem;">
+            This page is over the space budget for a {{ activeModel.page.width }}x{{ activeModel.page.height }} {{ activeModel.page.unit }} mini-page. Trim text or split across pages.
+          </div>
+          <div v-else-if="worstPct >= 85" style="margin-top:0.25rem;">
+            Getting close to the space limit for this mini-page.
+          </div>
+        </div>
+
+        <div class="zf-format-toolbar" style="margin-top:0.5rem;">
+          <button type="button" class="zf-icon-btn" title="Bold (Ctrl+B)" @mousedown.prevent @click="execCmd('bold')"><strong>B</strong></button>
+          <button type="button" class="zf-icon-btn" title="Italic (Ctrl+I)" @mousedown.prevent @click="execCmd('italic')"><em>I</em></button>
+          <button type="button" class="zf-icon-btn" title="Underline (Ctrl+U)" @mousedown.prevent @click="execCmd('underline')"><u>U</u></button>
+          <button type="button" class="zf-icon-btn" title="Strikethrough" @mousedown.prevent @click="execCmd('strikeThrough')"><s>S</s></button>
+          <button type="button" class="zf-icon-btn" title="Clear formatting" @mousedown.prevent @click="clearFormat" style="width:auto;padding:0 0.5rem;font-size:0.75rem;">Clear</button>
+        </div>
+
+        <div class="zf-inline-tools" style="margin-top:0.5rem;">
+          <label class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);cursor:pointer;">
+            Add image
+            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
+          </label>
+          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" v-if="activeImage" @click="clearImage">Remove image</button>
+          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" @click="addTextBox">Add text box</button>
+          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" v-if="activeTextBox" @click="onTextBoxDelete(activeTextBox)">Remove text box</button>
+          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" @click="fillWithLorem" title="Fill this page with sample text sized to fit the budget">Fill with lorem</button>
+        </div>
+
+        <div v-if="activeImage && !activeTextBox" class="zf-image-controls">
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">
+              Image selected
+            </label>
+            <span class="zf-muted" style="font-size:0.8rem;">Click an image on the page to select it, or use Add image to add another.</span>
+          </div>
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Width ({{ (activeImage.w || 1.5).toFixed(2) }} in)</label>
+            <input type="range" min="0.5" max="8" step="0.05"
+                   :value="activeImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" />
+          </div>
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Rotation ({{ activeImage.rot || 0 }}&deg;)</label>
+            <input type="range" min="-180" max="180" step="1"
+                   :value="activeImage.rot || 0" @input="setImageRot($event.target.value)" style="flex:1;" />
+          </div>
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Layout</label>
+            <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'flow') ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'flow') ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('flow')">Text flows around</button>
+            <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'free' || !activeImage.wrap) ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'free' || !activeImage.wrap) ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('free')">Text behind image</button>
+            <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'block') ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'block') ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('block')">Above text</button>
+          </div>
+          <div class="zf-image-control-row">
+            <button class="zf-btn" style="border-color:var(--zf-border);" @click="fitImage">Fit width</button>
+            <button class="zf-btn" style="border-color:var(--zf-border);" @click="resetImage">Reset</button>
+            <span class="zf-muted" style="font-size:0.8rem;" v-if="activeImage.wrap === 'flow'">Drag the image to move it. Text reflows around it as you drag.</span>
+            <span class="zf-muted" style="font-size:0.8rem;" v-else-if="activeImage.wrap === 'free' || !activeImage.wrap">Drag the image. Text sits underneath it.</span>
+            <span class="zf-muted" style="font-size:0.8rem;" v-else>Sits above the body text.</span>
+          </div>
+        </div>
+
+        <div v-if="activeTextBox" class="zf-image-controls">
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Text box selected</label>
+            <span class="zf-muted" style="font-size:0.8rem;">Click the box to edit, or drag it to move. Use the handles to resize/rotate.</span>
+          </div>
+
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Width ({{ (activeTextBox.w || 1.8).toFixed(2) }} in)</label>
+            <input type="range" min="0.4" max="8" step="0.05"
+                   :value="activeTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;" />
+          </div>
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Rotation ({{ activeTextBox.rot || 0 }}&deg;)</label>
+            <input type="range" min="-180" max="180" step="1"
+                   :value="activeTextBox.rot || 0" @input="setTextBoxRot($event.target.value)" style="flex:1;" />
+          </div>
+          <div class="zf-image-control-row">
+            <label class="zf-image-control-label">Font size ({{ (activeTextBox.fontSize || 1.0).toFixed(2) }}x)</label>
+            <input type="range" min="0.5" max="3" step="0.05"
+                   :value="activeTextBox.fontSize || 1.0" @input="setTextBoxFontSize($event.target.value)" style="flex:1;" />
+          </div>
+          <div class="zf-image-control-row">
+            <button class="zf-btn" style="border-color:var(--zf-border);" @click="resetTextBox">Reset</button>
+            <span class="zf-muted" style="font-size:0.8rem;">If the box looks reversed or off, click Reset to restore defaults.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // Logs to the console always. Adds a small debug panel to the page
+    // only when the URL hash includes #zfdebug, so it never ships visible.
+    function zfLog(msg) {
+      try { console.log('[ZF]', msg); } catch (e) {}
+      try {
+        if (location.hash.indexOf('zfdebug') === -1) return;
+        var wrap = document.getElementById('zf-boot-wrap');
+        if (!wrap) {
+          wrap = document.createElement('div');
+          wrap.id = 'zf-boot-wrap';
+          wrap.style.cssText = 'position:fixed;top:4px;right:4px;z-index:99999;font:11px monospace;';
+          var toggle = document.createElement('button');
+          toggle.textContent = 'ZF log';
+          toggle.style.cssText = 'background:#1b1b1b;color:#ffbe2e;border:1px solid #ffbe2e;border-radius:3px;padding:2px 6px;font:11px monospace;cursor:pointer;';
+          var panel = document.createElement('div');
+          panel.id = 'zf-boot-banner';
+          panel.style.cssText = 'display:none;margin-top:4px;background:#1b1b1b;color:#ffbe2e;padding:6px 8px;max-width:420px;max-height:220px;overflow:auto;white-space:pre-wrap;border:1px solid #ffbe2e;border-radius:3px;';
+          toggle.addEventListener('click', function () {
+            panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+          });
+          wrap.appendChild(toggle);
+          wrap.appendChild(panel);
+          (document.body || document.documentElement).appendChild(wrap);
+        }
+        var banner = document.getElementById('zf-boot-banner');
+        if (banner) {
+          banner.textContent += msg + '\n';
+          banner.scrollTop = banner.scrollHeight;
+        }
+      } catch (e) {}
+    }
+    window.onerror = function (msg, src, line, col, err) {
+      zfLog('ERROR: ' + msg + ' @ ' + src + ':' + line + ':' + col);
+    };
+    window.addEventListener('unhandledrejection', function (e) {
+      zfLog('REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+    });
+
+    // ---- store ----
+    var STORAGE_KEY = 'zine-forge-draft-v1';
+    function zfEmptyPage() {
+      return {
+        id: 'p' + Math.random().toString(36).slice(2, 9),
+        heading: '',
+        body: '',
+        images: [],
+        textBoxes: []
+      };
+    }
+    // -------- Image dimension cache --------
+    // Cache natural sizes keyed by data URL so we don't decode repeatedly.
+    var ZF_IMG_CACHE = {};
+    function zfGetImageSize(src, cb) {
+      if (!src) { cb({ w: 1, h: 1 }); return; }
+      if (ZF_IMG_CACHE[src]) { cb(ZF_IMG_CACHE[src]); return; }
+      var img = new Image();
+      img.onload = function () {
+        var size = { w: img.naturalWidth, h: img.naturalHeight };
+        ZF_IMG_CACHE[src] = size;
+        cb(size);
+      };
+      img.onerror = function () { cb({ w: 1, h: 1 }); };
+      img.src = src;
+    }
+
+    // Inject a flow-mode spacer + image into a body-like container.
+    // container: the element (usually the body div)
+    // page: the page record
+    // pxPerIn: screen pixels per physical inch
+    // bodyWIn, bodyHIn: the body box dimensions in inches
+    // zfInjectMergedFlow takes an ARRAY of flow-mode img objects and injects
+    // a SINGLE spacer with a multi-notched shape-outside polygon that text
+    // flows around. Also injects each image (positioned absolutely) so the
+    // visible picture sits inside the empty region of the polygon.
+    // This replaces the old per-image zfInjectFlow approach which could not
+    // handle multiple flow images (floats stack instead of merging).
+    function zfInjectMergedFlow(container, imgs, pxPerIn, bodyWIn, bodyHIn, opts) {
+      if (!container || !imgs || !imgs.length) return;
+      opts = opts || {};
+      // Strip all previous flow injections (spacers, wraps, imgs).
+      var old = container.querySelectorAll(
+        '[data-zf-spacer="1"], [data-zf-flow-img="1"], [data-zf-flow-wrap="1"]'
+      );
+      for (var i = 0; i < old.length; i++) old[i].remove();
+
+      // Build a list of rectangles (in inches) for each visible image, and
+      // also the pixel size needed for rendering each img.
+      var rects = [];   // { id, xL, yT, xR, yB, side, img, imgW, imgH, rot }
+      var pending = imgs.length;
+      if (!pending) return;
+
+      for (var k = 0; k < imgs.length; k++) {
+        (function (img) {
+          zfGetImageSize(img.src, function (size) {
+            var aspect = (size.w && size.h) ? (size.w / size.h) : 1.33;
+            var w = (typeof img.w === 'number') ? img.w : 1.5;
+            var h = w / aspect;
+            var rot = (typeof img.rot === 'number') ? img.rot : 0;
+            var xIn = (typeof img.x === 'number') ? img.x : 0;
+            var yIn = (typeof img.y === 'number') ? img.y : 0;
+            var rad = rot * Math.PI / 180;
+            var cosA = Math.abs(Math.cos(rad));
+            var sinA = Math.abs(Math.sin(rad));
+            var bbW = w * cosA + h * sinA;
+            var bbH = w * sinA + h * cosA;
+            var cx = xIn + w / 2;
+            var cy = yIn + h / 2;
+            var bbX = Math.max(0, cx - bbW / 2);
+            var bbY = Math.max(0, cy - bbH / 2);
+            var bbRight = Math.min(bodyWIn, bbX + bbW);
+            var bbBottom = Math.min(bodyHIn, bbY + bbH);
+            var side = (cx < bodyWIn / 2) ? 'left' : 'right';
+            rects.push({
+              id: img.id || ('anon-' + Math.random().toString(36).slice(2, 6)),
+              img: img,
+              xL: bbX / bodyWIn,
+              xR: bbRight / bodyWIn,
+              yT: Math.max(0, bbY / bodyHIn),
+              yB: Math.min(1, bbBottom / bodyHIn),
+              side: side,
+              imgW: w,
+              imgH: h,
+              rot: rot,
+              xIn: xIn,
+              yIn: yIn
+            });
+            pending--;
+            if (pending === 0) {
+              finalizeMergedFlow(container, rects, pxPerIn, opts);
+            }
+          });
+        })(imgs[k]);
+      }
+    }
+
+    function finalizeMergedFlow(container, rects, pxPerIn, opts) {
+      if (!rects.length) return;
+      // Sort by yT for stable polygon tracing.
+      rects.sort(function (a, b) { return a.yT - b.yT; });
+
+      // For the shape-outside polygon we need to trace a boundary that
+      // excludes every rectangle. Simplification: assign each rect to a side
+      // based on its center x. Then trace:
+      //   For all-left rects, notch in from the left edge.
+      //   For all-right rects, notch in from the right edge.
+      // Mixed rects are supported by tracing a staircase on both edges.
+      var leftRects = [];
+      var rightRects = [];
+      for (var i = 0; i < rects.length; i++) {
+        if (rects[i].side === 'left') leftRects.push(rects[i]);
+        else rightRects.push(rects[i]);
+      }
+      // Enforce at most one notch per side (same-side rects would produce a
+      // self-intersecting polygon, which browsers silently reject). Keep the
+      // rect closer to its own edge and drop the rest.
+      leftRects.sort(function (a, b) { return a.xL - b.xL; });   // closest to left first
+      rightRects.sort(function (a, b) { return b.xR - a.xR; });  // closest to right first
+      if (leftRects.length > 1) leftRects = [leftRects[0]];
+      if (rightRects.length > 1) rightRects = [rightRects[0]];
+      leftRects.sort(function (a, b) { return a.yT - b.yT; });
+      rightRects.sort(function (a, b) { return a.yT - b.yT; });
+
+      // Safety clamp: if a single notch would occupy more than 70% of the
+      // body width, shrink it so text always has at least 30% of the width
+      // to flow. This prevents "text completely disappears" when the image
+      // is large or centered.
+      function clampNotchLeft(rect) {
+        var minX = 0.3; // right edge of notch must leave at least 30% width
+        if (rect.xR > 1 - minX) rect.xR = 1 - minX;
+      }
+      function clampNotchRight(rect) {
+        var minX = 0.3;
+        if (rect.xL < minX) rect.xL = minX;
+      }
+      for (var ci = 0; ci < leftRects.length; ci++) clampNotchLeft(leftRects[ci]);
+      for (var cj = 0; cj < rightRects.length; cj++) clampNotchRight(rightRects[cj]);
+
+      // Build polygon: start top-left, go clockwise around the bounding box,
+      // but jog inward on the left edge for left-side notches and inward on
+      // the right edge for right-side notches. Since at most one notch per
+      // side, this is a simple 6- to 8-vertex polygon.
+      var pts = [];
+      pts.push('0% 0%');
+      pts.push('100% 0%');
+      // Right edge, top to bottom, with at most one notch
+      if (rightRects.length) {
+        var rr = rightRects[0];
+        pts.push(pct(1) + '% ' + pct(rr.yT) + '%');
+        pts.push(pct(rr.xL) + '% ' + pct(rr.yT) + '%');
+        pts.push(pct(rr.xL) + '% ' + pct(rr.yB) + '%');
+        pts.push(pct(1) + '% ' + pct(rr.yB) + '%');
+      }
+      pts.push(pct(1) + '% ' + pct(1) + '%');
+      pts.push('0% 100%');
+      // Left edge, bottom to top, with at most one notch
+      if (leftRects.length) {
+        var lr = leftRects[0];
+        pts.push('0% ' + pct(lr.yB) + '%');
+        pts.push(pct(lr.xR) + '% ' + pct(lr.yB) + '%');
+        pts.push(pct(lr.xR) + '% ' + pct(lr.yT) + '%');
+        pts.push('0% ' + pct(lr.yT) + '%');
+      }
+
+      function pct(x) {
+        if (x < 0) x = 0;
+        if (x > 1) x = 1;
+        return (x * 100).toFixed(3);
+      }
+
+      // Deduplicate consecutive identical points.
+      var cleaned = [];
+      for (var p = 0; p < pts.length; p++) {
+        if (p === 0 || pts[p] !== pts[p - 1]) cleaned.push(pts[p]);
+      }
+      if (cleaned.length < 3) return;
+
+      var spacer = document.createElement('div');
+      spacer.setAttribute('data-zf-spacer', '1');
+      spacer.style.cssText =
+        'float: left;width: 100%;height: 100%;' +
+        'shape-outside: polygon(' + cleaned.join(', ') + ');' +
+        'pointer-events: none;';
+      container.insertBefore(spacer, container.firstChild);
+
+      // Now draw each image as an absolutely positioned wrapper.
+      for (var im = 0; im < rects.length; im++) {
+        var rect = rects[im];
+        var img2 = rect.img;
+        var thisId = rect.id;
+        var wrapEl = document.createElement('div');
+        wrapEl.setAttribute('data-zf-flow-wrap', '1');
+        wrapEl.setAttribute('data-zf-img-id', thisId);
+        wrapEl.className = 'zf-img-wrap';
+        if (opts.selectedId && opts.selectedId === thisId) {
+          wrapEl.className += ' zf-img-selected';
+        }
+        wrapEl.style.cssText =
+          'position: absolute;' +
+          'left: ' + (rect.xIn * pxPerIn) + 'px;' +
+          'top: ' + (rect.yIn * pxPerIn) + 'px;' +
+          'width: ' + (rect.imgW * pxPerIn) + 'px;' +
+          'height: auto;' +
+          'transform: rotate(' + rect.rot + 'deg);' +
+          'transform-origin: center center;' +
+          'z-index: 2;';
+        var imgEl = document.createElement('img');
+        imgEl.setAttribute('data-zf-flow-img', '1');
+        imgEl.setAttribute('data-zf-img-id', thisId);
+        imgEl.setAttribute('src', img2.src);
+        imgEl.setAttribute('alt', 'Page illustration');
+        imgEl.className = 'zf-mini-image zf-flow-image';
+        imgEl.style.cssText = 'display:block;width:100%;height:auto;' +
+          (opts.draggable ? 'cursor: grab;' : 'pointer-events: none;');
+        wrapEl.appendChild(imgEl);
+
+        // Dragging: delegate to the editor's drag system so onImageMouseMove
+        // updates img.x / img.y and the shape-outside follows.
+        if (opts.draggable && opts.onDragStart) {
+          imgEl.addEventListener('mousedown', (function (timg) {
+            return function (evt) {
+              evt.stopPropagation();
+              opts.onDragStart(evt, timg);
+            };
+          })(img2));
+        }
+
+        if (opts.draggable) {
+          var handleR = document.createElement('span');
+          handleR.className = 'zf-img-handle zf-img-handle-resize';
+          handleR.title = 'Drag to resize';
+          handleR.addEventListener('mousedown', (function (timg) {
+            return function (evt) {
+              evt.stopPropagation();
+              evt.preventDefault();
+              if (opts.onResize) opts.onResize(evt, timg);
+            };
+          })(img2));
+          wrapEl.appendChild(handleR);
+          var handleRot = document.createElement('span');
+          handleRot.className = 'zf-img-handle zf-img-handle-rotate';
+          handleRot.title = 'Drag to rotate';
+          handleRot.addEventListener('mousedown', (function (timg) {
+            return function (evt) {
+              evt.stopPropagation();
+              evt.preventDefault();
+              if (opts.onRotate) opts.onRotate(evt, timg);
+            };
+          })(img2));
+          wrapEl.appendChild(handleRot);
+
+          if (opts.onSelect) {
+            wrapEl.addEventListener('click', (function (timg) {
+              return function (evt) {
+                evt.stopPropagation();
+                opts.onSelect(timg);
+              };
+            })(img2));
+          }
+        }
+
+        container.appendChild(wrapEl);
+      }
+    }
+
+    // Legacy: single-image injector. Kept for callers that haven't been
+    // migrated to the merged flow yet.
+    function zfInjectFlow(container, img, pxPerIn, bodyWIn, bodyHIn, opts) {
+      if (!container || !img || !img.src) return;
+      if (img.wrap && img.wrap !== 'flow') return;
+      opts = opts || {};
+      var thisId = img.id || 'anon';
+      // Remove ONLY our previous injections for THIS image; leave others alone.
+        var old = container.querySelectorAll(
+          '[data-zf-spacer="1"][data-zf-img-id="' + thisId + '"], ' +
+          '[data-zf-flow-img="1"][data-zf-img-id="' + thisId + '"], ' +
+          '[data-zf-flow-wrap="1"][data-zf-img-id="' + thisId + '"]'
+        );
+        for (var i = 0; i < old.length; i++) old[i].remove();
+
+      zfGetImageSize(img.src, function (size) {
+        var aspect = (size.w && size.h) ? (size.w / size.h) : 1.33;
+        var w = (typeof img.w === 'number') ? img.w : 1.5;
+        var imgW = w;
+        var imgH = w / aspect;
+        var rot = (typeof img.rot === 'number') ? img.rot : 0;
+        var xIn = (typeof img.x === 'number') ? img.x : 0;
+        var yIn = (typeof img.y === 'number') ? img.y : 0;
+        var rad = rot * Math.PI / 180;
+        var cosA = Math.abs(Math.cos(rad));
+        var sinA = Math.abs(Math.sin(rad));
+        var bbW = imgW * cosA + imgH * sinA;
+        var bbH = imgW * sinA + imgH * cosA;
+        var cx = xIn + imgW / 2;
+        var cy = yIn + imgH / 2;
+        var bbX = Math.max(0, cx - bbW / 2);
+        var bbY = Math.max(0, cy - bbH / 2);
+        var bbRight = Math.min(bodyWIn, bbX + bbW);
+        var bbBottom = Math.min(bodyHIn, bbY + bbH);
+
+        var xL = Math.max(0, (bbX / bodyWIn) * 100);
+        var xR = Math.min(100, (bbRight / bodyWIn) * 100);
+        var yT = Math.max(0, (bbY / bodyHIn) * 100);
+        var yB = Math.min(100, (bbBottom / bodyHIn) * 100);
+        if (xR <= xL) xR = xL + 1;
+        if (yB <= yT) yB = yT + 1;
+
+        var onRight = cx >= bodyWIn / 2;
+        var pts;
+        if (onRight) {
+          pts = [
+            xL.toFixed(2) + '% ' + yT.toFixed(2) + '%',
+            '100% ' + yT.toFixed(2) + '%',
+            '100% ' + yB.toFixed(2) + '%',
+            xL.toFixed(2) + '% ' + yB.toFixed(2) + '%'
+          ];
+        } else {
+          pts = [
+            '0% ' + yT.toFixed(2) + '%',
+            xR.toFixed(2) + '% ' + yT.toFixed(2) + '%',
+            xR.toFixed(2) + '% ' + yB.toFixed(2) + '%',
+            '0% ' + yB.toFixed(2) + '%'
+          ];
+        }
+
+        var spacer = document.createElement('div');
+        spacer.setAttribute('data-zf-spacer', '1');
+        spacer.setAttribute('data-zf-img-id', thisId);
+        spacer.style.cssText =
+          'float: left;width: 100%;height: 100%;' +
+          'shape-outside: polygon(' + pts.join(', ') + ');' +
+          'pointer-events: none;';
+        container.insertBefore(spacer, container.firstChild);
+
+        // Wrap the flow image so we can attach resize/rotate handles in the
+        // same way the free-mode images have them.
+        var wrapEl = document.createElement('div');
+        wrapEl.setAttribute('data-zf-flow-wrap', '1');
+        wrapEl.setAttribute('data-zf-img-id', thisId);
+        wrapEl.className = 'zf-img-wrap';
+        if (opts.selectedId && opts.selectedId === thisId) {
+          wrapEl.className += ' zf-img-selected';
+        }
+        wrapEl.style.cssText =
+          'position: absolute;' +
+          'left: ' + (xIn * pxPerIn) + 'px;' +
+          'top: ' + (yIn * pxPerIn) + 'px;' +
+          'width: ' + (imgW * pxPerIn) + 'px;' +
+          'height: auto;' +
+          'transform: rotate(' + rot + 'deg);' +
+          'transform-origin: center center;' +
+          'z-index: 2;';
+        var imgEl = document.createElement('img');
+        imgEl.setAttribute('data-zf-flow-img', '1');
+        imgEl.setAttribute('data-zf-img-id', thisId);
+        imgEl.setAttribute('src', img.src);
+        imgEl.setAttribute('alt', 'Page illustration');
+        imgEl.className = 'zf-mini-image zf-flow-image';
+        imgEl.style.cssText = 'display:block;width:100%;height:auto;' +
+          (opts.draggable ? 'cursor: grab;' : '');
+        wrapEl.appendChild(imgEl);
+
+        // Handles for the editor only.
+        if (opts.draggable) {
+          var handleR = document.createElement('span');
+          handleR.className = 'zf-img-handle zf-img-handle-resize';
+          handleR.title = 'Drag to resize';
+          handleR.addEventListener('mousedown', function (evt) {
+            evt.stopPropagation();
+            evt.preventDefault();
+            if (opts.onResize) opts.onResize(evt, img);
+          });
+          wrapEl.appendChild(handleR);
+          var handleRot = document.createElement('span');
+          handleRot.className = 'zf-img-handle zf-img-handle-rotate';
+          handleRot.title = 'Drag to rotate';
+          handleRot.addEventListener('mousedown', function (evt) {
+            evt.stopPropagation();
+            evt.preventDefault();
+            if (opts.onRotate) opts.onRotate(evt, img);
+          });
+          wrapEl.appendChild(handleRot);
+        }
+
+        container.appendChild(wrapEl);
+
+        // Selection: click selects this image. Only in editor (draggable).
+        if (opts.draggable && opts.onSelect) {
+          wrapEl.addEventListener('click', function (evt) {
+            evt.stopPropagation();
+            opts.onSelect(img);
+          });
+        }
+
+        // Optional drag handler for interactive editor use.
+        if (opts.draggable) {
+          imgEl.addEventListener('mousedown', function (evt) {
+            evt.preventDefault();
+            var startX = evt.clientX;
+            var startY = evt.clientY;
+            var baseX = (typeof img.x === 'number') ? img.x : 0;
+            var baseY = (typeof img.y === 'number') ? img.y : 0;
+            var active = true;
+            function move(e) {
+              if (!active) return;
+              var dx = (e.clientX - startX) / pxPerIn;
+              var dy = (e.clientY - startY) / pxPerIn;
+              var nx = Math.round((baseX + dx) * 100) / 100;
+              var ny = Math.round((baseY + dy) * 100) / 100;
+              img.x = nx;
+              img.y = ny;
+              imgEl.style.left = (nx * pxPerIn) + 'px';
+              imgEl.style.top = (ny * pxPerIn) + 'px';
+              if (opts.onDrag) opts.onDrag(img);
+            }
+            function up() {
+              active = false;
+              window.removeEventListener('mousemove', move);
+              window.removeEventListener('mouseup', up);
+              if (opts.onDrag) opts.onDrag(img);
+            }
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', up);
+          });
+        }
+      });
+    }
+
+    // -------- Rich text helpers --------
+    // Rich text is stored as HTML in page.body. Only a small whitelist of
+    // tags is allowed so pasted content cannot inject scripts or styles.
+    var ZF_ALLOWED_TAGS = { STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, STRIKE: 1, BR: 1, DIV: 1, P: 1 };
+
+    // Sanitize HTML: keep whitelisted tags, strip everything else (attributes,
+    // scripts, styles, unknown tags). Returns safe HTML string.
+    function zfSanitizeHtml(html) {
+      if (!html) return '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      function walk(node) {
+        var children = Array.prototype.slice.call(node.childNodes);
+        for (var i = 0; i < children.length; i++) {
+          var child = children[i];
+          if (child.nodeType === 3) continue; // text
+          if (child.nodeType !== 1) { // comment / other
+            node.removeChild(child);
+            continue;
+          }
+          var tag = child.tagName;
+          if (!ZF_ALLOWED_TAGS[tag]) {
+            // Replace element with its text content
+            var text = document.createTextNode(child.textContent || '');
+            node.replaceChild(text, child);
+            continue;
+          }
+          // Strip all attributes
+          var attrs = Array.prototype.slice.call(child.attributes || []);
+          for (var j = 0; j < attrs.length; j++) {
+            child.removeAttribute(attrs[j].name);
+          }
+          walk(child);
+        }
+      }
+      walk(tmp);
+      return tmp.innerHTML;
+    }
+
+    // Extract plain text from HTML (for word/char counting).
+    function zfHtmlToText(html) {
+      if (!html) return '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || '';
+    }
+
+    // -------- Page migration: single image -> multiple images --------
+    // Older zines stored a single image on page.image (plus imageX, imageY,
+    // imageW, imageRot, imageWrap). Newer zines use page.images = [...] with
+    // each image having its own { id, src, x, y, w, rot, wrap }. Migration
+    // runs at page load; if page.image exists but page.images is empty, we
+    // promote the single image into an array of one.
+    function zfNewImageId() {
+      return 'i-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    }
+
+    function zfMigratePage(page) {
+      if (!page) return page;
+      if (!Array.isArray(page.images)) page.images = [];
+      if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
+      if (page.image && !page.images.length) {
+        page.images.push({
+          id: zfNewImageId(),
+          src: page.image,
+          x: (typeof page.imageX === "number") ? page.imageX : 0,
+          y: (typeof page.imageY === "number") ? page.imageY : 0,
+          w: (typeof page.imageW === "number") ? page.imageW : 1.5,
+          rot: (typeof page.imageRot === "number") ? page.imageRot : 0,
+          wrap: page.imageWrap || 'free'
+        });
+      }
+      return page;
+    }
+
+    function zfNewTextBoxId() {
+      return 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    }
+
+    function zfMigrateAllPages(pages) {
+      if (!Array.isArray(pages)) return pages;
+      for (var i = 0; i < pages.length; i++) zfMigratePage(pages[i]);
+      return pages;
+    }
+
+    // Remove our internal shape-spacer elements before persisting body HTML.
+    function zfStripSpacers(html) {
+      if (!html) return '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      var sp = tmp.querySelectorAll('[data-zf-spacer="1"]');
+      for (var i = 0; i < sp.length; i++) sp[i].remove();
+      return tmp.innerHTML;
+    }
+
+    // -------- Image compression --------
+    // Downscales to at most maxSide px on the longest edge and re-encodes as
+    // JPEG at the given quality. Returns the new data URL synchronously for
+    // already-decoded images; we decode via Image and draw to canvas on load,
+    // which is fast enough for user-uploaded images up to ~8 MB.
+    function zfCompressImage(dataUrl, maxSide, quality) {
+      try {
+        var img = new Image();
+        img.src = dataUrl;
+        // drawImage in a synchronous callback is not possible with a data URL
+        // because decoding still happens on the next tick. We do the work on
+        // a separate canvas via a hidden image and swap in the result
+        // asynchronously using a callback captured by the caller.
+        // However, since we want a sync-feeling flow, we do a best-effort
+        // pass synchronously by reading dimensions from a fresh canvas.
+        var c = document.createElement('canvas');
+        // Fallback: if the image isn't decoded yet, return the original.
+        if (!img.complete || !img.naturalWidth) {
+          // Kick off the async path.
+          zfCompressImageAsync(dataUrl, maxSide, quality, function (out) {
+            // Update whichever page currently has this data URL.
+            for (var i = 0; i < store.pages.length; i++) {
+              if (store.pages[i].image === dataUrl) {
+                store.pages[i].image = out;
+                break;
+              }
+            }
+          });
+          return dataUrl;
+        }
+        return zfCompressImageSync(img, maxSide, quality, c);
+      } catch (e) {
+        console.warn('compress failed', e);
+        return dataUrl;
+      }
+    }
+
+    function zfCompressImageSync(img, maxSide, quality, c) {
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      var nw = Math.max(1, Math.round(w * scale));
+      var nh = Math.max(1, Math.round(h * scale));
+      c.width = nw;
+      c.height = nh;
+      var ctx = c.getContext('2d');
+      // Draw the image as-is (no white fill) so any alpha is preserved in
+      // the source. Whether we keep it depends on whether the source has
+      // any transparent pixels, which we detect below.
+      ctx.clearRect(0, 0, nw, nh);
+      ctx.drawImage(img, 0, 0, nw, nh);
+      // Detect transparency by scanning the pixel data for alpha < 255.
+      // Falls back to false if the canvas is tainted (cross-origin) or
+      // getImageData is unavailable for any reason.
+      var hasAlpha = false;
+      try {
+        var data = ctx.getImageData(0, 0, nw, nh).data;
+        for (var i = 3; i < data.length; i += 4) {
+          if (data[i] < 255) { hasAlpha = true; break; }
+        }
+      } catch (e) {
+        hasAlpha = false;
+      }
+      try {
+        if (hasAlpha) {
+          // PNG preserves transparency. Larger file, but necessary.
+          return c.toDataURL('image/png');
+        }
+        // For opaque images, JPEG is much smaller. Since there's no alpha,
+        // we don't need a white fill; the background is already opaque.
+        return c.toDataURL('image/jpeg', quality);
+      } catch (e) {
+        console.warn('toDataURL failed', e);
+        return img.src;
+      }
+    }
+
+    function zfCompressImageAsync(dataUrl, maxSide, quality, cb) {
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement('canvas');
+        cb(zfCompressImageSync(img, maxSide, quality, c));
+      };
+      img.onerror = function () { cb(dataUrl); };
+      img.src = dataUrl;
+    }
+
+    // -------- Lorem ipsum generator --------
+    var ZF_LOREM_WORDS = ('lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ' +
+      'enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit ' +
+      'voluptate velit esse cillum eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt ' +
+      'mollit anim id est laborum').split(' ');
+
+    // Generate lorem text targeting a word count, then trim to fit char budget.
+    function zfLorem(opts) {
+      opts = opts || {};
+      var targetWords = opts.words || 60;
+      var targetChars = opts.chars || 380;
+      var sentenceCap = opts.sentenceCap || 14;
+      var out = [];
+      var words = [];
+      for (var i = 0; i < targetWords; i++) {
+        words.push(ZF_LOREM_WORDS[Math.floor(Math.random() * ZF_LOREM_WORDS.length)]);
+      }
+      // Capitalize the first word of every "sentence".
+      var start = 0;
+      while (start < words.length) {
+        var end = Math.min(words.length, start + (2 + Math.floor(Math.random() * sentenceCap)));
+        words[start] = words[start].charAt(0).toUpperCase() + words[start].slice(1);
+        var sentence = words.slice(start, end).join(' ') + '.';
+        out.push(sentence);
+        start = end;
+      }
+      var text = out.join(' ');
+      if (text.length > targetChars) {
+        text = text.slice(0, targetChars).replace(/\s+\S*$/, '') + '.';
+      }
+      return text;
+    }
+
+    function zfLoad() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.pages) && parsed.pages.length) return parsed;
+      } catch (e) { zfLog('load failed: ' + e.message); }
+      return null;
+    }
+    var zfSaved = zfLoad();
+    var zfInitial = (zfSaved && zfSaved.pages && zfSaved.pages.length)
+      ? zfMigrateAllPages(zfSaved.pages)
+      : [zfEmptyPage()];
+    zfLog('initial pages=' + zfInitial.length);
+
+    var store = Vue.reactive({
+      title: zfSaved ? zfSaved.title : 'Untitled Zine',
+      author: zfSaved ? zfSaved.author : '',
+      pages: zfInitial,
+      activePageId: zfInitial[0].id,
+      view: 'editor',
+      status: '',
+      modelId: (zfSaved && zfSaved.modelId) ? zfSaved.modelId : 'mini-8',
+      themeId: (zfSaved && zfSaved.themeId) ? zfSaved.themeId : 'classic',
+      currentZineId: (zfSaved && zfSaved.currentZineId) ? zfSaved.currentZineId : null,
+      library: (window.ZFLibrary) ? window.ZFLibrary.list() : [],
+      marginIn: (zfSaved && typeof zfSaved.marginIn === "number") ? zfSaved.marginIn : 0.1,
+      printerSafetyIn: (zfSaved && typeof zfSaved.printerSafetyIn === "number") ? zfSaved.printerSafetyIn : 0.2,
+
+      activePage: function () {
+        var id = this.activePageId;
+        var found = this.pages.find(function (p) { return p.id === id; });
+        return found || this.pages[0];
+      },
+      addPage: function () { var p = zfEmptyPage(); this.pages.push(p); this.activePageId = p.id; },
+      duplicatePage: function (id) {
+        var idx = this.pages.findIndex(function (p) { return p.id === id; });
+        if (idx < 0) return;
+        var s = this.pages[idx];
+        var c = { id: 'p' + Math.random().toString(36).slice(2, 9), heading: s.heading, body: s.body, image: s.image };
+        this.pages.splice(idx + 1, 0, c);
+        this.activePageId = c.id;
+      },
+      deletePage: function (id) {
+        if (this.pages.length <= 1) return;
+        var idx = this.pages.findIndex(function (p) { return p.id === id; });
+        if (idx < 0) return;
+        this.pages.splice(idx, 1);
+        this.activePageId = this.pages[Math.min(idx, this.pages.length - 1)].id;
+      },
+      movePage: function (id, dir) {
+        var idx = this.pages.findIndex(function (p) { return p.id === id; });
+        if (idx < 0) return;
+        var t = idx + dir;
+        if (t < 0 || t >= this.pages.length) return;
+        var it = this.pages.splice(idx, 1)[0];
+        this.pages.splice(t, 0, it);
+      },
+      newZine: function () {
+        if (this.currentZineId && this.saveToLibrary) this.saveToLibrary();
+        this.currentZineId = window.ZFLibrary ? window.ZFLibrary.newId() : null;
+        this.title = 'Untitled Zine'; this.author = ''; this.pages = [zfEmptyPage()];
+        this.activePageId = this.pages[0].id; this.view = 'editor';
+        if (window.ZFLibrary) this.library = window.ZFLibrary.list();
+      },
+      setView: function (v) { this.view = v; },
+
+      saveDraft: function () {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            title: this.title,
+            author: this.author,
+            pages: this.pages,
+            modelId: this.modelId,
+            themeId: this.themeId,
+            currentZineId: this.currentZineId,
+            marginIn: this.marginIn,
+            printerSafetyIn: this.printerSafetyIn
+          }));
+        } catch (e) {
+          console.warn("saveDraft failed", e);
+        }
+      },
+
+      setMargin: function (v) {
+        var n = Number(v);
+        if (isNaN(n)) return;
+        if (n < 0.04) n = 0.04;
+        if (n > 0.35) n = 0.35;
+        this.marginIn = Math.round(n * 100) / 100;
+      },
+
+      setPrinterSafety: function (v) {
+        var n = Number(v);
+        if (isNaN(n)) return;
+        if (n < 0) n = 0;
+        if (n > 0.5) n = 0.5;
+        this.printerSafetyIn = Math.round(n * 100) / 100;
+      },
+
+      saveToLibrary: function () {
+        if (!window.ZFLibrary) return false;
+        if (!this.currentZineId) this.currentZineId = window.ZFLibrary.newId();
+        var ok = window.ZFLibrary.upsert({
+          id: this.currentZineId,
+          title: this.title,
+          author: this.author,
+          themeId: this.themeId,
+          modelId: this.modelId,
+          marginIn: this.marginIn,
+          pages: this.pages,
+          updatedAt: Date.now()
+        });
+        if (ok) this.library = window.ZFLibrary.list();
+        return ok;
+      },
+
+      loadFromLibrary: function (id) {
+        if (!window.ZFLibrary) return;
+        var rec = window.ZFLibrary.get(id);
+        if (!rec) return;
+        this.currentZineId = rec.id;
+        this.title = rec.title;
+        this.author = rec.author;
+        this.themeId = rec.themeId || 'classic';
+        this.modelId = rec.modelId || 'mini-8';
+        this.marginIn = (typeof rec.marginIn === 'number') ? rec.marginIn : 0.1;
+        this.pages = (rec.pages || []).map(function (p, i) {
+          return {
+            id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
+            heading: p.heading || '',
+            body: p.body || '',
+            image: p.image || ''
+          };
+        });
+        if (!this.pages.length) this.pages = [zfEmptyPage()];
+        this.activePageId = this.pages[0].id;
+        this.view = 'editor';
+        this.status = 'Opened: ' + rec.title;
+        var self = this;
+        setTimeout(function () {
+          if (self.status.indexOf('Opened: ') === 0) self.status = '';
+        }, 2000);
+      },
+
+      duplicateInLibrary: function (id) {
+        if (!window.ZFLibrary) return;
+        var copy = window.ZFLibrary.duplicate(id);
+        if (copy) {
+          this.library = window.ZFLibrary.list();
+          this.status = 'Duplicated.';
+          var self = this;
+          setTimeout(function () {
+            if (self.status === 'Duplicated.') self.status = '';
+          }, 2000);
+        }
+      },
+
+      deleteFromLibrary: function (id) {
+        if (!window.ZFLibrary) return;
+        var rec = window.ZFLibrary.get(id);
+        if (!rec) return;
+        if (!confirm('Delete "' + rec.title + '" from your library? This cannot be undone.')) return;
+        window.ZFLibrary.remove(id);
+        this.library = window.ZFLibrary.list();
+        if (this.currentZineId === id) this.currentZineId = null;
+      },
+
+      model: function () {
+        if (!window.ZFModels) return null;
+        return window.ZFModels.getModel(this.modelId);
+      },
+
+      theme: function () {
+        if (!window.ZFThemes) return null;
+        return window.ZFThemes.getTheme(this.themeId);
+      },
+
+      setTheme: function (id) {
+        if (!window.ZFThemes) return;
+        this.themeId = id;
+        var t = window.ZFThemes.getTheme(id);
+        this.status = 'Theme set to: ' + t.label;
+        var self = this;
+        setTimeout(function () {
+          if (self.status.indexOf('Theme set to:') === 0) self.status = '';
+        }, 2500);
+      },
+
+      setModel: function (id) {
+        if (!window.ZFModels) return;
+        this.modelId = id;
+        this.status = 'Zine model set to: ' + window.ZFModels.getModel(id).label;
+        var self = this;
+        setTimeout(function () {
+          if (self.status.indexOf('Zine model set to:') === 0) self.status = '';
+        }, 2500);
+      },
+
+      minimumPages: function () {
+        var m = this.model();
+        return m ? m.pagesPerSheet : 1;
+      },
+
+      pagesNeeded: function () {
+        var m = this.model();
+        if (!m) return 0;
+        var have = this.pages.length;
+        var need = m.pagesPerSheet;
+        var sheets = Math.max(1, Math.ceil(have / need));
+        return sheets * need;
+      }
+    });
+
+    var AppShell = {
+      data: function () { return { store: store, tick: 0 }; },
+      computed: {
+        canUndo: function () {
+          // Tie to the reactive tick so this recomputes when history changes.
+          var _ = this.tick;
+          return window.ZFCanUndo ? window.ZFCanUndo() : false;
+        },
+        canRedo: function () {
+          var _ = this.tick;
+          return window.ZFCanRedo ? window.ZFCanRedo() : false;
+        }
+      },
+      methods: {
+        goEditor: function () { store.setView("editor"); },
+        goReader: function () { store.setView("reader"); },
+        goSheet: function () { store.setView("sheet"); },
+        goLibrary: function () { store.setView("library"); },
+        onNew: function () {
+          if (confirm("Start a new zine? Unsaved changes will be lost.")) store.newZine();
+        },
+        onUndo: function () {
+          if (window.ZFUndo) window.ZFUndo();
+          this.tick++;
+        },
+        onRedo: function () {
+          if (window.ZFRedo) window.ZFRedo();
+          this.tick++;
+        }
+      },
+      template: "#zine-app-shell-template"
+    };
+
+    var ZF_EDITOR_METHODS = {
+      selectPage: function (id) { store.activePageId = id; },
+      pageLabel: function (page, i) {
+        var h = (page.heading || "").trim();
+        return h ? h : "Page " + (i + 1);
+      },
+      onModelChange: function (evt) { store.setModel(evt.target.value); },
+      onThemeChange: function (evt) { store.setTheme(evt.target.value); },
+      imageStyle: function (img) {
+        if (!img) return {};
+        var s = this.imageScale;
+        var margin = store.marginIn;
+        var x = (typeof img.x === "number" ? img.x : 0) + margin;
+        var y = (typeof img.y === "number" ? img.y : 0) + margin;
+        var w = (typeof img.w === "number" ? img.w : 1.5);
+        var rot = (typeof img.rot === "number" ? img.rot : 0);
+        var px = 96 * s;
+        return {
+          position: "absolute",
+          left: (x * px) + "px",
+          top: (y * px) + "px",
+          width: (w * px) + "px",
+          height: "auto",
+          transform: "rotate(" + rot + "deg)",
+          transformOrigin: "center center",
+          cursor: "grab"
+        };
+      },
+      imageBlockStyle: function (img) {
+        if (!img) return {};
+        var s = this.imageScale;
+        var px = 96 * s;
+        var w = (typeof img.w === "number" ? img.w : 1.5);
+        var rot = (typeof img.rot === "number" ? img.rot : 0);
+        var marginIn = 0.08;
+        return {
+          width: (w * px) + "px",
+          maxWidth: "100%",
+          marginBottom: (marginIn * px) + "px",
+          borderRadius: "calc(0.02in * var(--zf-page-scale, 1))",
+          transform: "rotate(" + rot + "deg)",
+          transformOrigin: "center center"
+        };
+      },
+      onImageChange: function (evt) {
+        var file = evt.target.files && evt.target.files[0];
+        if (!file) return;
+        if (!/^image\//.test(file.type)) { store.status = "Please pick an image file."; return; }
+        if (file.size > 8 * 1024 * 1024) { store.status = "Image is over 8 MB."; return; }
+        var fr = new FileReader();
+        var self = this;
+        fr.onload = function () {
+          var page = store.activePage();
+          if (!Array.isArray(page.images)) page.images = [];
+          var img = {
+            id: zfNewImageId(),
+            src: zfCompressImage(fr.result, 800, 0.8),
+            x: 0,
+            y: 0,
+            w: 1.5,
+            rot: 0,
+            wrap: "free"
+          };
+          page.images.push(img);
+          page.activeImageId = img.id;
+          self.fileInputKey++;
+        };
+        fr.readAsDataURL(file);
+      },
+      clearImage: function () {
+        var page = store.activePage();
+        var img = this.activeImage;
+        if (img && Array.isArray(page.images)) {
+          var idx = page.images.indexOf(img);
+          if (idx >= 0) page.images.splice(idx, 1);
+        }
+        page.activeImageId = null;
+        this.fileInputKey++;
+      },
+      onImageMouseDown: function (evt) {
+        // Legacy entry point used before the multi-image refactor. Kept for
+        // safety; the new template calls onImageMouseDownItem.
+        var img = this.activeImage;
+        if (!img) return;
+        this.onImageMouseDownItem(evt, img);
+      },
+        onImageMouseDownItem: function (evt, img) {
+          if (!img) return;
+          evt.preventDefault();
+          if (this.active) this.active.activeImageId = img.id;
+          // Re-inject flow spacers so the selection outline moves.
+          var self = this;
+          this.$nextTick(function () { self.injectShapeSpacer(); });
+        this.imageDrag = {
+          imgId: img.id,
+          mode: "move",
+          startX: evt.clientX,
+          startY: evt.clientY,
+          baseX: (typeof img.x === "number") ? img.x : 0,
+          baseY: (typeof img.y === "number") ? img.y : 0
+        };
+      },
+      onResizeStart: function (evt, img) {
+        if (!img) return;
+        evt.stopPropagation();
+        evt.preventDefault();
+        var px = 96 * this.imageScale;
+        var m = this.activeModel;
+        if (!m) return;
+        // Image center in screen px (page coords)
+        var pageEl = this.$refs.miniPage;
+        if (!pageEl) return;
+        var pr = pageEl.getBoundingClientRect();
+        var margin = store.marginIn;
+        var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
+        var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
+        // Approximate image height from its aspect if known, else assume 0.75 ratio
+        var cx = pr.left + cxIn * px;
+        var cy = pr.top + cyIn * px;
+        var dx = evt.clientX - cx;
+        var dy = evt.clientY - cy;
+        var startDist = Math.sqrt(dx * dx + dy * dy) || 1;
+        this.imageDrag = {
+          imgId: img.id,
+          mode: "resize",
+          startDist: startDist,
+          baseW: (typeof img.w === "number") ? img.w : 1.5,
+          cx: cx,
+          cy: cy
+        };
+        if (this.active) this.active.activeImageId = img.id;
+      },
+      onRotateStart: function (evt, img) {
+        if (!img) return;
+        evt.stopPropagation();
+        evt.preventDefault();
+        var px = 96 * this.imageScale;
+        var m = this.activeModel;
+        if (!m) return;
+        var pageEl = this.$refs.miniPage;
+        if (!pageEl) return;
+        var pr = pageEl.getBoundingClientRect();
+        var margin = store.marginIn;
+        var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
+        var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
+        var cx = pr.left + cxIn * px;
+        var cy = pr.top + cyIn * px;
+        var dx = evt.clientX - cx;
+        var dy = evt.clientY - cy;
+        var startAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+        this.imageDrag = {
+          imgId: img.id,
+          mode: "rotate",
+          startAngle: startAngle,
+          baseRot: (typeof img.rot === "number") ? img.rot : 0,
+          cx: cx,
+          cy: cy
+        };
+        if (this.active) this.active.activeImageId = img.id;
+      },
+      onImageMouseMove: function (evt) {
+        if (!this.imageDrag) return;
+        var page = this.active;
+        var m = this.activeModel;
+        if (!page || !m) return;
+        var img = null;
+        if (this.imageDrag.isText && Array.isArray(page.textBoxes)) {
+          for (var ti = 0; ti < page.textBoxes.length; ti++) {
+            if (page.textBoxes[ti].id === this.imageDrag.imgId) { img = page.textBoxes[ti]; break; }
+          }
+        } else if (Array.isArray(page.images)) {
+          for (var i = 0; i < page.images.length; i++) {
+            if (page.images[i].id === this.imageDrag.imgId) { img = page.images[i]; break; }
+          }
+        }
+        if (!img) return;
+        var pxPerInch = 96 * this.imageScale;
+        var mode = this.imageDrag.mode || "move";
+        if (mode === "move") {
+          var dxIn = (evt.clientX - this.imageDrag.startX) / pxPerInch;
+          var dyIn = (evt.clientY - this.imageDrag.startY) / pxPerInch;
+          img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
+          img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
+        } else if (mode === "resize") {
+          var dx = evt.clientX - this.imageDrag.cx;
+          var dy = evt.clientY - this.imageDrag.cy;
+          var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          var ratio = dist / this.imageDrag.startDist;
+          var newW = this.imageDrag.baseW * ratio;
+          if (newW < 0.25) newW = 0.25;
+          if (newW > 8) newW = 8;
+          img.w = Math.round(newW * 100) / 100;
+        } else if (mode === "rotate") {
+          var rdx = evt.clientX - this.imageDrag.cx;
+          var rdy = evt.clientY - this.imageDrag.cy;
+          var angle = Math.atan2(rdy, rdx) * 180 / Math.PI;
+          var delta = angle - this.imageDrag.startAngle;
+          var newRot = this.imageDrag.baseRot + delta;
+          // Snap near multiples of 15 degrees when close.
+          var snapped = Math.round(newRot / 15) * 15;
+          if (Math.abs(newRot - snapped) < 3) newRot = snapped;
+          // Wrap to -180..180.
+          while (newRot > 180) newRot -= 360;
+          while (newRot < -180) newRot += 360;
+          img.rot = Math.round(newRot);
+        }
+        if (!this.imageDrag.isText && img.wrap === "flow") {
+          var self = this;
+          if (!this._spacerScheduled) {
+            this._spacerScheduled = true;
+            requestAnimationFrame(function () {
+              self._spacerScheduled = false;
+              self.injectShapeSpacer();
+            });
+          }
+        }
+      },
+      onImageMouseUp: function () {
+        var wasDragging = !!this.imageDrag;
+        var wasText = this.imageDrag && this.imageDrag.isText;
+        this.imageDrag = null;
+        if (wasDragging && !wasText) {
+          var self = this;
+          this.$nextTick(function () { self.injectShapeSpacer(); });
+        }
+      },
+      setImageW: function (v) {
+        var img = this.activeImage;
+        if (!img) return;
+        img.w = Math.max(0.25, Math.min(8, Number(v)));
+      },
+      setImageRot: function (v) {
+        var img = this.activeImage;
+        if (!img) return;
+        img.rot = Math.round(Number(v));
+      },
+      setImageWrap: function (mode) {
+        var img = this.activeImage;
+        if (!img) return;
+        // Flow mode is limited to one image per side (left / right) because
+        // CSS shape-outside only supports one merged polygon per float and
+        // same-side notches stack unpredictably. If switching this image to
+        // flow would put two flow images on the same side, auto-switch the
+        // conflicting one to "free".
+        // Whenever we leave flow mode, clear any leftover flow elements.
+        var self0 = this;
+        if (mode !== "flow") {
+          this.$nextTick(function () {
+            var el = self0.$refs.bodyEditor;
+            if (!el) return;
+            var stale = el.querySelectorAll('[data-zf-spacer="1"][data-zf-img-id="' + img.id + '"], [data-zf-flow-img="1"][data-zf-img-id="' + img.id + '"], [data-zf-flow-wrap="1"][data-zf-img-id="' + img.id + '"]');
+            for (var i = 0; i < stale.length; i++) stale[i].remove();
+          });
+        }
+        if (mode === "flow") {
+          var page = this.active;
+          var m = this.activeModel;
+          if (page && m && Array.isArray(page.images)) {
+            var margin = store.marginIn;
+            var bodyW = m.page.width - margin * 2;
+            // Which side is this image on?
+            var cx = (typeof img.x === "number" ? img.x : 0) + (typeof img.w === "number" ? img.w : 1.5) / 2;
+            var mySide = (cx < bodyW / 2) ? "left" : "right";
+            for (var i = 0; i < page.images.length; i++) {
+              var other = page.images[i];
+              if (other === img) continue;
+              if (other.wrap !== "flow") continue;
+              var ocx = (typeof other.x === "number" ? other.x : 0) + (typeof other.w === "number" ? other.w : 1.5) / 2;
+              var otherSide = (ocx < bodyW / 2) ? "left" : "right";
+              if (otherSide === mySide) {
+                other.wrap = "free";
+                store.status = "Only one flow image per side - switched the other to text-behind.";
+                setTimeout(function () {
+                  if (store.status.indexOf("Only one flow image per side") === 0) store.status = "";
+                }, 3000);
+              }
+            }
+          }
+        }
+        img.wrap = mode;
+        var self = this;
+        this.$nextTick(function () { self.injectShapeSpacer(); });
+      },
+      resetImage: function () {
+        var img = this.activeImage;
+        if (!img) return;
+        img.x = 0;
+        img.y = 0;
+        img.w = 1.5;
+        img.rot = 0;
+        img.wrap = "free";
+        var self = this;
+        this.$nextTick(function () { self.injectShapeSpacer(); });
+      },
+      fitImage: function () {
+        var img = this.activeImage;
+        var m = this.activeModel;
+        if (!img || !m) return;
+        var w = m.page.width;
+        var margin = store.marginIn;
+        img.x = 0;
+        img.y = 0;
+        img.w = Math.max(0.5, w - margin * 2);
+        img.rot = 0;
+        var self = this;
+        this.$nextTick(function () { self.injectShapeSpacer(); });
+      },
+      selectImage: function (img) {
+        var page = this.active;
+        if (!page || !img) return;
+        page.activeImageId = img.id;
+        page.activeTextBoxId = null;
+      },
+      addTextBox: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
+        var box = {
+          id: zfNewTextBoxId(),
+          html: 'New text',
+          x: 0.3,
+          y: 0.3,
+          w: 1.8,
+          rot: 0,
+          fontSize: 1.0  // multiplier on base body font size
+        };
+        page.textBoxes.push(box);
+        page.activeTextBoxId = box.id;
+        page.activeImageId = null;
+          var self = this;
+          this.$nextTick(function () {
+            // Sync the DOM (so the contenteditable shows box.html) and focus
+            // the new box so the user can type immediately.
+            self.syncTextBoxDom();
+            var contentEl = document.querySelector('[data-zf-text-content-id="' + box.id + '"]');
+            if (contentEl) contentEl.focus();
+          });
+      },
+      selectTextBox: function (box) {
+        var page = this.active;
+        if (!page || !box) return;
+        page.activeTextBoxId = box.id;
+        page.activeImageId = null;
+      },
+      setTextBoxW: function (v) {
+        var box = this.activeTextBox;
+        if (!box) return;
+        box.w = Math.max(0.4, Math.min(8, Number(v)));
+      },
+      setTextBoxRot: function (v) {
+        var box = this.activeTextBox;
+        if (!box) return;
+        box.rot = Math.round(Number(v));
+      },
+      setTextBoxFontSize: function (v) {
+        var box = this.activeTextBox;
+        if (!box) return;
+        box.fontSize = Math.max(0.5, Math.min(3, Number(v)));
+      },
+      resetTextBox: function () {
+        var box = this.activeTextBox;
+        if (!box) return;
+        box.x = 0.3;
+        box.y = 0.3;
+        box.w = 1.8;
+        box.rot = 0;
+        box.fontSize = 1.0;
+      },
+      textStyle: function (box) {
+        if (!box) return {};
+        var s = this.imageScale;
+        var margin = store.marginIn;
+        var x = (typeof box.x === "number" ? box.x : 0) + margin;
+        var y = (typeof box.y === "number" ? box.y : 0) + margin;
+        var w = (typeof box.w === "number" ? box.w : 1.8);
+        var rot = (typeof box.rot === "number" ? box.rot : 0);
+        var px = 96 * s;
+        var fontSize = (typeof box.fontSize === "number" ? box.fontSize : 1.0);
+        return {
+          position: 'absolute',
+          left: (x * px) + 'px',
+          top: (y * px) + 'px',
+          width: (w * px) + 'px',
+          height: 'auto',
+          minHeight: '1em',
+          transform: 'rotate(' + rot + 'deg)',
+          transformOrigin: 'center center',
+          fontSize: (fontSize * 100) + '%'
+        };
+      },
+      onTextBoxInput: function (evt, box) {
+        // Read innerHTML only. Do NOT write it back via Vue's v-html (that
+        // would move the caret to position 0 on every keystroke). See
+        // syncTextBoxDom for the one-time DOM sync.
+        box.html = zfSanitizeHtml(evt.target.innerHTML);
+      },
+      syncTextBoxDom: function () {
+        // Set the contenteditable innerHTML from the store once, only if it
+        // has drifted (e.g. on page change or first render). Skipped for
+        // the element currently focused to avoid disrupting the caret.
+        // Also syncs the main body editor the same way (see below).
+        var self = this;
+        this.$nextTick(function () {
+          var page = self.active;
+          if (!page) return;
+          // 1) Main body contenteditable.
+          var bodyEl = self.$refs.bodyEditor;
+          if (bodyEl) {
+            var desiredBody = page.body || '';
+            if (document.activeElement !== bodyEl && bodyEl.innerHTML !== desiredBody) {
+              bodyEl.innerHTML = desiredBody;
+            }
+          }
+          // 2) Placed text boxes.
+          if (!Array.isArray(page.textBoxes)) return;
+          for (var i = 0; i < page.textBoxes.length; i++) {
+            var box = page.textBoxes[i];
+            var el = document.querySelector('[data-zf-text-content-id="' + box.id + '"]');
+            if (!el) continue;
+            if (document.activeElement === el) continue;
+            var desired = box.html || '';
+            if (el.innerHTML !== desired) el.innerHTML = desired;
+          }
+        });
+      },
+      onTextBoxMouseDown: function (evt, box) {
+        if (!box) return;
+        if (evt.target && evt.target.isContentEditable) {
+          // Let the user type without hijacking the click for a drag.
+          // Still select it so the controls update.
+          this.selectTextBox(box);
+          return;
+        }
+        evt.preventDefault();
+        this.selectTextBox(box);
+        this.imageDrag = {
+          imgId: box.id,
+          mode: 'move',
+          isText: true,
+          startX: evt.clientX,
+          startY: evt.clientY,
+          baseX: (typeof box.x === 'number') ? box.x : 0,
+          baseY: (typeof box.y === 'number') ? box.y : 0
+        };
+      },
+      onTextBoxResizeStart: function (evt, box) {
+        if (!box) return;
+        evt.stopPropagation();
+        evt.preventDefault();
+        var px = 96 * this.imageScale;
+        var m = this.activeModel;
+        if (!m) return;
+        var pageEl = this.$refs.miniPage;
+        if (!pageEl) return;
+        var pr = pageEl.getBoundingClientRect();
+        var margin = store.marginIn;
+        var w = (typeof box.w === 'number') ? box.w : 1.8;
+        var cxIn = (typeof box.x === 'number' ? box.x : 0) + margin + w / 2;
+        var cyIn = (typeof box.y === 'number' ? box.y : 0) + margin + 0.4;
+        var cx = pr.left + cxIn * px;
+        var cy = pr.top + cyIn * px;
+        var dx = evt.clientX - cx;
+        var dy = evt.clientY - cy;
+        var startDist = Math.sqrt(dx * dx + dy * dy) || 1;
+        this.imageDrag = {
+          imgId: box.id,
+          mode: 'resize',
+          isText: true,
+          startDist: startDist,
+          baseW: w,
+          cx: cx,
+          cy: cy
+        };
+        this.selectTextBox(box);
+      },
+      onTextBoxRotateStart: function (evt, box) {
+        if (!box) return;
+        evt.stopPropagation();
+        evt.preventDefault();
+        var px = 96 * this.imageScale;
+        var pageEl = this.$refs.miniPage;
+        if (!pageEl) return;
+        var pr = pageEl.getBoundingClientRect();
+        var margin = store.marginIn;
+        var w = (typeof box.w === 'number') ? box.w : 1.8;
+        var cxIn = (typeof box.x === 'number' ? box.x : 0) + margin + w / 2;
+        var cyIn = (typeof box.y === 'number' ? box.y : 0) + margin + 0.4;
+        var cx = pr.left + cxIn * px;
+        var cy = pr.top + cyIn * px;
+        var dx = evt.clientX - cx;
+        var dy = evt.clientY - cy;
+        var startAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+        this.imageDrag = {
+          imgId: box.id,
+          mode: 'rotate',
+          isText: true,
+          startAngle: startAngle,
+          baseRot: (typeof box.rot === 'number') ? box.rot : 0,
+          cx: cx,
+          cy: cy
+        };
+        this.selectTextBox(box);
+      },
+      onTextBoxDelete: function (box) {
+        var page = this.active;
+        if (!page || !box) return;
+        var idx = page.textBoxes.indexOf(box);
+        if (idx >= 0) page.textBoxes.splice(idx, 1);
+        page.activeTextBoxId = null;
+      },
+      injectShapeSpacer: function () {
+        var self = this;
+        this.$nextTick(function () {
+          var el = self.$refs.bodyEditor;
+          if (!el) return;
+          var page = self.active;
+          if (!page || !Array.isArray(page.images)) return;
+          // Strip every flow injection (spacer, image, wrapper) so removed or
+          // wrapped-away images can't leave orphan wrappers behind.
+          var stale = el.querySelectorAll("[data-zf-spacer=\"1\"], [data-zf-flow-img=\"1\"], [data-zf-flow-wrap=\"1\"]");
+          for (var i = 0; i < stale.length; i++) stale[i].remove();
+          // Also drop any stray handle elements that got orphaned.
+          var orphanHandles = el.querySelectorAll(".zf-img-handle");
+          for (var j = 0; j < orphanHandles.length; j++) {
+            if (!orphanHandles[j].closest("[data-zf-flow-wrap]")) orphanHandles[j].remove();
+          }
+          var m = self.activeModel;
+          if (!m) return;
+          var px = 96 * self.imageScale;
+          var rect = el.getBoundingClientRect();
+          if (rect.width < 20 || rect.height < 20) return;
+          var bodyWIn = rect.width / px;
+          var bodyHIn = rect.height / px;
+          var flowImgs = [];
+          for (var k = 0; k < page.images.length; k++) {
+            var img = page.images[k];
+            if (img.wrap === "flow") flowImgs.push(img);
+          }
+          if (!flowImgs.length) return;
+          var scheduleReinject = function () {
+            if (!self._spacerScheduled) {
+              self._spacerScheduled = true;
+              requestAnimationFrame(function () {
+                self._spacerScheduled = false;
+                self.injectShapeSpacer();
+              });
+            }
+          };
+          zfInjectMergedFlow(el, flowImgs, px, bodyWIn, bodyHIn, {
+            draggable: true,
+            selectedId: page.activeImageId,
+            onDrag: scheduleReinject,
+            onDragStart: function (evt, targetImg) {
+              self.onImageMouseDownItem(evt, targetImg);
+            },
+            onSelect: function (selectedImg) {
+              var pg = self.active;
+              if (pg) pg.activeImageId = selectedImg.id;
+              self.injectShapeSpacer();
+            },
+            onResize: function (evt, targetImg) {
+              self.onResizeStart(evt, targetImg);
+            },
+            onRotate: function (evt, targetImg) {
+              self.onRotateStart(evt, targetImg);
+            }
+          });
+        });
+      },
+      onBodyInput: function (evt) {
+        // Read innerHTML only. Writing it back via Vue v-html would reset
+        // the caret to position 0 on every keystroke (typed chars would
+        // appear in reverse order). syncTextBoxDom handles the one-time
+        // DOM sync when the page changes or when undo/redo replaces state.
+        var html = evt.target.innerHTML;
+        var stripped = zfStripSpacers(html);
+        var safe = zfSanitizeHtml(stripped);
+        store.activePage().body = safe;
+      },
+      onBodyPaste: function (evt) {
+        evt.preventDefault();
+        var text = (evt.clipboardData || window.clipboardData).getData("text/plain");
+        if (document.execCommand) document.execCommand("insertText", false, text);
+      },
+      execCmd: function (cmd) {
+        try {
+          document.execCommand(cmd, false, null);
+          var el = this.$refs.bodyEditor;
+          if (el) store.activePage().body = zfSanitizeHtml(zfStripSpacers(el.innerHTML));
+        } catch (e) { console.warn("execCommand failed", e); }
+      },
+      clearFormat: function () {
+        try {
+          document.execCommand("removeFormat", false, null);
+          var el = this.$refs.bodyEditor;
+          if (el) store.activePage().body = zfSanitizeHtml(zfStripSpacers(el.innerHTML));
+        } catch (e) {}
+      },
+      onDragStart: function (evt, i) {
+        this.dragIndex = i;
+        try { evt.dataTransfer.effectAllowed = "move"; } catch (e) {}
+        try { evt.dataTransfer.setData("text/plain", String(i)); } catch (e) {}
+      },
+      onDragOver: function (evt, i) {
+        if (this.dragIndex < 0 || i === this.dragIndex) { this.dropIndex = -1; this.dropSide = null; return; }
+        evt.preventDefault();
+        try { evt.dataTransfer.dropEffect = "move"; } catch (e) {}
+        var rect = evt.currentTarget.getBoundingClientRect();
+        var midY = rect.top + rect.height / 2;
+        this.dropIndex = i;
+        this.dropSide = (evt.clientY < midY) ? "above" : "below";
+      },
+      onDragLeave: function (evt, i) {
+        if (this.dropIndex === i) { this.dropIndex = -1; this.dropSide = null; }
+      },
+      onDrop: function (evt, i) {
+        evt.preventDefault();
+        if (this.dragIndex < 0 || this.dragIndex === i) { this.resetDrag(); return; }
+        var rect = evt.currentTarget.getBoundingClientRect();
+        var midY = rect.top + rect.height / 2;
+        var side = (evt.clientY < midY) ? "above" : "below";
+        var from = this.dragIndex;
+        var to = i;
+        if (side === "below") to = to + 1;
+        if (from < to) to = to - 1;
+        if (from !== to) { var item = store.pages.splice(from, 1)[0]; store.pages.splice(to, 0, item); }
+        this.resetDrag();
+      },
+      onDragEnd: function () { this.resetDrag(); },
+      resetDrag: function () { this.dragIndex = -1; this.dropIndex = -1; this.dropSide = null; },
+      dragClass: function (i) {
+        var c = [];
+        if (i === this.dragIndex) c.push("zf-dragging");
+        if (i === this.dropIndex && this.dropSide === "above") c.push("zf-drop-above");
+        if (i === this.dropIndex && this.dropSide === "below") c.push("zf-drop-below");
+        return c.join(" ");
+      },
+      fillWithLorem: function () {
+        var b = this.budget;
+        if (!b) return;
+        var text = zfLorem({ words: b.words, chars: b.chars });
+        store.activePage().body = text;
+        if (!store.activePage().heading) {
+          store.activePage().heading = "Sample page " + (store.pages.indexOf(store.activePage()) + 1);
+        }
+      },
+      fillAllWithLorem: function () {
+        var need = store.pagesNeeded();
+        while (store.pages.length < need) { store.pages.push(zfEmptyPage()); }
+        var b = this.budget;
+        for (var i = 0; i < store.pages.length; i++) {
+          var pg = store.pages[i];
+          pg.heading = pg.heading || "Sample page " + (i + 1);
+          if (!pg.body) pg.body = zfLorem({ words: b.words, chars: b.chars });
+        }
+        store.status = "Filled " + store.pages.length + " pages with sample text.";
+        var self = store;
+        setTimeout(function () { if (self.status.indexOf("Filled ") === 0) self.status = ""; }, 2500);
+      },
+      clearAllText: function () {
+        if (!confirm("Clear all page content? This removes text, images, and text boxes from every page and cannot be undone.")) return;
+        for (var i = 0; i < store.pages.length; i++) {
+          var pg = store.pages[i];
+          pg.body = "";
+          pg.images = [];
+          pg.textBoxes = [];
+          pg.activeImageId = null;
+          pg.activeTextBoxId = null;
+        }
+        store.status = "Cleared all page content.";
+        var self = store;
+        setTimeout(function () { if (self.status.indexOf("Cleared ") === 0) self.status = ""; }, 2500);
+      },
+      exportJson: function () {
+        var payload = {
+          specVersion: "1.0", app: "Zine Forge", exported: new Date().toISOString(),
+          title: store.title, author: store.author, modelId: store.modelId,
+          themeId: store.themeId, marginIn: store.marginIn,
+          pages: store.pages.map(function (p) {
+            return {
+              heading: p.heading,
+              body: p.body,
+              images: (p.images || []).map(function (im) {
+                return {
+                  id: im.id, src: im.src,
+                  x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap
+                };
+              }),
+              textBoxes: (p.textBoxes || []).map(function (tb) {
+                return {
+                  id: tb.id, html: tb.html,
+                  x: tb.x, y: tb.y, w: tb.w, rot: tb.rot,
+                  fontSize: tb.fontSize
+                };
+              })
+            };
+          })
+        };
+        var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        var safe = (store.title || "zine").replace(/[^a-zA-Z0-9-_]+/g, "-").replace(/^-|-$/g, "") || "zine";
+        a.href = url;
+        a.download = safe + ".zine.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      },
+      onImportFile: function (evt) {
+        var file = evt.target.files && evt.target.files[0];
+        if (!file) return;
+        var fr = new FileReader();
+        var self = this;
+        fr.onload = function () {
+          try {
+            var parsed = JSON.parse(fr.result);
+            if (!parsed || !Array.isArray(parsed.pages)) throw new Error("Not a zine file");
+            store.title = parsed.title || "Untitled Zine";
+            store.author = parsed.author || "";
+            if (parsed.modelId && window.ZFModels) store.modelId = parsed.modelId;
+            if (parsed.themeId && window.ZFThemes) store.themeId = parsed.themeId;
+            if (typeof parsed.marginIn === "number") store.marginIn = parsed.marginIn;
+            store.pages = parsed.pages.map(function (p, i) {
+              return {
+                id: "p" + i + "-" + Math.random().toString(36).slice(2, 7),
+                heading: p.heading || "", body: p.body || "", image: p.image || "",
+                imageX: typeof p.imageX === "number" ? p.imageX : 0,
+                imageY: typeof p.imageY === "number" ? p.imageY : 0,
+                imageW: typeof p.imageW === "number" ? p.imageW : 1.5,
+                imageRot: typeof p.imageRot === "number" ? p.imageRot : 0,
+                imageWrap: p.imageWrap || "free"
+              };
+            });
+            if (!store.pages.length) store.pages = [zfEmptyPage()];
+            store.activePageId = store.pages[0].id;
+            store.status = "Imported " + file.name;
+            setTimeout(function () { if (store.status.indexOf("Imported ") === 0) store.status = ""; }, 2500);
+          } catch (e) { store.status = "Could not import: " + e.message; }
+          self.fileInputKey++;
+        };
+        fr.readAsText(file);
+      },
+      toggleDebugFlow: function () { this.debugFlow = !this.debugFlow; }
+    };
+
+    var ZineEditor = {
+      data: function () {
+        return {
+          store: store,
+          fileInputKey: 0,
+          dragIndex: -1,
+          dropIndex: -1,
+          dropSide: null,
+          imageDrag: null,
+          debugFlow: false
+        };
+      },
+      computed: {
+        active: function () { return store.activePage(); },
+        activeImage: function () {
+          var p = this.active;
+          if (!p || !Array.isArray(p.images) || !p.images.length) return null;
+          if (p.activeImageId) {
+            for (var i = 0; i < p.images.length; i++) {
+              if (p.images[i].id === p.activeImageId) return p.images[i];
+            }
+          }
+          return p.images[p.images.length - 1];
+        },
+        activeTextBox: function () {
+          var p = this.active;
+          if (!p || !Array.isArray(p.textBoxes) || !p.textBoxes.length) return null;
+          if (p.activeTextBoxId) {
+            for (var i = 0; i < p.textBoxes.length; i++) {
+              if (p.textBoxes[i].id === p.activeTextBoxId) return p.textBoxes[i];
+            }
+          }
+          return p.textBoxes[p.textBoxes.length - 1];
+        },
+        models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
+        activeModel: function () { return store.model(); },
+        themes: function () { return (window.ZFThemes) ? window.ZFThemes.listThemes() : []; },
+        activeTheme: function () { return store.theme(); },
+        pageThemeStyle: function () {
+          if (!window.ZFThemes || !this.activeTheme) return {};
+          return window.ZFThemes.pageStyle(this.activeTheme);
+        },
+        budget: function () {
+          if (!window.ZFModels) return null;
+          return window.ZFModels.contentBudget(this.activeModel);
+        },
+        wordCount: function () {
+          if (!window.ZFModels) return 0;
+          return window.ZFModels.countWords(this.active ? zfHtmlToText(this.active.body) : "");
+        },
+        lineCount: function () {
+          if (!window.ZFModels) return 0;
+          return window.ZFModels.countLines(this.active ? zfHtmlToText(this.active.body) : "");
+        },
+        charCount: function () {
+          return this.active && this.active.body ? zfHtmlToText(this.active.body).length : 0;
+        },
+        wordPctRaw: function () {
+          if (!this.budget || !this.budget.words) return 0;
+          return 100 * this.wordCount / this.budget.words;
+        },
+        linePctRaw: function () {
+          if (!this.budget || !this.budget.lines) return 0;
+          return 100 * this.lineCount / this.budget.lines;
+        },
+        charPctRaw: function () {
+          if (!this.budget || !this.budget.chars) return 0;
+          return 100 * this.charCount / this.budget.chars;
+        },
+        worstPct: function () {
+          return Math.max(this.wordPctRaw, this.linePctRaw, this.charPctRaw);
+        },
+        budgetClass: function () {
+          if (this.worstPct >= 100) return "over";
+          if (this.worstPct >= 85) return "warn";
+          return "";
+        },
+        barClass: function () {
+          if (this.worstPct >= 100) return "over";
+          if (this.worstPct >= 85) return "warn";
+          return "";
+        },
+        barWidth: function () {
+          return Math.min(100, Math.round(this.worstPct)) + "%";
+        },
+        needsToFill: function () {
+          var need = store.pagesNeeded();
+          return Math.max(0, need - store.pages.length);
+        },
+        safeGuides: function () {
+          // Determine which paper edges the current page touches based on its
+          // slot position in the model's imposition. Show dashed guides on
+          // those edges, inset by the printer safety value.
+          var m = this.activeModel;
+          var page = this.active;
+          if (!m || !m.slots || !page) return [];
+          var pageIdx = store.pages.indexOf(page);
+          if (pageIdx < 0) return [];
+          var pageNum = pageIdx + 1;
+          var slot = null;
+          for (var i = 0; i < m.slots.length; i++) {
+            if (m.slots[i].page === pageNum) { slot = m.slots[i]; break; }
+          }
+          if (!slot) return [];
+          var grid = window.ZFModels && window.ZFModels.gridSize ? window.ZFModels.gridSize(m) : null;
+          if (!grid) return [];
+          // Safety in screen px.
+          var pxPerIn = 96 * this.imageScale;
+          var safetyPx = store.printerSafetyIn * pxPerIn;
+          if (safetyPx <= 0.5) return [];
+          var out = [];
+          var dashColor = 'rgba(181, 9, 9, 0.6)';
+          if (slot.row === 0) {
+            out.push({ key: 'top', style: {
+              left: '0', right: '0', top: '0',
+              height: safetyPx + 'px',
+              borderBottom: '1px dashed ' + dashColor
+            }});
+          }
+          if (slot.row === grid.rows - 1) {
+            out.push({ key: 'bottom', style: {
+              left: '0', right: '0', bottom: '0',
+              height: safetyPx + 'px',
+              borderTop: '1px dashed ' + dashColor
+            }});
+          }
+          if (slot.col === 0) {
+            out.push({ key: 'left', style: {
+              top: '0', bottom: '0', left: '0',
+              width: safetyPx + 'px',
+              borderRight: '1px dashed ' + dashColor
+            }});
+          }
+          if (slot.col === grid.cols - 1) {
+            out.push({ key: 'right', style: {
+              top: '0', bottom: '0', right: '0',
+              width: safetyPx + 'px',
+              borderLeft: '1px dashed ' + dashColor
+            }});
+          }
+          return out;
+        },
+        pageStyle: function () {
+          var m = this.activeModel;
+          if (!m) return {};
+          var w = m.page.width;
+          var h = m.page.height;
+          var longSide = Math.max(w, h);
+          var onscreenLong = 640;
+          var screenScale = onscreenLong / longSide;
+          var renderedW = w * screenScale;
+          var renderedH = h * screenScale;
+          var unit = m.page.unit || "in";
+          var physicalInches = unit === "mm" ? w / 25.4 : w;
+          var physicalCssPx = physicalInches * 96;
+          var pageScale = renderedW / physicalCssPx;
+          return {
+            width: Math.round(renderedW) + "px",
+            height: Math.round(renderedH) + "px",
+            "--zf-page-scale": pageScale,
+            "--zf-page-margin": store.marginIn + "in"
+          };
+        },
+        imageScale: function () {
+          var m = this.activeModel;
+          if (!m) return 1;
+          var w = m.page.width;
+          var h = m.page.height;
+          var longSide = Math.max(w, h);
+          var screenScale = 640 / longSide;
+          var renderedW = w * screenScale;
+          var unit = m.page.unit || "in";
+          var physicalInches = unit === "mm" ? w / 25.4 : w;
+          var physicalCssPx = physicalInches * 96;
+          return renderedW / physicalCssPx;
+        }
+      },
+      mounted: function () {
+        var self = this;
+        this._onMouseMove = function (evt) { self.onImageMouseMove(evt); };
+        this._onMouseUp = function () { self.onImageMouseUp(); };
+        window.addEventListener("mousemove", this._onMouseMove);
+        window.addEventListener("mouseup", this._onMouseUp);
+        this.injectShapeSpacer();
+        this.syncTextBoxDom();
+      },
+      watch: {
+        // When the active page changes (or its body is replaced by undo),
+        // re-sync the contenteditable so it shows the correct content.
+        active: {
+          handler: function () {
+            this.syncTextBoxDom();
+            this.injectShapeSpacer();
+          },
+          deep: false
+        }
+      },
+      beforeUnmount: function () {
+        window.removeEventListener("mousemove", this._onMouseMove);
+        window.removeEventListener("mouseup", this._onMouseUp);
+      },
+      updated: function () {
+        this.injectShapeSpacer();
+        this.syncTextBoxDom();
+      },
+      methods: ZF_EDITOR_METHODS,
+      template: "#zine-editor-template"
+    };
+
+    function zfRelativeTime(ts) {
+      if (!ts) return '';
+      var d = Date.now() - ts;
+      var min = Math.floor(d / 60000);
+      if (min < 1) return 'just now';
+      if (min < 60) return min + 'm ago';
+      var hr = Math.floor(min / 60);
+      if (hr < 24) return hr + 'h ago';
+      var day = Math.floor(hr / 24);
+      if (day < 30) return day + 'd ago';
+      return new Date(ts).toLocaleDateString();
+    }
+
+    var ZineLibrary = {
+      name: 'ZineLibrary',
+      data: function () {
+        return { store: store };
+      },
+      computed: {
+        entries: function () {
+          // Sort by updatedAt desc
+          return (store.library || []).slice().sort(function (a, b) {
+            return (b.updatedAt || 0) - (a.updatedAt || 0);
+          });
+        }
+      },
+      methods: {
+        openZine: function (id) { store.loadFromLibrary(id); },
+        duplicate: function (id) { store.duplicateInLibrary(id); },
+        remove: function (id) { store.deleteFromLibrary(id); },
+        exportZine: function (id) {
+          var rec = window.ZFLibrary ? window.ZFLibrary.get(id) : null;
+          if (!rec) return;
+          var payload = {
+            specVersion: '1.0',
+            app: 'Zine Forge',
+            exported: new Date().toISOString(),
+            title: rec.title,
+            author: rec.author,
+            modelId: rec.modelId,
+            themeId: rec.themeId,
+            pages: rec.pages
+          };
+          var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          var safe = (rec.title || 'zine').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-|-$/g, '') || 'zine';
+          a.href = url;
+          a.download = safe + '.zine.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        },
+        previewStyle: function (rec) {
+          if (!window.ZFThemes) return {};
+          var t = window.ZFThemes.getTheme(rec.themeId || 'classic');
+          return {
+            background: t.paperBg,
+            color: t.inkColor,
+            fontFamily: t.headingFont
+          };
+        },
+        metaLine: function (rec) {
+          var pages = (rec.pages || []).length;
+          var modelLabel = '';
+          if (window.ZFModels && rec.modelId) {
+            modelLabel = window.ZFModels.getModel(rec.modelId).label;
+          }
+          var when = zfRelativeTime(rec.updatedAt);
+          return pages + ' page' + (pages === 1 ? '' : 's') + ' \u00b7 ' + (modelLabel || 'zine') + (when ? ' \u00b7 ' + when : '');
+        },
+        storageUsedMb: function () {
+          var bytes = (window.ZFLibrary) ? window.ZFLibrary.approximateSize() : 0;
+          return (bytes / (1024 * 1024)).toFixed(2);
+        },
+        storagePct: function () {
+          var bytes = (window.ZFLibrary) ? window.ZFLibrary.approximateSize() : 0;
+          var cap = 5 * 1024 * 1024;
+          return Math.min(100, Math.round(100 * bytes / cap));
+        },
+        storageClass: function () {
+          var p = this.storagePct;
+          if (p >= 80) return 'over';
+          if (p >= 60) return 'warn';
+          return '';
+        }
+      },
+      template:
+        '<div class="zf-library">' +
+          '<div class="zf-library-header">' +
+            '<div>' +
+              '<h2>Your library</h2>' +
+              '<div class="zf-muted">{{ entries.length }} saved zine<span v-if="entries.length !== 1">s</span> in this browser.</div>' +
+              '<div class="zf-muted" style="margin-top:0.25rem;display:flex;align-items:center;gap:0.5rem;">' +
+                '<span>Storage: {{ storageUsedMb }} MB of ~5 MB used</span>' +
+                '<span class="zf-budget-bar" :class="storageClass" style="width:120px;">' +
+                  '<div :style="{ width: storagePct + \'%\' }"></div>' +
+                '</span>' +
+              '</div>' +
+              '<div v-if="storagePct >= 80" class="zf-muted" style="color:var(--zf-red);margin-top:0.25rem;">' +
+                'Storage is getting full. Export and delete old zines to free space.' +
+              '</div>' +
+            '</div>' +
+            '<div class="zf-header-actions" style="gap:0.5rem;">' +
+              '<button class="zf-btn zf-btn-primary" @click="store.newZine()">New zine</button>' +
+            '</div>' +
+          '</div>' +
+
+          '<div v-if="!entries.length" class="zf-empty">' +
+            'No saved zines yet. Start writing in the editor and your draft will appear here automatically.' +
+          '</div>' +
+
+          '<div v-else class="zf-library-grid">' +
+            '<div v-for="rec in entries" :key="rec.id" class="zf-lib-card">' +
+              '<div class="zf-lib-preview" :style="previewStyle(rec)">' +
+                '<span>{{ rec.title || \'Untitled Zine\' }}</span>' +
+              '</div>' +
+              '<div class="zf-lib-body">' +
+                '<div class="zf-lib-title">{{ rec.title || \'Untitled Zine\' }}</div>' +
+                '<div class="zf-lib-meta">{{ metaLine(rec) }}</div>' +
+              '</div>' +
+              '<div class="zf-lib-actions">' +
+                '<button class="primary" @click="openZine(rec.id)">Open</button>' +
+                '<button @click="duplicate(rec.id)">Copy</button>' +
+                '<button @click="exportZine(rec.id)">Export</button>' +
+                '<button class="danger" @click="remove(rec.id)">Delete</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+    };
+
+    var ZF_READER_METHODS = {
+      next: function () { if (this.currentIndex < this.total - 1) this.currentIndex++; },
+      prev: function () { if (this.currentIndex > 0) this.currentIndex--; },
+      printZine: function () { window.print(); },
+      shareLink: function () {
+        var self = this;
+        try {
+          var payload = { t: store.title, a: store.author, p: store.pages.map(function (p) { return { h: p.heading, b: p.body, i: p.image }; }) };
+          var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+          var url = location.origin + location.pathname + "#z=" + b64;
+          var done = function (msg) { self.shareStatus = msg; setTimeout(function () { self.shareStatus = ""; }, 4000); };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(
+              function () { done("Share link copied to clipboard."); },
+              function () { done("Copy this link: " + url); }
+            );
+          } else { done("Copy this link: " + url); }
+        } catch (e) { this.shareStatus = "Could not build share link."; }
+      },
+        readerBlockImageStyle: function (page) {
+          if (!page || !page.image) return {};
+          var m = store.model();
+          if (!m) return {};
+          var longSide = Math.max(m.page.width, m.page.height);
+          // screen px per physical inch on the on-screen mini-page
+          var pxPerIn = 560 / longSide;
+          var w = (typeof page.imageW === "number" ? page.imageW : 1.5);
+          var rot = (typeof page.imageRot === "number" ? page.imageRot : 0);
+          return {
+            width: (w * pxPerIn) + "px",
+            maxWidth: "100%",
+            marginBottom: "0.5rem",
+            transform: "rotate(" + rot + "deg)",
+            transformOrigin: "center center"
+          };
+        },
+        readerFreeImageStyle: function (page) {
+          if (!page || !page.image) return {};
+          var m = store.model();
+          if (!m) return {};
+          var longSide = Math.max(m.page.width, m.page.height);
+          var pxPerIn = 560 / longSide;
+          var margin = store.marginIn;
+          var x = (typeof page.imageX === "number" ? page.imageX : 0) + margin;
+          var y = (typeof page.imageY === "number" ? page.imageY : 0) + margin;
+          var w = (typeof page.imageW === "number" ? page.imageW : 1.5);
+          var rot = (typeof page.imageRot === "number" ? page.imageRot : 0);
+          return {
+            left: (x * pxPerIn) + "px",
+            top: (y * pxPerIn) + "px",
+            width: (w * pxPerIn) + "px",
+            transform: "rotate(" + rot + "deg)"
+          };
+        },
+        injectReaderFlow: function () {
+          var self = this;
+          this.$nextTick(function () {
+            self._attemptReaderInject(0);
+          });
+        },
+        _attemptReaderInject: function (attempt) {
+          var self = this;
+          if (attempt > 20) return;
+          // Only retry while the reader view is actually active.
+          if (store.view !== "reader") return;
+          var el = self.$refs.bodyReader;
+          if (!el) { self._schedReaderRetry(attempt); return; }
+          var page = self.page;
+          if (!page) { self._schedReaderRetry(attempt); return; }
+          var rect = el.getBoundingClientRect();
+          // If the reader isn't visible yet, wait and retry.
+          if (rect.width < 20 || rect.height < 20) {
+            self._schedReaderRetry(attempt);
+            return;
+          }
+          var stale = el.querySelectorAll("[data-zf-spacer=\"1\"], [data-zf-flow-img=\"1\"]");
+          for (var i = 0; i < stale.length; i++) stale[i].remove();
+          if (page.imageWrap !== "flow" || !page.image) return;
+          var m = store.model();
+          if (!m) return;
+          var longSide = Math.max(m.page.width, m.page.height);
+          var pxPerIn = 560 / longSide;
+          var bodyWIn = rect.width / pxPerIn;
+          var bodyHIn = rect.height / pxPerIn;
+          zfLog("reader inject: firing for page " + (self.currentIndex + 1) + " w=" + Math.round(rect.width) + " h=" + Math.round(rect.height));
+          zfInjectFlow(el, page, pxPerIn, bodyWIn, bodyHIn, { draggable: false });
+        },
+        _schedReaderRetry: function (attempt) {
+          var self = this;
+          setTimeout(function () { self._attemptReaderInject(attempt + 1); }, 80);
+        }
+    };
+
+    var ZineReader = {
+      data: function () { return { store: store, currentIndex: 0, shareStatus: "" }; },
+      computed: {
+        total: function () { return store.pages.length; },
+        page: function () { return store.pages[this.currentIndex] || store.pages[0]; },
+        readerThemeStyle: function () {
+          if (!window.ZFThemes || !store.theme()) return {};
+          return window.ZFThemes.pageStyle(store.theme());
+        },
+        bodyHtml: function () {
+          if (!this.page) return "";
+          return this.page.body || "";
+        },
+        readerPageStyle: function () {
+          var m = store.model();
+          if (!m || !m.page) return {};
+          var w = m.page.width;
+          var h = m.page.height;
+          var longSide = Math.max(w, h);
+          var onscreenLong = 560;
+          var screenScale = onscreenLong / longSide;
+          var renderedW = w * screenScale;
+          var renderedH = h * screenScale;
+          var unit = m.page.unit || "in";
+          var physicalInches = unit === "mm" ? w / 25.4 : w;
+          var physicalCssPx = physicalInches * 96;
+          var pageScale = renderedW / physicalCssPx;
+          return {
+            width: Math.round(renderedW) + "px",
+            height: Math.round(renderedH) + "px",
+            "--zf-page-scale": pageScale,
+            "--zf-page-margin": store.marginIn + "in"
+          };
+        }
+      },
+      watch: {
+        "store.view": function (v) {
+          if (v === "reader") {
+            var self = this;
+            this.$nextTick(function () { self.injectReaderFlow(); });
+          }
+        },
+        currentIndex: function () {
+          var self = this;
+          this.$nextTick(function () { self.injectReaderFlow(); });
+        }
+      },
+      mounted: function () { this.injectReaderFlow(); },
+      updated: function () { this.injectReaderFlow(); },
+      methods: ZF_READER_METHODS,
+      template: "#zine-reader-template"
+    };
+
+    // SVG-based fold guide for the classic W-fold mini zine.
+    // Each panel shows the sheet AFTER the step, with a motion arrow indicating
+    // the fold. Red dashed lines are fold lines; solid black lines are cuts.
+    var ZineFoldGuide = {
+      name: 'ZineFoldGuide',
+      template:
+        '<div class="zf-fold-guide zf-no-print">' +
+          '<h3>How to fold (visual)</h3>' +
+          '<p class="zf-muted" style="margin:0;font-size:0.85rem;">Top-down views of the sheet at each step. Red dashed = fold. Solid black = cut. Numbers 1-8 show which page ends up where.</p>' +
+          '<div class="zf-fold-steps">' +
+
+            // Panel 1: sheet lying flat, portrait. Fold in half vertically (short way).
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                // sheet (portrait)
+                '<rect x="15" y="10" width="60" height="110" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                // vertical fold line (down the middle, short dimension)
+                '<line x1="45" y1="10" x2="45" y2="120" stroke="#b50909" stroke-width="1.2" stroke-dasharray="4 3"/>' +
+                // curved arrow showing right half folding over to the left
+                '<path d="M 70 40 Q 45 30 30 60" fill="none" stroke="#005ea2" stroke-width="2"/>' +
+                '<polygon points="30,60 26,55 34,55" fill="#005ea2"/>' +
+                // tiny p1 marker for orientation
+                '<text x="22" y="24" font-size="7" fill="#1b1b1b">1</text>' +
+                '<text x="60" y="24" font-size="7" fill="#1b1b1b">2</text>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">1</span>Lay the sheet portrait. Fold in half right-over-left, then unfold. This makes the vertical center line.</div>' +
+            '</div>' +
+
+            // Panel 2: sheet portrait, fold top edge to bottom edge.
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="15" y="10" width="60" height="110" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                // horizontal fold line through middle
+                '<line x1="15" y1="65" x2="75" y2="65" stroke="#b50909" stroke-width="1.2" stroke-dasharray="4 3"/>' +
+                // curved arrow top folding down
+                '<path d="M 20 25 Q 45 45 70 30" fill="none" stroke="#005ea2" stroke-width="2"/>' +
+                '<polygon points="70,30 66,34 65,27" fill="#005ea2"/>' +
+                // vertical center line already created
+                '<line x1="45" y1="10" x2="45" y2="120" stroke="#b50909" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">2</span>Fold top edge down to bottom edge, then unfold. Now the sheet has 4 quadrants.</div>' +
+            '</div>' +
+
+            // Panel 3: sheet portrait with quadrant labels showing 5,4 / 3,6
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="15" y="10" width="60" height="110" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<line x1="45" y1="10" x2="45" y2="120" stroke="#b50909" stroke-width="1" stroke-dasharray="3 3"/>' +
+                '<line x1="15" y1="65" x2="75" y2="65" stroke="#b50909" stroke-width="1" stroke-dasharray="3 3"/>' +
+                // quadrant numbers, top two upside down
+                '<text x="28" y="40" font-size="14" fill="#1b1b1b" transform="rotate(180 30 35)">5</text>' +
+                '<text x="55" y="40" font-size="14" fill="#1b1b1b" transform="rotate(180 57 35)">4</text>' +
+                '<text x="28" y="95" font-size="14" fill="#1b1b1b">3</text>' +
+                '<text x="55" y="95" font-size="14" fill="#1b1b1b">6</text>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">3</span>You now have 4 quadrants. Top row is upside-down (pages 5, 4). Bottom row is upright (pages 3, 6).</div>' +
+            '</div>' +
+
+            // Panel 4: scissors cutting the center of the vertical line
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="15" y="10" width="60" height="110" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                // vertical cut line down the center (solid)
+                '<line x1="45" y1="10" x2="45" y2="65" stroke="#1b1b1b" stroke-width="1.8"/>' +
+                // scissors emoji-ish shape
+                '<circle cx="45" cy="70" r="4" fill="none" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<circle cx="45" cy="78" r="4" fill="none" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<line x1="48" y1="70" x2="55" y2="60" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<line x1="48" y1="78" x2="55" y2="88" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<text x="48" y="100" font-size="7" fill="#1b1b1b">cut here</text>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">4</span>Cut along the vertical center line from one end to the middle only.</div>' +
+            '</div>' +
+
+            // Panel 5: open into a W, showing arrows
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                '<polygon points="15,30 45,60 45,120 15,110" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<polygon points="45,60 75,30 75,110 45,120" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                // arrows outward from the peaks
+                '<path d="M 20 30 L 10 20" stroke="#005ea2" stroke-width="2"/>' +
+                '<polygon points="10,20 15,18 12,24" fill="#005ea2"/>' +
+                '<path d="M 70 30 L 80 20" stroke="#005ea2" stroke-width="2"/>' +
+                '<polygon points="80,20 78,24 83,26" fill="#005ea2"/>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">5</span>Open the cut. Push the two top peaks apart. The paper now looks like a W from the side.</div>' +
+            '</div>' +
+
+            // Panel 6: W collapses into a booklet
+            '<div class="zf-fold-step">' +
+              '<svg viewBox="0 0 90 130" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="25" y="40" width="40" height="55" fill="#fbf6e8" stroke="#1b1b1b" stroke-width="1.2"/>' +
+                '<text x="41" y="72" font-size="18" font-weight="bold" fill="#1b1b1b">1</text>' +
+                '<text x="48" y="118" font-size="7" fill="#71767a">finished</text>' +
+              '</svg>' +
+              '<div class="zf-fold-caption"><span class="zf-fold-num">6</span>The W collapses into a booklet. Page 1 is now on the front cover.</div>' +
+            '</div>' +
+
+          '</div>' +
+        '</div>'
+    };
+
+    var ZineSheet = {
+      data: function () { return { store: store, showPageNumbers: true }; },
+      watch: {
+        "store.view": function (v) {
+          if (v === "sheet") {
+            var self = this;
+            this.$nextTick(function () { self.sheetInjectFlows(); });
+          }
+        },
+        "store.pages": {
+          deep: true,
+          handler: function () {
+            var self = this;
+            this.$nextTick(function () { self.sheetInjectFlows(); });
+          }
+        }
+      },
+      computed: {
+        model: function () { return store.model(); },
+        themeStyle: function () {
+          if (!window.ZFThemes || !store.theme()) return {};
+          return window.ZFThemes.pageStyle(store.theme());
+        },
+        sheetStyle: function () {
+          var m = this.model;
+          if (!m) return {};
+          // Screen display: fit within a 560px-tall preview.
+          var aspect = m.paper.width / m.paper.height;
+          var h = 560;
+          var w = Math.round(h * aspect);
+          return { width: w + 'px', height: h + 'px' };
+        },
+        paperCss: function () {
+          var m = this.model;
+          if (!m) return '';
+          // Emit dynamic @page rules and the print size for this model's paper.
+          // NOTE: do NOT include an orientation keyword alongside explicit
+          // dimensions -- that confuses some browsers. Use explicit dims only.
+          var unit = m.paper.unit === 'in' ? 'in' : 'mm';
+          var w = m.paper.width + unit;
+          var h = m.paper.height + unit;
+          var aspect = m.paper.width / m.paper.height;
+          // No scale: the sheet prints edge-to-edge at exactly the paper size,
+          // so the fold lines land at the correct physical positions. Printers
+          // may clip the outer unprintable border (typically ~0.15-0.25in);
+          // design accordingly (put important content away from the extreme
+          // edges, or use the page margin for a bleed buffer).
+          return '@page { size: ' + w + ' ' + h + '; margin: 0; }\n' +
+                 '@media print {\n' +
+                 '  html, body { margin: 0; padding: 0; background: #ffffff; }\n' +
+                 '  .zf-sheet {\n' +
+                 '    width: ' + w + ' !important;\n' +
+                 '    height: ' + h + ' !important;\n' +
+                 '    margin: 0 !important;\n' +
+                 '    padding: 0 !important;\n' +
+                 '    transform: none !important;\n' +
+                 '    overflow: visible !important;\n' +
+                 '  }\n' +
+                 '  /* Lock the sheet aspect ratio to the paper so nothing gets\n' +
+                 '     squished if the browser overrides our page size. */\n' +
+                 '  .zf-sheet, .zf-slot, .zf-mini-page {\n' +
+                 '    aspect-ratio: auto;\n' +
+                 '  }\n' +
+                 '}\n';
+        },
+        slots: function () {
+          var m = this.model;
+          if (!m || !window.ZFModels) return [];
+          return m.slots.map(function (slot) {
+            var rect = window.ZFModels.slotRect(m, slot);
+            var page = store.pages[slot.page - 1];
+            // Compute a page scale for this slot: slot is 1 column wide.
+            // The slot's rendered width is (sheetWidthPx / cols). The physical
+            // mini-page width in CSS px is (page width in inches * 96).
+            // But since the sheet is landscape and slots sit rotated, keep it
+            // simple: scale by (sheetRenderedWidthPx / cols) / physicalPageWidthPx.
+            var unit = m.page.unit || 'in';
+            var pageInchesW = unit === 'mm' ? m.page.width / 25.4 : m.page.width;
+            var physicalCssW = pageInchesW * 96;
+            // sheet is fixed at 560 tall by display height; width follows aspect.
+            var sheetHeight = 560;
+            var aspect = m.paper.width / m.paper.height;
+            var sheetWidth = sheetHeight * aspect;
+            var grid = window.ZFModels.gridSize(m);
+            var slotRenderedW = sheetWidth / grid.cols;
+            var slotScale = slotRenderedW / physicalCssW;
+            return {
+              key: 's-' + slot.page,
+              pageNum: slot.page,
+              rotation: slot.rotation,
+              rect: rect,
+              page: page,
+              isEmpty: !page || (!page.heading && !page.body && !page.image),
+              pageScale: slotScale,
+              pageMargin: store.marginIn + 'in',
+              bodyHtml: page ? (page.body || '') : ''
+            };
+          });
+        }
+      },
+      methods: {
+        slotBlockImageStyleFor: function (img, s) {
+          var m = this.model;
+          if (!m || !img || !img.src) return {};
+          var px = 96 * (s.pageScale || 1);
+          var w = (typeof img.w === "number" ? img.w : 1.5);
+          var rot = (typeof img.rot === "number" ? img.rot : 0);
+          return {
+            width: (w * px) + "px",
+            maxWidth: "100%",
+            marginBottom: "0.5rem",
+            transform: "rotate(" + rot + "deg)",
+            transformOrigin: "center center"
+          };
+        },
+        slotFreeImageStyleFor: function (img, s) {
+          var m = this.model;
+          if (!m || !img || !img.src) return {};
+          var px = 96 * (s.pageScale || 1);
+          var margin = store.marginIn;
+          var x = (typeof img.x === "number" ? img.x : 0) + margin;
+          var y = (typeof img.y === "number" ? img.y : 0) + margin;
+          var w = (typeof img.w === "number" ? img.w : 1.5);
+          var rot = (typeof img.rot === "number" ? img.rot : 0);
+          return {
+            left: (x * px) + "px",
+            top: (y * px) + "px",
+            width: (w * px) + "px",
+            transform: "rotate(" + rot + "deg)",
+            transformOrigin: "center center"
+          };
+        },
+        slotTextBoxStyleFor: function (box, s) {
+          var m = this.model;
+          if (!m || !box) return {};
+          var px = 96 * (s.pageScale || 1);
+          var margin = store.marginIn;
+          var x = (typeof box.x === "number" ? box.x : 0) + margin;
+          var y = (typeof box.y === "number" ? box.y : 0) + margin;
+          var w = (typeof box.w === "number" ? box.w : 1.8);
+          var rot = (typeof box.rot === "number" ? box.rot : 0);
+          var fontSize = (typeof box.fontSize === "number" ? box.fontSize : 1.0);
+          return {
+            position: "absolute",
+            left: (x * px) + "px",
+            top: (y * px) + "px",
+            width: (w * px) + "px",
+            transform: "rotate(" + rot + "deg)",
+            transformOrigin: "center center",
+            fontSize: (fontSize * 100) + "%"
+          };
+        },
+        slotBlockImageStyle: function (s) {
+          // Legacy fallback for old single-image pages.
+          var m = this.model;
+          if (!m || !s || !s.page || !s.page.image) return {};
+          var px = 96 * (s.pageScale || 1);
+          var w = (typeof s.page.imageW === "number" ? s.page.imageW : 1.5);
+          var rot = (typeof s.page.imageRot === "number" ? s.page.imageRot : 0);
+          return {
+            width: (w * px) + "px",
+            maxWidth: "100%",
+            marginBottom: "0.5rem",
+            transform: "rotate(" + rot + "deg)",
+            transformOrigin: "center center"
+          };
+        },
+        slotFreeImageStyle: function (s) {
+          // Legacy fallback for old single-image pages.
+          var m = this.model;
+          if (!m || !s || !s.page || !s.page.image) return {};
+          var px = 96 * (s.pageScale || 1);
+          var margin = store.marginIn;
+          var x = (typeof s.page.imageX === "number" ? s.page.imageX : 0) + margin;
+          var y = (typeof s.page.imageY === "number" ? s.page.imageY : 0) + margin;
+          var w = (typeof s.page.imageW === "number" ? s.page.imageW : 1.5);
+          var rot = (typeof s.page.imageRot === "number" ? s.page.imageRot : 0);
+          return {
+            left: (x * px) + "px",
+            top: (y * px) + "px",
+            width: (w * px) + "px",
+            transform: "rotate(" + rot + "deg)"
+          };
+        },
+        sheetInjectFlows: function () {
+          var self = this;
+          this.$nextTick(function () {
+            self._attemptSheetInject(0);
+          });
+        },
+        _attemptSheetInject: function (attempt) {
+          var self = this;
+          if (attempt > 20) return;
+          // Only retry while the sheet view is actually active.
+          if (store.view !== "sheet") return;
+          var root = self.$el;
+          if (!root) { self._schedSheetRetry(attempt); return; }
+          var bodies = root.querySelectorAll('.zf-mini-body[data-slot-page]');
+          if (!bodies.length) { self._schedSheetRetry(attempt); return; }
+          // Check if the sheet is visible yet (first body should have size)
+          var firstRect = bodies[0].getBoundingClientRect();
+          if (firstRect.width < 20 || firstRect.height < 20) {
+            self._schedSheetRetry(attempt);
+            return;
+          }
+          // TEMPORARY: legacy single-image path. Will be replaced by the
+          // multi-image loop in a subsequent step.
+          for (var i = 0; i < bodies.length; i++) {
+            var el = bodies[i];
+            var pageNum = Number(el.getAttribute('data-slot-page'));
+            var page = store.pages[pageNum - 1];
+            if (!page) continue;
+            var stale = el.querySelectorAll('[data-zf-spacer="1"], [data-zf-flow-img="1"]');
+            for (var k = 0; k < stale.length; k++) stale[k].remove();
+            // Support both old (page.image) and new (page.images) shape.
+            var flowImgs = [];
+            if (Array.isArray(page.images) && page.images.length) {
+              for (var fi = 0; fi < page.images.length; fi++) {
+                if (page.images[fi].wrap === 'flow') flowImgs.push(page.images[fi]);
+              }
+            } else if (page.image && page.imageWrap === 'flow') {
+              flowImgs.push({ src: page.image, x: page.imageX || 0, y: page.imageY || 0, w: page.imageW || 1.5, rot: page.imageRot || 0 });
+            }
+            if (!flowImgs.length) continue;
+            var m = self.model;
+            if (!m) continue;
+            var slotEl = el.closest('.zf-mini-page');
+            var slotScale = 1;
+            if (slotEl) {
+              var styleScale = slotEl.style.getPropertyValue('--zf-page-scale');
+              slotScale = parseFloat(styleScale) || 1;
+            }
+            var px = 96 * slotScale;
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 20) continue;
+            var bodyWIn = rect.width / px;
+            var bodyHIn = rect.height / px;
+            for (var fk = 0; fk < flowImgs.length; fk++) {
+              zfInjectFlow(el, flowImgs[fk], px, bodyWIn, bodyHIn);
+            }
+          }
+        },
+        _schedSheetRetry: function (attempt) {
+          var self = this;
+          setTimeout(function () { self._attemptSheetInject(attempt + 1); }, 80);
+        },
+        printSheet: function () { window.print(); },
+        installPaperCss: function () {
+          var id = 'zf-paper-css';
+          var el = document.getElementById(id);
+          if (!el) {
+            el = document.createElement('style');
+            el.id = id;
+            document.head.appendChild(el);
+          }
+          el.textContent = this.paperCss;
+        }
+      },
+      mounted: function () {
+        this.installPaperCss();
+        this.sheetInjectFlows();
+      },
+      updated: function () {
+        this.installPaperCss();
+        this.sheetInjectFlows();
+      },
+      template:
+        '<div class="zf-sheet-view">' +
+          '<component :is="\'style\'" v-html="paperCss"></component>' +
+          '<div class="zf-no-print" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">' +
+            '<div>' +
+              '<h2 style="margin:0;font-family:var(--zf-serif);">{{ model ? model.label : \'No model\' }}</h2>' +
+              '<div class="zf-muted">Printable sheet preview. Fold and cut along the dashed guides.</div>' +
+            '</div>' +
+            '<div class="zf-header-actions" style="gap:0.5rem;">' +
+              '<label class="zf-muted" style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;">' +
+                '<input type="checkbox" v-model="showPageNumbers" /> page numbers' +
+              '</label>' +
+              '<button class="zf-btn zf-btn-primary" @click="printSheet">Print this sheet</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="zf-sheet" :style="sheetStyle">' +
+            '<div class="zf-sheet-guides zf-no-print">' +
+              '<div class="zf-fold-h"></div>' +
+              '<div class="zf-fold-v"></div>' +
+            '</div>' +
+            '<div v-for="s in slots" :key="s.key" class="zf-slot" :style="Object.assign({}, s.rect, themeStyle)">' +
+              '<div class="zf-mini-page zf-slot-rot" :style="{ transform: \'rotate(\' + s.rotation + \'deg)\', width: \'100%\', height: \'100%\', \'--zf-page-scale\': s.pageScale, \'--zf-page-margin\': s.pageMargin }">' +
+                '<span v-if="showPageNumbers && s.pageNum > 1" class="zf-slot-page-num">{{ s.pageNum - 1 }}</span>' +
+                '<template v-if="!s.isEmpty">' +
+                  '<h3 class="zf-mini-heading" v-if="s.page.heading">{{ s.page.heading }}</h3>' +
+                  '<template v-for="img in (s.page.images || [])" :key="\'sl-blk-\' + img.id">' +
+                    '<img v-if="img.wrap === \'block\'" ' +
+                      'class="zf-mini-image zf-block-image" :src="img.src" alt="" ' +
+                      ':style="slotBlockImageStyleFor(img, s)" />' +
+                  '</template>' +
+                  '<div class="zf-mini-body" :data-slot-page="s.pageNum" v-html="s.bodyHtml" style="position: relative;"></div>' +
+                  '<template v-for="img in (s.page.images || [])" :key="\'sl-free-\' + img.id">' +
+                    '<img v-if="img.wrap === \'free\' || !img.wrap" ' +
+                      'class="zf-mini-image zf-positioned" :src="img.src" alt="" ' +
+                      ':style="slotFreeImageStyleFor(img, s)" />' +
+                  '</template>' +
+                  '<template v-for="box in (s.page.textBoxes || [])" :key="\'sl-tb-\' + box.id">' +
+                    '<div class="zf-textbox zf-textbox-readonly" :style="slotTextBoxStyleFor(box, s)">' +
+                      '<div class="zf-textbox-content" v-html="box.html"></div>' +
+                    '</div>' +
+                  '</template>' +
+                '</template>' +
+                '<div v-else class="zf-slot-empty">page {{ s.pageNum }} empty</div>' +
+              '</div>' +
+
+            '</div>' +
+          '</div>' +
+
+          '<div class="zf-instructions zf-no-print" v-if="model && model.instructions">' +
+            '<h3>Text instructions</h3>' +
+            '<ol>' +
+              '<li v-for="(step, i) in model.instructions" :key="i">{{ step }}</li>' +
+            '</ol>' +
+          '</div>' +
+        '</div>'
+    };
+
+    function loadSharedZineFromHash() {
+      var hash = location.hash || '';
+      var m = hash.match(/(?:^#|&)z=([^&]+)/);
+      if (!m) return;
+      try {
+        var parsed = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+        if (!parsed || !Array.isArray(parsed.p)) return;
+        store.title = parsed.t || 'Untitled Zine';
+        store.author = parsed.a || '';
+        store.pages = parsed.p.map(function (p, i) {
+          return { id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7), heading: p.h || '', body: p.b || '', image: p.i || '' };
+        });
+        if (!store.pages.length) store.pages = [zfEmptyPage()];
+        store.activePageId = store.pages[0].id;
+        store.view = 'reader';
+      } catch (e) { zfLog('bad share link: ' + e.message); }
+    }
+
+    function boot() {
+      if (!window.Vue) {
+        document.getElementById('app').innerHTML =
+          '<div class="zf-empty" style="margin:2rem;">Vue failed to load from the CDN.</div>';
+        zfLog('Vue missing - aborting boot');
+        return;
+      }
+      zfLog('Vue found, mounting...');
+      try {
+        var app = Vue.createApp({
+          data: function () { return { store: store }; },
+          template: '<app-shell />'
+        });
+        app.component('app-shell', AppShell);
+        app.component('zine-editor', ZineEditor);
+        app.component('zine-reader', ZineReader);
+        app.component('zine-sheet', ZineSheet);
+        app.component('zine-library', ZineLibrary);
+        app.config.errorHandler = function (err, instance, info) {
+          zfLog('VUE ERROR: ' + (err && err.message ? err.message : err) + ' | info: ' + info);
+        };
+        app.config.warnHandler = function (msg, instance, trace) {
+          zfLog('VUE WARN: ' + msg);
+        };
+        app.mount('#app');
+        zfLog('mounted OK; view=' + store.view + '; pages=' + store.pages.length);
+      } catch (e) {
+        zfLog('MOUNT ERROR: ' + (e && e.message ? e.message : String(e)));
+        zfLog('STACK: ' + (e && e.stack ? e.stack : '(no stack)'));
+        try {
+          document.getElementById('app').innerHTML =
+            '<div class="zf-empty" style="margin:2rem;">Boot failed: ' + (e && e.message ? e.message : String(e)) + '</div>';
+        } catch (e2) {}
+      }
+      loadSharedZineFromHash();
+      window.addEventListener('hashchange', loadSharedZineFromHash);
+
+      // Keyboard shortcuts for undo/redo. Skip when focus is inside an
+      // input/textarea/contenteditable so users get normal browser undo
+      // while typing (which is not what we want for structure changes but
+      // is what they'd expect for text).
+      window.addEventListener('keydown', function (evt) {
+        var cmd = evt.ctrlKey || evt.metaKey;
+        if (!cmd) return;
+        var key = (evt.key || '').toLowerCase();
+        if (key === 'z' && !evt.shiftKey) {
+          evt.preventDefault();
+          if (window.ZFUndo) window.ZFUndo();
+        } else if ((key === 'z' && evt.shiftKey) || key === 'y') {
+          evt.preventDefault();
+          if (window.ZFRedo) window.ZFRedo();
+        }
+      });
+
+    // -------- Undo / redo --------
+    // Snapshot-based history: keeps the last N "meaningful" states of the
+    // zine. A state is captured on a debounce whenever the content changes
+    // (same signal the autosave loop uses). This is simple and covers every
+    // kind of edit (text, images, text boxes, page ops, model/theme changes).
+    var ZF_HISTORY_MAX = 40;
+    var zfHistory = [];       // past states, oldest first
+    var zfRedo = [];          // future states (after undo)
+    var zfLastSnapStr = '';   // last captured state, to detect changes
+    var zfSnapTimer = null;
+    var zfApplying = false;   // set during undo/redo to suppress snapshots
+
+    function zfCaptureState() {
+      return {
+        title: store.title,
+        author: store.author,
+        modelId: store.modelId,
+        themeId: store.themeId,
+        marginIn: store.marginIn,
+        pages: JSON.parse(JSON.stringify(store.pages))
+      };
+    }
+
+    function zfApplyState(snap) {
+      zfApplying = true;
+      store.title = snap.title;
+      store.author = snap.author;
+      store.modelId = snap.modelId;
+      store.themeId = snap.themeId;
+      store.marginIn = snap.marginIn;
+      store.pages = snap.pages.map(function (p) {
+        // Ensure optional arrays exist.
+        if (!Array.isArray(p.images)) p.images = [];
+        if (!Array.isArray(p.textBoxes)) p.textBoxes = [];
+        return p;
+      });
+      if (!store.pages.length) store.pages = [zfEmptyPage()];
+      if (!store.pages.find(function (p) { return p.id === store.activePageId; })) {
+        store.activePageId = store.pages[0].id;
+      }
+      zfApplying = false;
+      zfLastSnapStr = JSON.stringify(zfCaptureState());
+    }
+
+    function zfCommitHistory() {
+      // Called from the autosave loop when content has changed. Snapshots the
+      // PREVIOUS state (zfLastSnapStr) into history, then updates lastSnap.
+      if (zfApplying) return;
+      var current = zfCaptureState();
+      var currentStr = JSON.stringify(current);
+      if (currentStr === zfLastSnapStr) return;
+      if (zfLastSnapStr) {
+        try {
+          zfHistory.push(JSON.parse(zfLastSnapStr));
+          if (zfHistory.length > ZF_HISTORY_MAX) zfHistory.shift();
+          zfRedo.length = 0;
+        } catch (e) { /* ignore */ }
+      }
+      zfLastSnapStr = currentStr;
+    }
+
+    function zfUndo() {
+      if (!zfHistory.length) { store.status = 'Nothing to undo.'; return; }
+      var current = zfCaptureState();
+      var prev = zfHistory.pop();
+      zfRedo.push(current);
+      zfApplyState(prev);
+      store.status = 'Undo.';
+      setTimeout(function () { if (store.status === 'Undo.') store.status = ''; }, 1200);
+    }
+
+    function zfRedoAction() {
+      if (!zfRedo.length) { store.status = 'Nothing to redo.'; return; }
+      var next = zfRedo.pop();
+      zfHistory.push(zfCaptureState());
+      zfApplyState(next);
+      store.status = 'Redo.';
+      setTimeout(function () { if (store.status === 'Redo.') store.status = ''; }, 1200);
+    }
+
+    // Seed the initial snapshot so we have a baseline.
+    zfLastSnapStr = JSON.stringify(zfCaptureState());
+
+    // Autosave loop: writes the current draft slot and, if the zine has an
+    // id, mirrors it into the local library. Also drives the undo history.
+    setInterval(function () {
+      var snap = JSON.stringify({
+        t: store.title, a: store.author, m: store.modelId, th: store.themeId,
+        p: store.pages
+      });
+      if (snap !== store._zfLastAutoSave) {
+        // Check whether it's actually different from the last snapshot.
+        // zfCommitHistory handles this internally using its own tracker.
+        zfCommitHistory();
+        store._zfLastAutoSave = snap;
+        store.saveDraft();
+        if (store.currentZineId) store.saveToLibrary();
+      }
+    }, 1500);
+
+    // Expose for buttons and keyboard handlers.
+    window.ZFUndo = zfUndo;
+    window.ZFRedo = zfRedoAction;
+    window.ZFCanUndo = function () { return zfHistory.length > 0; };
+    window.ZFCanRedo = function () { return zfRedo.length > 0; };
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
+  </script>
+</body>
+</html>
