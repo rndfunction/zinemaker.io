@@ -1,0 +1,287 @@
+/* Zine Forge - base styles (USWDS-inspired) */
+:root {
+  --zf-blue: #005ea2;
+  --zf-blue-dark: #1a4480;
+  --zf-ink: #1b1b1b;
+  --zf-gray-light: #f0f0f0;
+  --zf-gray-mid: #71767a;
+  --zf-border: #dfe1e2;
+  --zf-red: #b50909;
+  --zf-font: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --zf-serif: "Source Serif Pro", Georgia, "Times New Roman", serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--zf-font);
+  color: var(--zf-ink);
+  background: #ffffff;
+}
+
+button, input, textarea, select { font-family: inherit; }
+
+a { color: var(--zf-blue); }
+
+.zf-header {
+  background: var(--zf-blue-dark);
+  color: #ffffff;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.zf-header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.zf-header .zf-sub {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-left: 0.5rem;
+  font-weight: 400;
+}
+
+.zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.zf-btn {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: #ffffff;
+  color: var(--zf-blue-dark);
+  transition: background 0.15s ease;
+}
+
+.zf-btn:hover { background: var(--zf-gray-light); }
+
+.zf-btn:focus-visible {
+  outline: 3px solid #ffbe2e;
+  outline-offset: 2px;
+}
+
+.zf-btn-secondary {
+  background: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.zf-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.zf-btn-primary { background: #ffbe2e; color: var(--zf-ink); font-weight: 600; }
+.zf-btn-primary:hover { background: #e5a000; }
+
+.zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+
+.zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
+.zf-error { color: var(--zf-red); font-size: 0.9rem; }
+
+.zf-empty {
+  border: 2px dashed var(--zf-border);
+  border-radius: 6px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--zf-gray-mid);
+}
+
+.zf-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* -------- Editor layout -------- */
+.zf-editor {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .zf-editor { grid-template-columns: 1fr; }
+}
+
+.zf-page-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--zf-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.zf-page-list li {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--zf-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.zf-page-list li:last-child { border-bottom: none; }
+.zf-page-list li.active { background: var(--zf-blue); color: #ffffff; }
+.zf-page-list li.active .zf-mini { color: #ffffff; opacity: 0.8; }
+
+.zf-mini {
+  font-size: 0.75rem;
+  color: var(--zf-gray-mid);
+}
+
+.zf-page-tools { display: flex; gap: 0.25rem; }
+
+.zf-icon-btn {
+  border: 1px solid var(--zf-border);
+  background: #ffffff;
+  border-radius: 4px;
+  width: 26px; height: 26px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+}
+
+.zf-icon-btn:hover { background: var(--zf-gray-light); }
+.zf-icon-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 1px; }
+
+/* -------- Canvas / page -------- */
+.zf-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  background: var(--zf-gray-light);
+  padding: 1.5rem;
+  border-radius: 6px;
+}
+
+.zf-page {
+  width: 480px;
+  min-height: 640px;
+  background: #ffffff;
+  border: 1px solid var(--zf-border);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  padding: 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.zf-page-heading {
+  font-family: var(--zf-serif);
+  font-size: 1.5rem;
+  border: none;
+  border-bottom: 2px solid var(--zf-ink);
+  padding: 0.25rem 0;
+  width: 100%;
+  outline: none;
+  background: transparent;
+}
+
+.zf-page-body {
+  flex: 1;
+  border: none;
+  resize: vertical;
+  font-family: var(--zf-serif);
+  font-size: 1rem;
+  line-height: 1.5;
+  width: 100%;
+  outline: none;
+  background: transparent;
+}
+
+.zf-page-image {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.zf-inline-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.zf-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--zf-gray-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.zf-input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--zf-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.zf-field { margin-bottom: 0.75rem; }
+
+/* -------- Reader -------- */
+.zf-reader {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.zf-reader-page {
+  background: #ffffff;
+  border: 1px solid var(--zf-border);
+  border-radius: 6px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.zf-reader-page h2 {
+  font-family: var(--zf-serif);
+  font-size: 1.75rem;
+  margin-top: 0;
+  border-bottom: 2px solid var(--zf-ink);
+  padding-bottom: 0.25rem;
+}
+
+.zf-reader-page .zf-reader-body {
+  font-family: var(--zf-serif);
+  line-height: 1.6;
+  font-size: 1.05rem;
+  white-space: pre-wrap;
+}
+
+.zf-reader-page img { max-width: 100%; border-radius: 4px; margin: 0.75rem 0; }
+
+.zf-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* -------- Print -------- */
+@media print {
+  .zf-header, .zf-no-print, .zf-pager { display: none !important; }
+  body { background: #ffffff; }
+  .zf-reader-page {
+    box-shadow: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    page-break-after: always;
+  }
+}
