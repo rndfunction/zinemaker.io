@@ -58,17 +58,10 @@
 
   <template id="zine-reader-template">
     <div class="zf-reader">
-      <div class="zf-no-print" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
-        <div>
-          <h2 style="margin:0;font-family:var(--zf-serif);">{{ store.title || 'Untitled Zine' }}</h2>
-          <div class="zf-muted" v-if="store.author">by {{ store.author }}</div>
-        </div>
-        <div class="zf-header-actions" style="gap:0.5rem;">
-          <button class="zf-btn zf-btn-primary" @click="shareLink">Share link</button>
-          <button class="zf-btn" style="border-color:var(--zf-border);" @click="printZine">Print / PDF</button>
-        </div>
+      <div class="zf-no-print" style="margin-bottom:1rem;">
+        <h2 style="margin:0;font-family:var(--zf-serif);">{{ store.title || 'Untitled Zine' }}</h2>
+        <div class="zf-muted" v-if="store.author">by {{ store.author }}</div>
       </div>
-      <div v-if="shareStatus" class="zf-muted" role="status" aria-live="polite" style="margin-bottom:0.75rem;">{{ shareStatus }}</div>
       <article class="zf-mini-page" v-if="page" :style="Object.assign({}, readerThemeStyle, readerPageStyle)">
         <h2 class="zf-mini-heading" v-if="page.heading">{{ page.heading }}</h2>
         <template v-for="img in (page.images || [])" :key="'r-blk-' + img.id">
