@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zine Forge - Style Mockups</title>
+<style>
+  /* Shared mockup scaffolding. Each theme re-skins the SAME markup
+     by overriding CSS custom properties on [data-theme]. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+
+  .mock-tabs {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; gap: 0.25rem; padding: 0.6rem 1rem;
+    background: #1b1b1b; color: #fff; flex-wrap: wrap; align-items: center;
+  }
+  .mock-tabs strong { font-size: 0.85rem; margin-right: 0.75rem; opacity: 0.8; }
+  .mock-tabs button {
+    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 4px; padding: 0.35rem 0.75rem; font-size: 0.8rem; cursor: pointer;
+  }
+  .mock-tabs button[aria-pressed="true"] { background: #ffbe2e; color: #1b1b1b; border-color: #ffbe2e; font-weight: 700; }
+  .mock-note { padding: 0.75rem 1rem; font-size: 0.85rem; color: #71767a; }
+
+  /* ---------- THEME: cut & paste ---------- */
+  [data-theme="cut"] {
+    --bg: #eae6da; --panel: #f4f1e8; --paper: #fdfbf4;
+    --ink: #121212; --muted: #5b564c; --accent: #d7263d; --accent-2: #1b1b1b;
+    --border: #121212; --radius: 0px; --radius-btn: 0px;
+    --font-head: "Arial Black", "Helvetica Neue", Impact, sans-serif;
+    --font-body: "Courier New", Courier, monospace;
+    --shadow: 4px 4px 0 var(--ink);
+    --header-bg: #121212; --header-ink: #fdfbf4;
+    --btn-bg: #fdfbf4; --btn-ink: #121212; --btn-border: #121212;
+    --gap: 0.85rem;
+  }
+  /* ---------- THEME: risograph ---------- */
+  [data-theme="riso"] {
+    --bg: #f3eee3; --panel: #f8f4ec; --paper: #fbf7ef;
+    --ink: #1a2b4a; --muted: #6b7280; --accent: #ff4d80; --accent-2: #2b6cb0;
+    --border: #cfc7b8; --radius: 6px; --radius-btn: 4px;
+    --font-head: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-body: Georgia, "Times New Roman", serif;
+    --shadow: 3px 3px 0 rgba(43,108,176,0.25), -2px -2px 0 rgba(255,77,128,0.18);
+    --header-bg: #2b6cb0; --header-ink: #fbf7ef;
+    --btn-bg: #fbf7ef; --btn-ink: #1a2b4a; --btn-border: #2b6cb0;
+    --gap: 1rem;
+  }
+  /* ---------- THEME: editorial ---------- */
+  [data-theme="editorial"] {
+    --bg: #f4f1ea; --panel: #faf8f3; --paper: #ffffff;
+    --ink: #111111; --muted: #6b6b6b; --accent: #111111; --accent-2: #8b0000;
+    --border: #d8d3c8; --radius: 0px; --radius-btn: 0px;
+    --font-head: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --font-body: Georgia, "Times New Roman", serif;
+    --shadow: 0 1px 0 var(--border);
+    --header-bg: #ffffff; --header-ink: #111111;
+    --btn-bg: #ffffff; --btn-ink: #111111; --btn-border: #111111;
+    --gap: 1.25rem;
+  }
+  /* ---------- THEME: soft studio ---------- */
+  [data-theme="soft"] {
+    --bg: #f6f4ef; --panel: #ffffff; --paper: #ffffff;
+    --ink: #23272f; --muted: #7a8291; --accent: #3b7dd8; --accent-2: #7c5cff;
+    --border: #e6e3dc; --radius: 14px; --radius-btn: 10px;
+    --font-head: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-body: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --shadow: 0 8px 24px rgba(35,39,47,0.08);
+    --header-bg: #ffffff; --header-ink: #23272f;
+    --btn-bg: #f6f4ef; --btn-ink: #23272f; --btn-border: #e6e3dc;
+    --gap: 1rem;
+  }
+
+  /* ---------- generic chrome ---------- */
+  .topbar {
+    background: var(--header-bg); color: var(--header-ink);
+    padding: 0.85rem 1.25rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  }
+  .topbar h1 { font-family: var(--font-head); font-size: 1.25rem; margin: 0; }
+  [data-theme="cut"] .topbar h1 { text-transform: uppercase; letter-spacing: 0.04em; }
+  [data-theme="editorial"] .topbar { border-bottom: 3px double var(--ink); }
+  [data-theme="editorial"] .topbar h1 { font-weight: 400; }
+  [data-theme="soft"] .topbar { border-bottom: 1px solid var(--border); }
+  .topbar .sub { font-size: 0.8rem; opacity: 0.8; margin-left: 0.5rem; font-weight: 400; }
+  .nav { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+  .nav button {
+    font-family: var(--font-body);
+    background: var(--btn-bg); color: var(--btn-ink);
+    border: 1px solid var(--btn-border); border-radius: var(--radius-btn);
+    padding: 0.45rem 0.85rem; font-size: 0.85rem; cursor: pointer;
+  }
+  [data-theme="cut"] .nav button { box-shadow: 2px 2px 0 var(--header-ink); }
+  .nav button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  [data-theme="soft"] .nav button.primary { box-shadow: 0 4px 12px rgba(59,125,216,0.3); }
+
+  .body { max-width: 1180px; margin: 0 auto; padding: 1.5rem; }
+  .editor { display: grid; grid-template-columns: 250px 1fr 320px; gap: var(--gap); align-items: start; }
+  @media (max-width: 1000px) { .editor { grid-template-columns: 250px 1fr; } .tools { grid-column: 1 / -1; } }
+  @media (max-width: 700px) { .editor { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0.9rem;
+  }
+  [data-theme="cut"] .panel { box-shadow: var(--shadow); }
+  [data-theme="soft"] .panel { box-shadow: var(--shadow); }
+  .panel + .panel { margin-top: 0.75rem; }
+
+  .field-label {
+    display: block; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; font-weight: 700;
+  }
+  .input {
+    width: 100%; padding: 0.5rem 0.6rem; font-family: var(--font-body);
+    font-size: 0.9rem; color: var(--ink); background: var(--paper);
+    border: 1px solid var(--border); border-radius: var(--radius-btn);
+  }
+  .field + .field { margin-top: 0.65rem; }
+
+  .page-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+  .page-list li {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.55rem 0.6rem; border: 1px solid var(--border); border-bottom: none;
+    font-family: var(--font-body); font-size: 0.88rem; background: var(--paper); cursor: pointer;
+  }
+  .page-list li:last-child { border-bottom: 1px solid var(--border); }
+  .page-list li.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .page-list li .num { font-weight: 700; opacity: 0.7; margin-right: 0.35rem; }
+
+  .canvas-wrap {
+    display: flex; justify-content: center; padding: 1.75rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  [data-theme="cut"] .canvas-wrap { background: repeating-linear-gradient(45deg, var(--bg), var(--bg) 12px, #e2ddcf 12px, #e2ddcf 24px); }
+  [data-theme="soft"] .canvas-wrap { border: none; }
+  .page {
+    width: 420px; min-height: 560px; background: var(--paper);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 1.6rem; display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  [data-theme="soft"] .page { border: none; }
+  .page h2 {
+    font-family: var(--font-head); font-size: 1.6rem; margin: 0;
+    border-bottom: 2px solid var(--accent); padding-bottom: 0.3rem; color: var(--ink);
+  }
+  [data-theme="cut"] .page h2 { text-transform: uppercase; }
+  [data-theme="editorial"] .page h2 { font-weight: 400; border-bottom: 1px solid var(--ink); }
+  .page .body-text {
+    font-family: var(--font-body); font-size: 1rem; line-height: 1.55;
+    color: var(--ink); white-space: pre-wrap; flex: 1;
+  }
+  .img-placeholder {
+    background: var(--bg); border: 1px dashed var(--muted); border-radius: var(--radius-btn);
+    height: 110px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.8rem; font-family: var(--font-body);
+  }
+
+  .tools h3 { font-family: var(--font-head); font-size: 0.95rem; margin: 0 0 0.5rem; }
+  .tool-row { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .tool-btn {
+    font-family: var(--font-body); font-size: 0.8rem;
+    background: var(--btn-bg); color: var(--btn-ink); border: 1px solid var(--btn-border);
+    border-radius: var(--radius-btn); padding: 0.4rem 0.65rem; cursor: pointer;
+  }
+  .meter { margin-top: 0.5rem; }
+  .meter-bar { height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+  .meter-bar > div { height: 100%; width: 62%; background: var(--accent); }
+  .meter-label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; font-family: var(--font-body); }
+</style>
+</head>
+<body>
+
+<div class="mock-tabs" role="tablist" aria-label="Mockup themes">
+  <strong>Zine Forge mockups:</strong>
+  <button data-set="cut" aria-pressed="true">1. Cut &amp; Paste</button>
+  <button data-set="riso" aria-pressed="false">2. Risograph</button>
+  <button data-set="editorial" aria-pressed="false">3. Editorial</button>
+  <button data-set="soft" aria-pressed="false">4. Soft Studio</button>
+</div>
+
+<div class="mock-note">Click a theme to re-skin the same editor layout. Same markup, different CSS variables.</div>
+
+<div class="shell" id="shell" data-theme="cut">
+  <header class="topbar">
+    <h1>Zine Forge <span class="sub">make + share zines</span></h1>
+    <div class="nav">
+      <button>Editor</button>
+      <button>Read</button>
+      <button>Sheet</button>
+      <button>Library</button>
+      <button>Undo</button>
+      <button>Redo</button>
+      <button class="primary">New</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <div class="editor">
+
+      <aside>
+        <div class="panel">
+          <div class="field">
+            <label class="field-label">Zine model</label>
+            <select class="input"><option>8-page mini zine (1 sheet, US Letter)</option></select>
+          </div>
+          <div class="field">
+            <label class="field-label">Theme</label>
+            <select class="input"><option>Risograph (off-white, red accent)</option></select>
+          </div>
+          <div class="field">
+            <label class="field-label">Zine title</label>
+            <input class="input" value="Midnight Mixtape" />
+          </div>
+          <div class="field">
+            <label class="field-label">Author</label>
+            <input class="input" value="A. Zinester" />
+          </div>
+        </div>
+
+        <div class="panel">
+          <span class="field-label">Pages</span>
+          <ul class="page-list">
+            <li class="active"><span><span class="num">1</span>Cover</span><span>&times;</span></li>
+            <li><span><span class="num">2</span>Track list</span><span>&times;</span></li>
+            <li><span><span class="num">3</span>Side B notes</span><span>&times;</span></li>
+            <li><span><span class="num">4</span>Colophon</span><span>&times;</span></li>
+            <li><span>+ Add page</span></li>
+          </ul>
+        </div>
+      </aside>
+
+      <div>
+        <div class="canvas-wrap">
+          <div class="page">
+            <h2>Midnight Mixtape</h2>
+            <div class="img-placeholder">[ cover image ]</div>
+            <div class="body-text">Songs for the walk home. Recorded on a borrowed four-track in a kitchen in November. Side A is the loud half; Side B is the quiet half.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tools">
+        <div class="panel">
+          <h3>Format</h3>
+          <div class="tool-row">
+            <button class="tool-btn"><b>B</b></button>
+            <button class="tool-btn"><i>I</i></button>
+            <button class="tool-btn"><u>U</u></button>
+            <button class="tool-btn">Clear</button>
+          </div>
+          <div class="tool-row">
+            <button class="tool-btn">Add image</button>
+            <button class="tool-btn">Add text box</button>
+            <button class="tool-btn">Add icon</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Space budget</h3>
+          <div class="meter">
+            <div class="meter-bar"><div></div></div>
+            <div class="meter-label">62 / 150 words &middot; 12 / 23 lines</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  var shell = document.getElementById('shell');
+  var buttons = document.querySelectorAll('.mock-tabs button');
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var theme = b.getAttribute('data-set');
+      shell.setAttribute('data-theme', theme);
+      buttons.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    });
+  });
+</script>
+</body>
+</html>

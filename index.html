@@ -19,21 +19,32 @@
 
   <template id="zine-app-shell-template">
     <div>
-      <header class="zf-header">
-        <h1>
-          Zine Forge
-          <span class="zf-sub">make + share zines</span>
-        </h1>
-        <div class="zf-header-actions">
-          <button class="zf-btn zf-btn-secondary" @click="goEditor">Editor</button>
-          <button class="zf-btn zf-btn-secondary" @click="goReader">Read</button>
-          <button class="zf-btn zf-btn-secondary" @click="goSheet">Sheet</button>
-          <button class="zf-btn zf-btn-secondary" @click="goLibrary">Library</button>
-          <button class="zf-btn zf-btn-secondary" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
-          <button class="zf-btn zf-btn-secondary" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-          <button class="zf-btn zf-btn-secondary" @click="onNew">New</button>
+      <header class="zf2-masthead">
+        <div class="zf2-masthead-titles">
+          <span class="zf2-kicker">Zine &middot; {{ store.view }}</span>
+          <h1 class="zf2-title">{{ store.title || 'Untitled Zine' }}</h1>
+          <div class="zf2-meta">
+            <span v-if="store.author">by {{ store.author }}</span>
+            <span v-if="store.author" aria-hidden="true">&middot;</span>
+            <span class="zf-save-indicator" v-if="savedLabel" title="Your draft is saved in this browser" aria-live="polite">{{ savedLabel }}</span>
+          </div>
+        </div>
+        <div class="zf2-masthead-actions">
+          <button class="zf2-ghost" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
+          <button class="zf2-ghost" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+          <button class="zf2-ghost" @click="store.settingsOpen = !store.settingsOpen" :aria-expanded="store.settingsOpen" title="Toggle zine settings" aria-haspopup="dialog">
+            <iconify-icon icon="ph:gear-six" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Settings
+          </button>
+          <button class="zf2-ghost" @click="onNew">New</button>
         </div>
       </header>
+      <nav class="zf2-viewtabs" aria-label="Sections">
+        <button class="zf2-tab" :aria-current="store.view === 'editor'" @click="goEditor">Editor</button>
+        <button class="zf2-tab" :aria-current="store.view === 'reader'" @click="goReader">Read</button>
+        <button class="zf2-tab" :aria-current="store.view === 'sheet'" @click="goSheet">Print</button>
+        <button class="zf2-tab" :aria-current="store.view === 'library'" @click="goLibrary">Library</button>
+      </nav>
 
       <main class="zf-main">
         <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
@@ -94,42 +105,49 @@
   <template id="zine-editor-template">
     <div class="zf-editor">
       <aside>
-        <div class="zf-field">
-          <label class="zf-label" for="zf-zine-model">Zine model</label>
-          <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="onModelChange">
-            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
-          </select>
-        </div>
-        <div class="zf-field">
-          <label class="zf-label" for="zf-zine-theme">Theme</label>
-          <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="onThemeChange">
-            <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
-          </select>
-        </div>
-        <div class="zf-field">
-          <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
-          <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
-                 :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
-        </div>
-            '<div class="zf-field">' +
-              '<label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>' +
-              '<input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01" ' +
-                ':value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />' +
-              '<div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can\'t reach. Content outside this area may be clipped.</div>' +
-            '</div>' +
-            '<div class="zf-field">' +
-              '<label class="zf-label" for="zf-zine-safe-edge">Edge safety margin ({{ store.safeEdgeIn }} in)</label>' +
-              '<input id="zf-zine-safe-edge" type="range" min="0" max="0.75" step="0.01" ' +
-                ':value="store.safeEdgeIn" @input="store.setSafeEdge($event.target.value)" style="width:100%;" />' +
-              '<div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Extra padding auto-applied to the outer edge of corner pages so your printer doesn\'t clip them.</div>' +
-            '</div>' +
-        <div class="zf-field">
-          <label class="zf-label" for="zf-zine-title">Zine title</label>
-          <input id="zf-zine-title" class="zf-input" v-model="store.title" />
-        </div>
-        <div class="zf-field">
-          <label class="zf-label" for="zf-zine-author">Author</label>
-          <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+        <div class="zf-settings-backdrop" v-if="store.settingsOpen" @click="store.settingsOpen = false" aria-hidden="true"></div>
+        <div class="zf-settings-slide" :class="{ open: store.settingsOpen }" role="dialog" aria-label="Zine settings" @keydown.esc="store.settingsOpen = false">
+          <div class="zf-settings-slide-head">
+            <strong>Zine settings</strong>
+            <button class="zf-icon-btn" @click="store.settingsOpen = false" aria-label="Close settings">&times;</button>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-model">Zine model</label>
+            <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="onModelChange">
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+            </select>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-theme">Theme</label>
+            <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="onThemeChange">
+              <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
+            <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
+                   :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>
+            <input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01"
+                   :value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />
+            <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can't reach. Content outside this area may be clipped.</div>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-safe-edge">Edge safety margin ({{ store.safeEdgeIn }} in)</label>
+            <input id="zf-zine-safe-edge" type="range" min="0" max="0.75" step="0.01"
+                   :value="store.safeEdgeIn" @input="store.setSafeEdge($event.target.value)" style="width:100%;" />
+            <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Extra padding auto-applied to the outer edge of corner pages so your printer doesn't clip them.</div>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-title">Zine title</label>
+            <input id="zf-zine-title" class="zf-input" v-model="store.title" />
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-zine-author">Author</label>
+            <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+          </div>
         </div>
         <div class="zf-muted" style="margin-bottom:0.5rem;">
           {{ store.pages.length }} page<span v-if="store.pages.length !== 1">s</span> filled
@@ -164,8 +182,10 @@
               <button class="zf-icon-btn" @click.stop="store.deletePage(p.id)" title="Delete page">&times;</button>
             </span>
           </li>
-          <li class="zf-page-add" @click="store.addPage()" role="button" tabindex="0" title="Add a new page at the end">
-            <span class="zf-page-add-label">+ Add page</span>
+          <li class="zf-page-add" @click="store.addPageOrSheet()" role="button" tabindex="0"
+              :title="store.isCurrentSheetFull() ? 'This sheet is full. Add a new sheet.' : 'Add a new page at the end'">
+            <span class="zf-page-add-label" v-if="!store.isCurrentSheetFull()">+ Add page</span>
+            <span class="zf-page-add-label" v-else>+ Add sheet ({{ activeModel ? activeModel.pagesPerSheet : '' }} pages)</span>
           </li>
         </ul>
         <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
@@ -182,7 +202,54 @@
       </aside>
 
       <div class="zf-canvas-col">
+        <div class="zf-format-bar" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="zf-fmt-btn" title="Bold (Ctrl+B)" @mousedown.prevent @click="execCmdOnActive('bold')"><b>B</b></button>
+          <button type="button" class="zf-fmt-btn" title="Italic (Ctrl+I)" @mousedown.prevent @click="execCmdOnActive('italic')"><i>I</i></button>
+          <button type="button" class="zf-fmt-btn" title="Underline (Ctrl+U)" @mousedown.prevent @click="execCmdOnActive('underline')"><u>U</u></button>
+          <span class="zf-fmt-sep" aria-hidden="true"></span>
+          <label class="zf-fmt-color" title="Text / element color">
+            <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
+            <input type="color" value="#1b1b1b" @input="applyColor($event.target.value)" />
+          </label>
+          <button type="button" class="zf-fmt-btn zf-fmt-reset" title="Reset to theme color" @click="resetColor">Reset color</button>
+          <span class="zf-fmt-sep" aria-hidden="true"></span>
+          <select class="zf-fmt-font" title="Font" @change="applyFont($event.target.value)" aria-label="Font">
+            <option value="">Font</option>
+            <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+            <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino</option>
+            <option value="'Times New Roman', Times, serif">Times</option>
+            <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans</option>
+            <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+            <option value="'Courier New', Courier, monospace">Courier</option>
+            <option value="Impact, 'Arial Black', sans-serif">Impact</option>
+          </select>
+        </div>
+        <div class="zf-insert-bar" role="toolbar" aria-label="Add elements">
+          <label class="zf-insert-btn" title="Add an image to this page">
+            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
+            <span>Image</span>
+            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
+          </label>
+          <button class="zf-insert-btn" @click="addTextBox" title="Add a text box to this page">
+            <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
+            <span>Text box</span>
+          </button>
+          <button class="zf-insert-btn" @click="openIconPicker" title="Add an icon to this page">
+            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
+            <span>Icon</span>
+          </button>
+        </div>
+        <div class="zf-canvas-empty-hint" v-if="isEmptyPage(active)">
+          Start your page: type a heading, then write below. Use the tools on the right to add an image, icon, or text box.
+        </div>
         <div class="zf-canvas-wrap">
+          <div class="zf-ghost-page zf-ghost-prev" v-if="prevPage" role="button" tabindex="0"
+               @click="goToPageId(prevPage.id)" @keydown.enter="goToPageId(prevPage.id)"
+               :title="'Go to ' + (prevPage.heading || 'previous page')">
+            <span class="zf-ghost-label">Page {{ activeIndex }}</span>
+            <div class="zf-ghost-title">{{ prevPage.heading || 'Untitled' }}</div>
+            <div class="zf-ghost-snippet">{{ ghostSnippet(prevPage) }}</div>
+          </div>
           <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)">
             <template v-for="g in safeGuides" :key="g.key">
               <div class="zf-mini-safe-guide" :style="g.style"></div>
@@ -208,11 +275,14 @@
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div class="zf-textbox"
+                   tabindex="0"
                    :class="{ 'zf-textbox-selected': active.activeTextBoxId === box.id }"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                    @mousedown="onTextBoxMouseDown($event, box)"
-                   @click.stop="selectTextBox(box)">
+                   @click.stop="selectTextBox(box)"
+                   @keydown.delete.prevent="deleteSelectedElement"
+                   @keydown.backspace.prevent="deleteSelectedElement">
                 <div class="zf-textbox-content"
                      :data-zf-text-content-id="box.id"
                      contenteditable="true"
@@ -230,10 +300,13 @@
             <template v-for="img in (active.images || [])" :key="'ovl-' + img.id">
               <div v-if="img.wrap === 'free' || !img.wrap"
                    class="zf-img-wrap"
+                   tabindex="0"
                    :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
                    @mousedown="onImageMouseDownItem($event, img)"
-                   @click.stop="selectImage(img)">
+                   @click.stop="selectImage(img)"
+                   @keydown.delete.prevent="deleteSelectedElement"
+                   @keydown.backspace.prevent="deleteSelectedElement">
                  <img v-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
                  <iconify-icon v-else class="zf-icon-element" :icon="img.src" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }"></iconify-icon>
                 <span class="zf-img-handle zf-img-handle-resize"
@@ -244,6 +317,13 @@
                       @mousedown.stop.prevent="onRotateStart($event, img)"></span>
               </div>
             </template>
+          </div>
+          <div class="zf-ghost-page zf-ghost-next" v-if="nextPage" role="button" tabindex="0"
+               @click="goToPageId(nextPage.id)" @keydown.enter="goToPageId(nextPage.id)"
+               :title="'Go to ' + (nextPage.heading || 'next page')">
+            <span class="zf-ghost-label">Page {{ activeIndex + 2 }}</span>
+            <div class="zf-ghost-title">{{ nextPage.heading || 'Untitled' }}</div>
+            <div class="zf-ghost-snippet">{{ ghostSnippet(nextPage) }}</div>
           </div>
         </div>
         <zine-icon-picker
@@ -269,7 +349,18 @@
         </div>
       </div>
 
-      <div class="zf-tools-col">
+      <div class="zf-inspector-backdrop" v-if="inspectorOpen" @click="inspectorOpen = false" aria-hidden="true"></div>
+      <button class="zf-inspector-tab" v-if="!inspectorOpen" @click="inspectorOpen = true"
+              title="Open tools" aria-label="Open tools">Tools</button>
+      <div class="zf-tools-col" :class="{ 'zf-inspector-collapsed': !inspectorOpen }" role="dialog" aria-label="Tools">
+        <div class="zf-inspector-head">
+          <span class="zf-inspector-title" v-if="inspectorOpen">Tools</span>
+          <button class="zf-inspector-toggle" @click="inspectorOpen = !inspectorOpen"
+                  :aria-expanded="inspectorOpen" :title="inspectorOpen ? 'Collapse tools' : 'Expand tools'">
+            <span v-if="inspectorOpen">&rsaquo;</span>
+            <span v-else>&lsaquo;</span>
+          </button>
+        </div>
         <div class="zf-format-toolbar">
           <button type="button" class="zf-icon-btn" title="Bold (Ctrl+B)" @mousedown.prevent @click="execCmdOnActive('bold')">
             <iconify-icon icon="ph:text-b-bold"></iconify-icon>
@@ -289,15 +380,7 @@
         </div>
 
         <div class="zf-inline-tools" style="margin-top:0.5rem;">
-          <label class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);cursor:pointer;">
-            Add image
-            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
-          </label>
-
-          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" @click="addTextBox">Add text box</button>
-          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" @click="openIconPicker">Add icon</button>
-
-          <button class="zf-btn zf-btn-secondary" style="color:var(--zf-blue-dark);border-color:var(--zf-border);" @click="fillWithLorem" title="Fill this page with sample text sized to fit the budget">Fill with lorem</button>
+          <button class="zf-btn zf-btn-secondary" @click="fillWithLorem" title="Fill this page with sample text sized to fit the budget">Fill with lorem</button>
         </div>
 
         <div v-if="activeImage && !activeTextBox" class="zf-image-controls">
@@ -904,6 +987,8 @@
       activePageId: zfInitial[0].id,
       view: 'editor',
       status: '',
+      lastSavedAt: 0,
+      settingsOpen: false,
       modelId: (zfSaved && zfSaved.modelId) ? zfSaved.modelId : 'mini-8',
       themeId: (zfSaved && zfSaved.themeId) ? zfSaved.themeId : 'classic',
       currentZineId: (zfSaved && zfSaved.currentZineId) ? zfSaved.currentZineId : null,
@@ -920,6 +1005,34 @@
         return found || this.pages[0];
       },
       addPage: function () { var p = zfEmptyPage(); this.pages.push(p); this.activePageId = p.id; },
+      // -------- Sheet-aware page capacity --------
+      // The model defines pagesPerSheet. Pages fill sheets; you cannot add
+      // beyond the current sheet's capacity without starting a new sheet.
+      sheetCapacity: function () {
+        var m = this.model();
+        var per = (m && m.pagesPerSheet) ? m.pagesPerSheet : 1;
+        var have = this.pages.length;
+        var sheets = Math.max(1, Math.ceil(have / per));
+        return sheets * per;
+      },
+      isCurrentSheetFull: function () {
+        return this.pages.length >= this.sheetCapacity();
+      },
+      // Add one page if the current sheet has room; otherwise start a new
+      // sheet by adding a full sheet's worth of blank pages. Never destroys.
+      addPageOrSheet: function () {
+        var m = this.model();
+        var per = (m && m.pagesPerSheet) ? m.pagesPerSheet : 1;
+        if (this.pages.length < this.sheetCapacity()) {
+          this.addPage();
+        } else {
+          for (var i = 0; i < per; i++) {
+            var p = zfEmptyPage();
+            this.pages.push(p);
+          }
+          this.activePageId = this.pages[this.pages.length - per].id;
+        }
+      },
       duplicatePage: function (id) {
         var idx = this.pages.findIndex(function (p) { return p.id === id; });
         if (idx < 0) return;
@@ -967,6 +1080,7 @@
             showFoldLines: this.showFoldLines,
             showCutLines: this.showCutLines
           }));
+          this.lastSavedAt = Date.now();
         } catch (e) {
           console.warn("saveDraft failed", e);
         }
@@ -1135,6 +1249,16 @@
         canRedo: function () {
           var _ = this.tick;
           return window.ZFCanRedo ? window.ZFCanRedo() : false;
+        },
+        savedLabel: function () {
+          var t = store.lastSavedAt;
+          if (!t) return '';
+          var secs = Math.floor((Date.now() - t) / 1000);
+          if (secs < 5) return 'Saved';
+          if (secs < 60) return 'Saved ' + secs + 's ago';
+          var mins = Math.floor(secs / 60);
+          if (mins < 60) return 'Saved ' + mins + 'm ago';
+          return 'Saved';
         }
       },
       methods: {
@@ -1315,6 +1439,27 @@
           }
         }
       },
+      goToPageId: function (id) {
+        if (id) store.activePageId = id;
+      },
+      ghostSnippet: function (page) {
+        if (!page) return '';
+        var t = '';
+        if (page.body) {
+          t = String(page.body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        if (!t && page.heading) t = page.heading;
+        if (!t) return '(blank page)';
+        return t.length > 80 ? t.slice(0, 80) + '...' : t;
+      },
+      isEmptyPage: function (page) {
+        if (!page) return true;
+        var hasHeading = !!(page.heading && String(page.heading).trim());
+        var hasBody = !!(page.body && String(page.body).trim());
+        var hasImages = Array.isArray(page.images) && page.images.length > 0;
+        var hasTextBoxes = Array.isArray(page.textBoxes) && page.textBoxes.length > 0;
+        return !(hasHeading || hasBody || hasImages || hasTextBoxes);
+      },
       onImageChange: function (evt) {
         var file = evt.target.files && evt.target.files[0];
         if (!file) return;
@@ -1365,6 +1510,9 @@
           if (!img) return;
           evt.preventDefault();
           if (this.active) this.active.activeImageId = img.id;
+          // Focus the wrapper so Delete/Backspace reach the element handler
+          // instead of being swallowed by a contenteditable elsewhere.
+          try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus(); } catch (e) {}
           // Re-inject flow spacers so the selection outline moves.
           var self = this;
           this.$nextTick(function () { self.injectShapeSpacer(); });
@@ -1749,6 +1897,70 @@
         var box = this.activeTextBox;
         if (!box) return;
         box.fontFamily = fam;
+      },
+      applyFont: function (fam) {
+        if (!fam) return;
+        // Apply to the selected text box (whole-box font). This mirrors the
+        // inspector's font control but keeps the action one click away.
+        if (this.activeTextBox) { this.activeTextBox.fontFamily = fam; return; }
+        var page = this.active;
+        if (page && page.activeTextBoxId && Array.isArray(page.textBoxes)) {
+          for (var i = 0; i < page.textBoxes.length; i++) {
+            if (page.textBoxes[i].id === page.activeTextBoxId) { page.textBoxes[i].fontFamily = fam; return; }
+          }
+        }
+      },
+      applyColor: function (c) {
+        if (!c) return;
+        var el = document.activeElement;
+        var inTextBox = el && el.classList && el.classList.contains('zf-textbox-content');
+        var sel = window.getSelection ? window.getSelection() : null;
+        var hasTextSel = sel && sel.rangeCount > 0 && !sel.isCollapsed;
+        // 0) A selected icon or text box takes priority: clicking the swatch
+        // blurs the element, but a stale text selection must not hijack it.
+        // Look the element up by its explicit id on the active page rather
+        // than relying on the activeImage/activeTextBox computeds, which can
+        // fall back to the last item and recolor the wrong element.
+        var page0 = this.active;
+        if (!inTextBox && page0 && page0.activeTextBoxId && Array.isArray(page0.textBoxes)) {
+          for (var b0 = 0; b0 < page0.textBoxes.length; b0++) {
+            if (page0.textBoxes[b0].id === page0.activeTextBoxId) { page0.textBoxes[b0].color = c; return; }
+          }
+        }
+        if (!inTextBox && page0 && page0.activeImageId && Array.isArray(page0.images)) {
+          for (var i0 = 0; i0 < page0.images.length; i0++) {
+            if (page0.images[i0].id === page0.activeImageId) { page0.images[i0].color = c; return; }
+          }
+        }
+        // 1) Text within a text box
+        if (inTextBox) {
+          try { document.execCommand('foreColor', false, c); } catch (e) {}
+          var page = this.active;
+          if (page && Array.isArray(page.textBoxes)) {
+            var tid = el.getAttribute('data-zf-text-content-id');
+            for (var i = 0; i < page.textBoxes.length; i++) {
+              if (page.textBoxes[i].id === tid) { page.textBoxes[i].html = zfSanitizeHtml(el.innerHTML); break; }
+            }
+          }
+          return;
+        }
+        // 2) Text selection in the page body (or anywhere contenteditable)
+        if (hasTextSel) {
+          try { document.execCommand('foreColor', false, c); } catch (e) {}
+          var bodyEl = this.$refs.bodyEditor;
+          if (bodyEl && document.activeElement === bodyEl) {
+            store.activePage().body = zfSanitizeHtml(zfStripSpacers(bodyEl.innerHTML));
+          }
+          return;
+        }
+        // 3) A selected element (icon or text box) takes the color as a property
+        if (this.activeTextBox) { this.setTextBoxColor(c); return; }
+        if (this.activeImage) { this.setIconColor(c); return; }
+      },
+      resetColor: function () {
+        if (this.activeTextBox) { this.setTextBoxColor(''); return; }
+        if (this.activeImage) { this.setIconColor(''); return; }
+        try { document.execCommand('foreColor', false, ''); } catch (e) {}
       },
       execCmdOnActive: function (cmd) {
         try {
@@ -2143,11 +2355,24 @@
           imageDrag: null,
           debugFlow: false,
           iconPickerOpen: false,
-          iconPickerQuery: ''
+          iconPickerQuery: '',
+          inspectorOpen: false
         };
       },
       computed: {
         active: function () { return store.activePage(); },
+        activeIndex: function () {
+          var id = store.activePageId;
+          return store.pages.findIndex(function (p) { return p.id === id; });
+        },
+        prevPage: function () {
+          var i = this.activeIndex;
+          return (i > 0) ? store.pages[i - 1] : null;
+        },
+        nextPage: function () {
+          var i = this.activeIndex;
+          return (i >= 0 && i < store.pages.length - 1) ? store.pages[i + 1] : null;
+        },
         activeImage: function () {
           var p = this.active;
           if (!p || !Array.isArray(p.images) || !p.images.length) return null;
@@ -3070,7 +3295,6 @@
                 '<input type="checkbox" v-model="store.showCutLines" /> cut lines' +
               '</label>' +
               '<button class="zf-btn zf-btn-primary" @click="printSheet">Print this sheet</button>' +
-              '<button class="zf-btn" style="border-color:var(--zf-border);" @click="printRaster" title="Print an image-exact copy of the sheet view (uses html2canvas)">Print (image)</button>' +
             '</div>' +
           '</div>' +
           '<div class="zf-sheet" :style="sheetStyle">' +

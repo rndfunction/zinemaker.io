@@ -9,6 +9,26 @@
       --zf-red: #b50909;
       --zf-font: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
       --zf-serif: "Source Serif Pro", Georgia, "Times New Roman", serif;
+
+      /* ---- Long Table v2 design tokens (introduced for the redesign port;
+         not yet referenced by any rule, so the current UI is unchanged). ---- */
+      --zf2-ink: #14171a;
+      --zf2-ink-2: #3a4149;
+      --zf2-muted: #5c6570;
+      --zf2-paper: #ffffff;
+      --zf2-wash: #f4f4f1;
+      --zf2-wash-2: #ebebe6;
+      --zf2-line: #d6d6d0;
+      --zf2-line-strong: #14171a;
+      --zf2-accent: #c8102e;
+      --zf2-accent-ink: #ffffff;
+      --zf2-focus: #ff9500;
+      --zf2-sans: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --zf2-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --zf2-mono: "Courier New", Courier, monospace;
+      --zf2-radius-sm: 7px;
+      --zf2-shadow-page: 0 10px 30px rgba(20,23,26,0.14);
+      --zf2-shadow-side: 0 4px 14px rgba(20,23,26,0.10);
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; font-family: var(--zf-font); color: var(--zf-ink); background: #ffffff; }
@@ -17,10 +37,121 @@
     .zf-header { background: var(--zf-blue-dark); color: #ffffff; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
     .zf-header h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.02em; }
     .zf-header .zf-sub { font-size: 0.8rem; opacity: 0.85; margin-left: 0.5rem; font-weight: 400; }
-    .zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .zf-save-indicator {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.75);
+      margin-right: 0.25rem;
+      white-space: nowrap;
+    }
+
+    /* ---- Long Table v2 masthead + view tabs ---- */
+    .zf2-masthead {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; padding: 0.7rem 1.25rem; background: var(--zf2-paper);
+      border-bottom: 2px solid var(--zf2-line-strong);
+    }
+    .zf2-masthead-titles { min-width: 0; }
+    .zf2-kicker {
+      font-family: var(--zf2-sans); font-size: 0.6rem; letter-spacing: 0.16em;
+      text-transform: uppercase; font-weight: 700; color: var(--zf2-accent);
+    }
+    .zf2-title {
+      font-family: var(--zf2-serif); font-size: 1.6rem; line-height: 1.05;
+      color: var(--zf2-ink); margin: 0.1rem 0 0; letter-spacing: -0.01em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .zf2-meta {
+      font-size: 0.78rem; color: var(--zf2-muted); margin-top: 0.15rem;
+      display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+    }
+    .zf2-meta .zf-save-indicator { color: var(--zf2-muted); }
+    .zf2-masthead-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; flex: 0 0 auto; }
+    .zf2-ghost {
+      background: transparent; color: var(--zf2-ink);
+      border: 2px solid var(--zf2-line-strong); border-radius: var(--zf2-radius-sm);
+      padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    }
+    .zf2-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+    .zf2-viewtabs {
+      display: flex; gap: 0.25rem; padding: 0 1.25rem;
+      background: var(--zf2-paper); border-bottom: 1px solid var(--zf2-line);
+    }
+    .zf2-tab {
+      background: transparent; border: none; border-bottom: 3px solid transparent;
+      padding: 0.55rem 0.85rem; font-family: var(--zf2-sans); font-size: 0.85rem;
+      font-weight: 600; color: var(--zf2-muted); cursor: pointer;
+    }
+    .zf2-tab:hover { color: var(--zf2-ink); }
+    .zf2-tab[aria-current="true"] { color: var(--zf2-ink); border-bottom-color: var(--zf2-accent); }
+    .zf2-ghost:focus-visible, .zf2-tab:focus-visible {
+      outline: 3px solid var(--zf2-focus); outline-offset: 2px;
+    }
+
+    /* ---- Settings button (clearly an action, not a heading) ---- */
+    .zf-settings-btn {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      background: var(--zf2-paper); color: var(--zf2-ink);
+      border: 2px solid var(--zf2-line-strong); border-radius: var(--zf2-radius-sm);
+      padding: 0.5rem 0.75rem; font-family: var(--zf2-sans);
+      font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    }
+    .zf-settings-btn:hover { background: var(--zf2-wash); }
+    .zf-settings-btn iconify-icon { font-size: 1.05rem; }
+    .zf-settings-btn:focus-visible { outline: 3px solid var(--zf2-focus); outline-offset: 2px; }
+
+    /* ---- Settings slide-over panel ---- */
+    .zf-settings-slide {
+      position: fixed; top: 0; right: 0; height: 100vh; width: 320px;
+      background: var(--zf2-paper); border-left: 2px solid var(--zf2-line-strong);
+      padding: 1rem; overflow: auto; transform: translateX(100%);
+      transition: transform 0.2s ease; z-index: 200;
+      box-shadow: -8px 0 24px rgba(20,23,26,0.12);
+    }
+    .zf-settings-slide.open { transform: translateX(0); }
+    .zf-settings-backdrop {
+      position: fixed; inset: 0; z-index: 190;
+      background: rgba(20,23,26,0.15);
+    }
+    .zf-settings-slide-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem; padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--zf2-line);
+      font-family: var(--zf2-sans);
+    }
+    .zf-settings-slide .zf-field { margin-bottom: 0.75rem; }
+    .zf-settings-slide .zf-label { color: var(--zf2-muted); }
+    .zf-settings-slide .zf-input {
+      border: 2px solid var(--zf2-line); border-radius: var(--zf2-radius-sm);
+      padding: 0.5rem 0.6rem; font-family: var(--zf2-sans);
+    }
     .zf-btn { border: 1px solid transparent; border-radius: 4px; padding: 0.5rem 0.9rem; font-size: 0.9rem; cursor: pointer; background: #ffffff; color: var(--zf-blue-dark); }
     .zf-btn:hover { background: var(--zf-gray-light); }
     .zf-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    /* Broader keyboard focus coverage for 508 / WCAG 2.4.7 compliance.
+       Uses the same amber outline as .zf-btn so the app has one focus look. */
+    .zf-input:focus-visible,
+    select.zf-input:focus-visible,
+    textarea:focus-visible,
+    input[type="text"]:focus-visible,
+    input[type="range"]:focus-visible,
+    input[type="file"]:focus-visible,
+    a:focus-visible {
+      outline: 3px solid #ffbe2e;
+      outline-offset: 2px;
+    }
+    .zf-icon-btn:focus-visible {
+      outline: 3px solid #ffbe2e;
+      outline-offset: -3px;
+    }
+    .zf-modal-close:focus-visible {
+      outline: 3px solid #ffbe2e;
+      outline-offset: 2px;
+    }
+    .zf-icon-tile:focus-visible {
+      outline: 3px solid #ffbe2e;
+      outline-offset: 2px;
+    }
     .zf-btn-secondary { background: transparent; color: #ffffff; border-color: rgba(255,255,255,0.6); }
     .zf-btn-secondary:hover { background: rgba(255,255,255,0.12); }
     .zf-btn-primary { background: #ffbe2e; color: var(--zf-ink); font-weight: 600; }
@@ -29,8 +160,173 @@
     .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
     .zf-error { color: var(--zf-red); font-size: 0.9rem; }
     .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
-    .zf-editor { display: grid; grid-template-columns: 240px 1fr 340px; gap: 1.25rem; align-items: start; }
+    .zf-editor { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; align-items: start; }
     .zf-canvas-col { min-width: 0; }
+    /* Always-visible format bar above the insert bar. */
+    .zf-format-bar {
+      display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+      margin-bottom: 0.6rem; padding: 0.35rem 0.5rem;
+      background: #ffffff; border: 1px solid var(--zf-border);
+      border-radius: 6px; width: max-content;
+    }
+    .zf-fmt-btn {
+      min-width: 30px; height: 30px; padding: 0 0.5rem;
+      background: transparent; border: 1px solid transparent; border-radius: 4px;
+      font-size: 0.95rem; color: var(--zf-ink); cursor: pointer;
+    }
+    .zf-fmt-btn:hover { background: var(--zf-gray-light); }
+    .zf-fmt-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-fmt-reset { font-size: 0.8rem; }
+    .zf-fmt-sep { width: 1px; height: 20px; background: var(--zf-border); margin: 0 0.15rem; }
+    .zf-fmt-color {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.25rem 0.4rem; border-radius: 4px; cursor: pointer;
+      color: var(--zf-ink); border: 1px solid transparent;
+    }
+    .zf-fmt-color:hover { background: var(--zf-gray-light); }
+    .zf-fmt-color iconify-icon { font-size: 1.05rem; }
+    .zf-fmt-color input[type="color"] {
+      width: 28px; height: 24px; border: 1px solid var(--zf-border);
+      border-radius: 4px; background: #ffffff; cursor: pointer; padding: 0;
+    }
+    .zf-fmt-font {
+      height: 30px; padding: 0 0.4rem; font-size: 0.82rem;
+      border: 1px solid var(--zf-border); border-radius: 4px;
+      background: #ffffff; color: var(--zf-ink); cursor: pointer;
+      max-width: 130px;
+    }
+    .zf-fmt-font:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    /* Always-visible insert bar above the canvas. */
+    .zf-insert-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+    .zf-insert-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-family: var(--zf-font); font-size: 0.85rem; font-weight: 600;
+      color: var(--zf-blue-dark);
+      background: #ffffff; border: 1px solid var(--zf-border);
+      border-radius: 6px; padding: 0.45rem 0.75rem; cursor: pointer;
+    }
+    .zf-insert-btn:hover { background: var(--zf-gray-light); }
+    .zf-insert-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-insert-btn iconify-icon { font-size: 1.05rem; }
+    /* Trailing neighbor pages flanking the editable page. Absolutely
+       positioned so they tuck beside the page without consuming layout
+       width (the middle column can be narrower than page + both ghosts). */
+    .zf-canvas-wrap { position: relative; }
+    .zf-ghost-page {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 130px; min-height: 230px;
+      background: #ffffff; border: 1px solid var(--zf-border); border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 0.6rem; cursor: pointer; opacity: 0.5;
+      display: flex; flex-direction: column; gap: 0.35rem;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      overflow: hidden;
+    }
+    /* Flank the centered page (approx 414px wide) rather than the canvas
+       edges, so the ghosts read as adjacent pages. The left offset is
+       half the page width (207px) plus the ghost width (130px) plus a
+       small gap; if the canvas is too narrow the ghosts are hidden via
+       the media query below rather than allowed to overlap the page. */
+    .zf-ghost-page.zf-ghost-prev { left: calc(50% - 207px - 140px); }
+    .zf-ghost-page.zf-ghost-next { right: calc(50% - 207px - 140px); }
+    .zf-ghost-page:hover { opacity: 0.8; transform: translateY(-50%) scale(1.02); }
+    .zf-ghost-page:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 3px; opacity: 0.9; }
+    .zf-ghost-label {
+      font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+      font-weight: 700; color: var(--zf-gray-mid);
+    }
+    .zf-ghost-title {
+      font-family: var(--zf-serif); font-size: 0.95rem; color: var(--zf-ink);
+      border-bottom: 1px solid var(--zf-border); padding-bottom: 0.2rem;
+    }
+    .zf-ghost-snippet { font-family: var(--zf-serif); font-size: 0.75rem; line-height: 1.4; color: var(--zf-gray-mid); }
+    /* With the left page sidebar (~240px) and right inspector (~300px),
+       the canvas column needs real room before neighbor ghosts fit beside
+       the page. Hide them on narrower viewports rather than let them
+       overlap the editable page. */
+    @media (max-width: 1500px) { .zf-ghost-page { display: none; } }
+    .zf-editor.zf-inspector-is-collapsed .zf-ghost-page { display: block; }
+
+    /* ---- Right inspector panel: an overlay, not a grid column, so the
+       page canvas keeps the full width and stays centered. ---- */
+    .zf-editor > .zf-tools-col {
+      position: fixed;
+      top: 0; right: 0;
+      height: 100vh;
+      width: 300px;
+      z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      padding: 0.9rem;
+      background: #ffffff;
+      border-left: 2px solid var(--zf2-line-strong);
+      box-shadow: -8px 0 24px rgba(20,23,26,0.12);
+      overflow-y: auto;
+      transform: translateX(0);
+      transition: transform 0.2s ease;
+    }
+    .zf-editor > .zf-tools-col.zf-inspector-collapsed {
+      transform: translateX(100%);
+    }
+    /* A persistent tab to reopen the collapsed inspector. */
+    .zf-inspector-tab {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      z-index: 201;
+      background: var(--zf2-ink); color: #ffffff; border: none;
+      border-radius: 8px 0 0 8px; padding: 0.7rem 0.5rem;
+      writing-mode: vertical-rl; text-orientation: mixed;
+      font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+      font-weight: 700; cursor: pointer;
+    }
+    .zf-inspector-tab:hover { background: var(--zf2-accent); }
+    .zf-inspector-tab:focus-visible { outline: 3px solid var(--zf2-focus); outline-offset: 2px; }
+    .zf-inspector-backdrop {
+      position: fixed; inset: 0; z-index: 199;
+      background: rgba(20,23,26,0.12);
+    }
+    .zf-inspector-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.4rem; margin-bottom: 0.25rem;
+    }
+    .zf-inspector-title {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 700; color: var(--zf-gray-mid);
+    }
+    .zf-inspector-toggle {
+      border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px;
+      width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 1rem;
+      color: var(--zf-blue-dark); flex: 0 0 auto;
+    }
+    .zf-inspector-toggle:hover { background: var(--zf-gray-light); }
+    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-format-toolbar,
+    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-inline-tools,
+    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-image-controls {
+      display: none;
+    }
+    .zf-editor > .zf-tools-col .zf-inline-tools { gap: 0.3rem; flex-wrap: wrap; }
+    /* Selected-item control panels live inline in the right inspector. */
+    .zf-editor > .zf-tools-col .zf-image-controls {
+      position: static;
+      width: auto;
+      background: #ffffff;
+      color: var(--zf-ink);
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      z-index: 160;
+    }
+
+    .zf-canvas-empty-hint {
+      margin-bottom: 0.75rem;
+      padding: 0.6rem 0.85rem;
+      border: 1px dashed var(--zf-border);
+      border-radius: 6px;
+      background: var(--zf-gray-light);
+      color: var(--zf-gray-mid);
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
     .zf-tools-col {
       min-width: 0;
       padding: 0.75rem;
@@ -45,6 +341,22 @@
       .zf-tools-col { grid-column: 1 / -1; }
     }
     @media (max-width: 800px) { .zf-editor { grid-template-columns: 1fr; } }
+    /* -------- Mobile / narrow-screen adjustments -------- */
+    @media (max-width: 600px) {
+      .zf-main { padding: 0.75rem; }
+      .zf-header { padding: 0.6rem 0.75rem; }
+      .zf-header h1 { font-size: 1rem; }
+      .zf-header .zf-sub { display: none; }
+      .zf-save-indicator { font-size: 0.7rem; }
+      .zf-reader { padding: 0.75rem; }
+      .zf-reader-page { padding: 1rem; margin-bottom: 1rem; }
+      .zf-reader-page h2 { font-size: 1.35rem; }
+      .zf-reader-page .zf-reader-body { font-size: 1rem; }
+      .zf-pager { flex-wrap: wrap; justify-content: center; }
+      .zf-sheet-view { padding: 0.75rem; }
+      .zf-library-grid { grid-template-columns: 1fr; }
+      .zf-tools-col { position: static; }
+    }
     .zf-page-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow: hidden; }
     .zf-page-list li { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--zf-border); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem; }
     .zf-page-list li:last-child { border-bottom: none; }
@@ -163,6 +475,16 @@
       background: transparent;
       border: 0;
       border-color: rgba(181, 9, 9, 0.5);
+    }
+    /* Faint full-margin outline always visible in the editor so the page
+       margin reads clearly even on interior pages that touch no paper edge. */
+    .zf-page.zf-mini-page::after {
+      content: "";
+      position: absolute;
+      inset: calc(var(--zf-page-margin, 0.1in) * var(--zf-page-scale, 1));
+      border: 1px dashed rgba(181, 9, 9, 0.28);
+      pointer-events: none;
+      z-index: 14;
     }
     @media print {
       .zf-safe-guide, .zf-sheet-safe-guide, .zf-mini-safe-guide { display: none !important; }
@@ -462,13 +784,7 @@
     }
     /* The editor's wrapper is position: absolute from its inline style,
        so it already establishes a positioning context. No override needed. */
-    /* DEBUG: show wrapper boundary for icons in both editor and sheet. */
-    .zf-img-wrap, .zf-positioned-icon-wrap, .zf-block-icon {
-      outline: 1px solid rgba(0, 0, 255, 0.35);
-    }
-    .zf-icon-element {
-      outline: 1px solid rgba(255, 0, 255, 0.35);
-    }
+
     /* Icons resize via font-size on the wrapper, not width. aspect-ratio
        keeps the wrapper square so width == height for the SVG. */
     .zf-img-wrap:has(.zf-icon-element) {
@@ -743,11 +1059,20 @@
          origins consistent through the entire print layout. */
       /* For print, override the mini-page's padding and font-size with
          physical units instead of scale-multiplied px. This gives us
-         correct physical dimensions on paper (0.1in padding, 10pt text)
-         without touching the mini-page's layout box, which keeps the
-         aspect ratio correct. */
+         correct physical dimensions on paper (10pt text) without touching
+         the mini-page's layout box, which keeps the aspect ratio correct.
+         The padding honors the user's configured page margin via
+         --zf-page-margin (set inline from store.marginIn) so printed
+         content is inset by the same amount the editor previews. */
+      /* Reset the on-screen page scale to 1 for print so all the
+         scale-multiplied calc() values resolve to their physical sizes.
+         This was described in the comment above but was never actually
+         declared, which left print inheriting the small screen scale. */
+      html, body, #app, .zf-sheet-view, .zf-sheet, .zf-slot, .zf-mini-page {
+        --zf-page-scale: 1 !important;
+      }
       .zf-mini-page {
-        padding: 0.1in !important;
+        padding: var(--zf-page-margin, 0.1in) !important;
         font-size: 10pt !important;
       }
       /* In print, icons size against the physical width (in inches) that
@@ -813,8 +1138,12 @@
       .zf-slot-label { display: none !important; }
     }
     @media print {
-      .zf-header, .zf-no-print, .zf-pager { display: none !important; }
+      .zf-header, .zf2-masthead, .zf2-viewtabs, .zf-no-print, .zf-pager,
+      .zf-settings-slide, .zf-editor > .zf-tools-col, .zf-canvas-empty-hint {
+        display: none !important;
+      }
       body { background: #ffffff; margin: 0; padding: 0; }
       .zf-reader-page { box-shadow: none; border: none; padding: 0; margin: 0; page-break-after: always; }
+      .zf-editor { display: block !important; padding: 0 !important; }
     }
   
