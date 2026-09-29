@@ -50,13 +50,13 @@
       accent: '#111111'
     },
     {
-      id: 'dark',
-      label: 'Dark (charcoal paper, light ink)',
-      paperBg: '#1f1f23',
-      inkColor: '#f0efe8',
-      headingFont: '"Iowan Old Style", Georgia, serif',
-      bodyFont: '"Iowan Old Style", Georgia, serif',
-      accent: '#ffbe2e'
+      id: 'graph-grid',
+      label: 'Graph paper (faint blue grid)',
+      paperBg: '#f8fbff',
+      inkColor: '#1b1b1b',
+      headingFont: '"Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif',
+      bodyFont: '"Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif',
+      accent: '#4f7cac'
     }
   ];
 
@@ -64,6 +64,7 @@
     for (var i = 0; i < THEMES.length; i++) {
       if (THEMES[i].id === id) return THEMES[i];
     }
+    // Fallback: legacy or unknown themes (e.g. 'dark') return the default.
     return THEMES[0];
   }
 

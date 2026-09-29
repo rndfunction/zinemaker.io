@@ -1,287 +1,820 @@
-/* Zine Forge - base styles (USWDS-inspired) */
-:root {
-  --zf-blue: #005ea2;
-  --zf-blue-dark: #1a4480;
-  --zf-ink: #1b1b1b;
-  --zf-gray-light: #f0f0f0;
-  --zf-gray-mid: #71767a;
-  --zf-border: #dfe1e2;
-  --zf-red: #b50909;
-  --zf-font: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --zf-serif: "Source Serif Pro", Georgia, "Times New Roman", serif;
-}
 
-* { box-sizing: border-box; }
+    :root {
+      --zf-blue: #005ea2;
+      --zf-blue-dark: #1a4480;
+      --zf-ink: #1b1b1b;
+      --zf-gray-light: #f0f0f0;
+      --zf-gray-mid: #71767a;
+      --zf-border: #dfe1e2;
+      --zf-red: #b50909;
+      --zf-font: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --zf-serif: "Source Serif Pro", Georgia, "Times New Roman", serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--zf-font); color: var(--zf-ink); background: #ffffff; }
+    button, input, textarea, select { font-family: inherit; }
+    a { color: var(--zf-blue); }
+    .zf-header { background: var(--zf-blue-dark); color: #ffffff; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .zf-header h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.02em; }
+    .zf-header .zf-sub { font-size: 0.8rem; opacity: 0.85; margin-left: 0.5rem; font-weight: 400; }
+    .zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .zf-btn { border: 1px solid transparent; border-radius: 4px; padding: 0.5rem 0.9rem; font-size: 0.9rem; cursor: pointer; background: #ffffff; color: var(--zf-blue-dark); }
+    .zf-btn:hover { background: var(--zf-gray-light); }
+    .zf-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-btn-secondary { background: transparent; color: #ffffff; border-color: rgba(255,255,255,0.6); }
+    .zf-btn-secondary:hover { background: rgba(255,255,255,0.12); }
+    .zf-btn-primary { background: #ffbe2e; color: var(--zf-ink); font-weight: 600; }
+    .zf-btn-primary:hover { background: #e5a000; }
+    .zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+    .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
+    .zf-error { color: var(--zf-red); font-size: 0.9rem; }
+    .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
+    .zf-editor { display: grid; grid-template-columns: 240px 1fr 340px; gap: 1.25rem; align-items: start; }
+    .zf-canvas-col { min-width: 0; }
+    .zf-tools-col {
+      min-width: 0;
+      padding: 0.75rem;
+      background: var(--zf-gray-light);
+      border-radius: 6px;
+      align-self: start;
+      position: sticky;
+      top: 0.75rem;
+    }
+    @media (max-width: 1200px) {
+      .zf-editor { grid-template-columns: 240px 1fr; }
+      .zf-tools-col { grid-column: 1 / -1; }
+    }
+    @media (max-width: 800px) { .zf-editor { grid-template-columns: 1fr; } }
+    .zf-page-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow: hidden; }
+    .zf-page-list li { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--zf-border); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.9rem; }
+    .zf-page-list li:last-child { border-bottom: none; }
+    .zf-page-list li.zf-page-add {
+      color: var(--zf-blue);
+      font-weight: 600;
+      justify-content: center;
+      background: #ffffff;
+      cursor: pointer;
+    }
+    .zf-page-list li.zf-page-add:hover {
+      background: var(--zf-gray-light);
+    }
+    .zf-page-list li.zf-page-add:focus-visible {
+      outline: 3px solid #ffbe2e;
+      outline-offset: -3px;
+    }
+    .zf-page-list li.active { background: var(--zf-blue); color: #ffffff; }
+    .zf-mini { font-size: 0.75rem; color: var(--zf-gray-mid); }
+    .zf-page-tools { display: flex; gap: 0.25rem; }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: var(--zf-font);
-  color: var(--zf-ink);
-  background: #ffffff;
-}
+    /* -------- Drag to reorder -------- */
+    .zf-page-list li.zf-draggable { cursor: grab; }
+    .zf-page-list li.zf-dragging { opacity: 0.4; }
+    .zf-page-list li.zf-drop-above {
+      box-shadow: inset 0 3px 0 0 var(--zf-blue);
+    }
+    .zf-page-list li.zf-drop-below {
+      box-shadow: inset 0 -3px 0 0 var(--zf-blue);
+    }
+    .zf-page-grip {
+      color: var(--zf-gray-mid);
+      font-size: 0.9rem;
+      cursor: grab;
+      user-select: none;
+      margin-right: 0.25rem;
+    }
+    .zf-page-list li.active .zf-page-grip { color: #ffffff; opacity: 0.85; }
+    .zf-icon-btn { border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px; width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 0.9rem; padding: 0; }
+    .zf-icon-btn:hover { background: var(--zf-gray-light); }
+    .zf-canvas-wrap { display: flex; justify-content: center; background: var(--zf-gray-light); padding: 1.5rem; border-radius: 6px; }
+    .zf-page { width: 480px; min-height: 640px; background: #ffffff; border: 1px solid var(--zf-border); box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .zf-page-heading { font-family: var(--zf-page-heading-font, var(--zf-serif)); font-size: 1.5rem; border: none; border-bottom: 2px solid var(--zf-page-accent, var(--zf-ink)); padding: 0.25rem 0; width: 100%; outline: none; background: transparent; color: inherit; }
+    .zf-page-body { flex: 1; border: none; resize: vertical; font-family: var(--zf-page-body-font, var(--zf-serif)); font-size: 1rem; line-height: 1.5; width: 100%; outline: none; background: transparent; color: inherit; }
+    .zf-page-image { max-width: 100%; border-radius: 4px; }
+    .zf-inline-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .zf-label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--zf-gray-mid); text-transform: uppercase; letter-spacing: 0.03em; }
+    .zf-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--zf-border); border-radius: 4px; font-size: 0.9rem; }
+    .zf-field { margin-bottom: 0.75rem; }
 
-button, input, textarea, select { font-family: inherit; }
+    /* -------- Content budget meter -------- */
+    .zf-budget { margin-top: 0.5rem; font-size: 0.8rem; color: var(--zf-gray-mid); }
+    .zf-budget-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+    .zf-budget-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--zf-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .zf-budget-bar > div {
+      height: 100%;
+      background: #2e8540;
+      transition: width 0.15s ease, background 0.15s ease;
+    }
+    .zf-budget-bar.warn > div { background: #e5a000; }
+    .zf-budget-bar.over > div { background: var(--zf-red); }
+    .zf-budget-num { font-variant-numeric: tabular-nums; }
+    .zf-budget.over { color: var(--zf-red); }
+    .zf-budget.warn { color: #8a6d00; }
 
-a { color: var(--zf-blue); }
+    /* -------- Zine page number labels -------- */
+    .zf-page-num {
+      display: inline-block;
+      font-size: 0.7rem;
+      color: var(--zf-gray-mid);
+      font-variant-numeric: tabular-nums;
+      padding: 0 4px;
+      border: 1px solid var(--zf-border);
+      border-radius: 3px;
+      background: #ffffff;
+    }
+    .zf-page-num.cover {
+      background: var(--zf-blue);
+      color: #ffffff;
+      border-color: var(--zf-blue);
+    }
+    .zf-page-num.back {
+      background: var(--zf-ink);
+      color: #ffffff;
+      border-color: var(--zf-ink);
+    }
+    /* Printed corner number inside each mini-page on the sheet */
+    /* Printer safe-area guides (visual only, never printed) */
+    .zf-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      border-style: dashed;
+      border-color: rgba(181, 9, 9, 0.5);
+      border-width: 0;
+    }
+    /* Sheet-level: rectangle inset from the paper edge on every side. */
+    .zf-sheet-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      border: 1px dashed rgba(181, 9, 9, 0.5);
+      box-sizing: border-box;
+    }
+    /* Editor canvas: guide stripes along specific page edges. */
+    .zf-mini-safe-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      background: transparent;
+      border: 0;
+      border-color: rgba(181, 9, 9, 0.5);
+    }
+    @media print {
+      .zf-safe-guide, .zf-sheet-safe-guide, .zf-mini-safe-guide { display: none !important; }
+    }
+    .zf-slot-page-num {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      font-family: var(--zf-font);
+      font-size: 0.6rem;
+      color: var(--zf-gray-mid);
+      z-index: 10;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      line-height: 1;
+    }
 
-.zf-header {
-  background: var(--zf-blue-dark);
-  color: #ffffff;
-  padding: 0.75rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
+    /* -------- Unified mini-page renderer --------
+       All three views (editor canvas, reader page, sheet slot) render the same
+       content inside a .zf-mini-page, so what you type matches what you read
+       and what you print. The --zf-page-scale variable scales typography from
+       physical inches to the on-screen size. */
+    .zf-mini-page {
+      background: var(--zf-page-paper, #ffffff);
+      color: var(--zf-page-ink, #1b1b1b);
+      font-family: var(--zf-page-body-font, var(--zf-serif));
+      /* Base body font size: 10pt physical, scaled by --zf-page-scale.
+         10pt = 13.333px CSS. */
+      font-size: calc(13.333px * var(--zf-page-scale, 1));
+      line-height: 1.3;
+      /* Margins are user-editable via --zf-page-margin (inches), scaled to
+         the current on-screen size by --zf-page-scale. Default 0.1in. */
+      padding: calc(var(--zf-page-margin, 0.1in) * var(--zf-page-scale, 1));
+      /* Clip anything that runs off the page. Images hanging off the edge
+         bleed out visually and are trimmed for print - the way zines work. */
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: calc(0.04in * var(--zf-page-scale, 1));
+      box-sizing: border-box;
+      /* So absolutely-positioned images anchor here, not the viewport. */
+      position: relative;
+    }
+    .zf-mini-page .zf-mini-heading {
+      font-family: var(--zf-page-heading-font, var(--zf-serif));
+      font-size: 1.6em;
+      line-height: 1.1;
+      margin: 0;
+      padding-bottom: 0.1em;
+      border-bottom: calc(0.015in * var(--zf-page-scale, 1)) solid var(--zf-page-accent, var(--zf-ink));
+      background: transparent;
+      color: inherit;
+      width: 100%;
+      outline: none;
+      border-top: 0;
+      border-left: 0;
+      border-right: 0;
+    }
+    .zf-mini-page .zf-mini-body {
+      font-family: var(--zf-page-body-font, var(--zf-serif));
+      flex: 1;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      width: 100%;
+      outline: none;
+      resize: none;
+      overflow: hidden;
+      white-space: pre-wrap;
+      font-size: 1em;
+      line-height: 1.35;
+      /* Small bottom padding for descenders (g, j, p, q, y). Without this
+         the last line's descending strokes get clipped by the mini-page's
+         overflow boundary. Kept tight so we don't waste space. */
+      padding: 0 0 0.1em 0;
+      word-wrap: break-word;
+    }
+    .zf-mini-body.zf-editable {
+      cursor: text;
+      min-height: 1em;
+    }
+    .zf-mini-body.zf-editable:empty:before {
+      content: attr(data-placeholder);
+      color: var(--zf-gray-mid);
+      font-style: italic;
+      pointer-events: none;
+    }
+    .zf-format-toolbar {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      background: var(--zf-gray-light);
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      width: fit-content;
+    }
+    /* Iconify icons inside our buttons */
+    .zf-format-toolbar iconify-icon {
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--zf-blue-dark);
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .zf-icon-btn iconify-icon {
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--zf-blue-dark);
+      display: inline-block;
+      vertical-align: middle;
+    }
 
-.zf-header h1 {
-  font-size: 1.1rem;
-  margin: 0;
-  letter-spacing: 0.02em;
-}
+    /* -------- Icon picker modal -------- */
+    .zf-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      padding: 1rem;
+    }
+    .zf-modal {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+      padding: 1.25rem;
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow: auto;
+    }
+    .zf-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .zf-modal-header h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+    .zf-modal-close {
+      background: transparent;
+      border: 0;
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      color: var(--zf-gray-mid);
+    }
+    .zf-modal-close:hover { color: var(--zf-ink); }
+    .zf-icon-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+      gap: 0.35rem;
+    }
+    .zf-icon-tile {
+      border: 1px solid var(--zf-border);
+      background: #ffffff;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 0.5rem;
+      font-size: 1.5rem;
+      color: var(--zf-ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      aspect-ratio: 1;
+    }
+    .zf-icon-tile:hover { background: var(--zf-gray-light); border-color: var(--zf-blue); }
+    .zf-modal-footer {
+      margin-top: 0.75rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--zf-border);
+    }
+    .zf-image-dragging { cursor: grabbing; }
+    .zf-image-selected { outline: 2px dashed var(--zf-blue); outline-offset: 2px; }
 
-.zf-header .zf-sub {
-  font-size: 0.8rem;
-  opacity: 0.85;
-  margin-left: 0.5rem;
-  font-weight: 400;
-}
+    /* -------- Image wrapper with resize/rotate handles -------- */
+    .zf-img-wrap {
+      position: absolute;
+      box-sizing: border-box;
+      z-index: 2;
+    }
+    .zf-img-wrap > img {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: grab;
+    }
+    .zf-img-wrap.zf-img-selected {
+      outline: 2px dashed var(--zf-blue);
+      outline-offset: 2px;
+    }
+    .zf-img-handle {
+      position: absolute;
+      display: none;
+      background: var(--zf-blue);
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1px var(--zf-blue);
+      cursor: pointer;
+      z-index: 3;
+      touch-action: none;
+    }
+    .zf-img-wrap.zf-img-selected .zf-img-handle { display: block; }
+    .zf-img-handle.zf-img-handle-resize {
+      width: 12px; height: 12px;
+      right: -7px; bottom: -7px;
+      border-radius: 2px;
+      cursor: nwse-resize;
+    }
+    .zf-img-handle.zf-img-handle-rotate {
+      width: 14px; height: 14px;
+      right: -8px; top: -8px;
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .zf-img-handle.zf-img-handle-rotate::after {
+      content: "";
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 4px; height: 4px;
+      background: #ffffff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
 
-.zf-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    /* -------- Placed text boxes -------- */
+    .zf-textbox {
+      position: absolute;
+      box-sizing: border-box;
+      z-index: 3;
+      min-height: 1em;
+      padding: 0.15em 0.2em;
+      border: 1px dashed transparent;
+      border-radius: 2px;
+      cursor: move;
+      outline: none;
+    }
+    .zf-textbox:hover { border-color: rgba(0,94,162,0.35); }
+    .zf-textbox-selected {
+      border: 1px dashed var(--zf-blue) !important;
+      outline: 2px dashed var(--zf-blue);
+      outline-offset: 2px;
+    }
+    .zf-textbox .zf-textbox-content {
+      outline: none;
+      min-height: 1em;
+      cursor: text;
+    }
+    .zf-textbox .zf-img-handle {
+      display: none;
+    }
+    .zf-textbox-selected .zf-img-handle {
+      display: block;
+    }
+    .zf-mini-image.zf-positioned { cursor: grab; }
+    .zf-mini-image.zf-block-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+      max-width: 100%;
+      height: auto;
+      display: block;
+      flex-shrink: 0;
+    }
+    .zf-mini-body { position: relative; }
+    .zf-mini-body.zf-editable { cursor: text; min-height: 1em; }
+    .zf-mini-image.zf-flow-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+    }
+    /* .zf-icon-element lives inside a wrapper (which carries position/size),
+       so it should fill the wrapper completely. Use absolute positioning to
+       avoid percentage-height resolution issues when the wrapper only has
+       aspect-ratio (not an explicit height). */
+    .zf-icon-element {
+      display: block;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      color: inherit;
+    }
+    /* .zf-block-icon and .zf-positioned-icon are direct iconify-icon
+       elements in the sheet/reader templates (no wrapper). They size via
+       inline font-size; do not force width 100%. */
+    .zf-block-icon,
+    .zf-positioned-icon {
+      display: block;
+      color: inherit;
+    }
+    /* Wrapper used for sheet/reader positioned icons. */
+    .zf-positioned-icon-wrap {
+      position: absolute;
+    }
+    .zf-positioned-icon-wrap:has(> .zf-icon-element) {
+      aspect-ratio: 1;
+    }
+    /* The editor's wrapper is position: absolute from its inline style,
+       so it already establishes a positioning context. No override needed. */
+    /* DEBUG: show wrapper boundary for icons in both editor and sheet. */
+    .zf-img-wrap, .zf-positioned-icon-wrap, .zf-block-icon {
+      outline: 1px solid rgba(0, 0, 255, 0.35);
+    }
+    .zf-icon-element {
+      outline: 1px solid rgba(255, 0, 255, 0.35);
+    }
+    /* Icons resize via font-size on the wrapper, not width. aspect-ratio
+       keeps the wrapper square so width == height for the SVG. */
+    .zf-img-wrap:has(.zf-icon-element) {
+      aspect-ratio: 1;
+    }
+    .zf-mini-image.zf-flow-image {
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+    }
+    .zf-image-controls {
+      margin-top: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      background: var(--zf-gray-light);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .zf-image-control-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .zf-image-control-label {
+      font-size: 0.8rem;
+      color: var(--zf-gray-mid);
+      min-width: 130px;
+    }
+    .zf-mini-page .zf-mini-image {
+      max-width: 100%;
+      max-height: 45%;
+      object-fit: contain;
+      border-radius: calc(0.02in * var(--zf-page-scale, 1));
+      align-self: flex-start;
+    }
+    /* Positioned image: sits on top of text inside the printable area. */
+    .zf-mini-image.zf-positioned {
+      position: absolute;
+      max-width: none;
+      max-height: none;
+      transform-origin: center center;
+      user-select: none;
+      touch-action: none;
+    }
+    .zf-mini-page.zf-has-abs-image {
+      position: relative;
+    }
 
-.zf-btn {
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  background: #ffffff;
-  color: var(--zf-blue-dark);
-  transition: background 0.15s ease;
-}
+    .zf-fill-hint {
+      margin: 0.5rem 0 0.5rem 0;
+      padding: 0.5rem 0.6rem;
+      border-left: 3px solid var(--zf-blue);
+      background: #e7f6ff;
+      font-size: 0.8rem;
+      border-radius: 3px;
+    }
+    .zf-fill-hint.complete { border-left-color: #2e8540; background: #ecf8ef; }
+    .zf-reader { max-width: 720px; margin: 0 auto; padding: 1.5rem; display: flex; flex-direction: column; align-items: center; }
+    .zf-reader-page { background: #ffffff; border: 1px solid var(--zf-border); border-radius: 6px; padding: 1.5rem; margin: 0 auto 1.5rem auto; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; overflow: hidden; }
+    .zf-reader-page h2 { font-family: var(--zf-serif); font-size: 1.75rem; margin-top: 0; border-bottom: 2px solid var(--zf-ink); padding-bottom: 0.25rem; }
+    .zf-reader-page .zf-reader-body { font-family: var(--zf-serif); line-height: 1.6; font-size: 1.05rem; white-space: pre-wrap; }
+    .zf-reader-page img { max-width: 100%; border-radius: 4px; margin: 0.75rem 0; }
+    .zf-pager { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
 
-.zf-btn:hover { background: var(--zf-gray-light); }
+    /* -------- Sheet view -------- */
+    .zf-sheet-view { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+    .zf-sheet {
+      position: relative;
+      background: #ffffff;
+      border: 1px solid var(--zf-border);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    /* .zf-sheet-inner holds the landscape imposition. On screen it fills the
+       sheet 1:1. In print, the paper becomes portrait (matching the printer's
+       physical paper feed), and this inner element is rotated 90 degrees to
+       fit the landscape imposition onto portrait paper. */
+    .zf-sheet-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    .zf-sheet-guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .zf-sheet-guides .zf-fold-h,
+    .zf-sheet-guides .zf-fold-v,
+    .zf-sheet-guides .zf-cut-v {
+      position: absolute;
+      background: transparent;
+      pointer-events: none;
+    }
+    .zf-sheet-guides .zf-fold-h {
+      left: 0; right: 0; top: 50%;
+      border-top: 2px dashed #b50909;
+    }
+    .zf-sheet-guides .zf-fold-v {
+      top: 0; bottom: 0; left: 50%;
+      border-left: 2px dashed #b50909;
+    }
+    .zf-sheet-guides .zf-cut-h {
+      position: absolute;
+      border-top: 2px solid #1b1b1b;
+    }
+    .zf-slot {
+      position: absolute;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px dotted rgba(0,0,0,0.12);
+      background: #ffffff;
+    }
+    .zf-slot-rot { transform-origin: center center; }
+    /* Debug slot label removed from the template; keeping the CSS rule out
+       entirely so nothing accidentally picks it up later. */
+    .zf-slot-empty {
+      color: var(--zf-gray-mid);
+      font-size: 0.7rem;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .zf-instructions {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-left: 4px solid var(--zf-blue);
+      background: var(--zf-gray-light);
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    .zf-instructions h3 { margin: 0 0 0.5rem 0; font-size: 0.95rem; }
+    .zf-instructions ol { margin: 0; padding-left: 1.25rem; }
+    .zf-instructions li { margin-bottom: 0.25rem; }
 
-.zf-btn:focus-visible {
-  outline: 3px solid #ffbe2e;
-  outline-offset: 2px;
-}
+    /* -------- Visual fold guide -------- */
+    .zf-fold-guide {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    .zf-fold-guide h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+    .zf-fold-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .zf-fold-step {
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .zf-fold-step svg { width: 120px; height: auto; display: block; }
+    .zf-fold-caption {
+      font-size: 0.75rem;
+      color: var(--zf-gray-mid);
+      text-align: center;
+      line-height: 1.3;
+    }
+    .zf-fold-num {
+      display: inline-block;
+      width: 18px; height: 18px;
+      line-height: 18px;
+      text-align: center;
+      border-radius: 50%;
+      background: var(--zf-blue);
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: 0.25rem;
+    }
 
-.zf-btn-secondary {
-  background: transparent;
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.6);
-}
+    /* -------- Library -------- */
+    .zf-library { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+    .zf-library-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .zf-library-header h2 { margin: 0; font-family: var(--zf-serif); }
+    .zf-library-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .zf-lib-card {
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      background: #ffffff;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.15s ease;
+    }
+    .zf-lib-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    .zf-lib-preview {
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--zf-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-align: center;
+      padding: 0.5rem;
+      overflow: hidden;
+      border-bottom: 1px solid var(--zf-border);
+    }
+    .zf-lib-preview span {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .zf-lib-body { padding: 0.6rem 0.75rem; }
+    .zf-lib-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .zf-lib-meta { font-size: 0.75rem; color: var(--zf-gray-mid); }
+    .zf-lib-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem 0.75rem 0.75rem;
+      border-top: 1px solid var(--zf-border);
+    }
+    .zf-lib-actions button {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.8rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+    }
+    .zf-lib-actions button:hover { background: var(--zf-gray-light); }
+    .zf-lib-actions button.danger { color: var(--zf-red); }
+    .zf-lib-actions button.primary {
+      background: var(--zf-blue);
+      color: #ffffff;
+      border-color: var(--zf-blue);
+    }
+    .zf-lib-actions button.primary:hover { background: var(--zf-blue-dark); }
 
-.zf-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
+    @media print {
+      /* Reset page scale to 1 in print so padding and font sizes resolve to
+         their physical values (0.1in, 10pt, etc.) instead of the screen-scale
+         px values used on the on-screen preview. Without this, mini-pages
+         inside the printed sheet keep their screen-relative padding/sizing
+         and the content ends up too small for the paper.
 
-.zf-btn-primary { background: #ffbe2e; color: var(--zf-ink); font-weight: 600; }
-.zf-btn-primary:hover { background: #e5a000; }
-
-.zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
-
-.zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
-.zf-error { color: var(--zf-red); font-size: 0.9rem; }
-
-.zf-empty {
-  border: 2px dashed var(--zf-border);
-  border-radius: 6px;
-  padding: 2rem;
-  text-align: center;
-  color: var(--zf-gray-mid);
-}
-
-.zf-sr-only {
-  position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0,0,0,0);
-  white-space: nowrap; border: 0;
-}
-
-/* -------- Editor layout -------- */
-.zf-editor {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 1.25rem;
-  align-items: start;
-}
-
-@media (max-width: 800px) {
-  .zf-editor { grid-template-columns: 1fr; }
-}
-
-.zf-page-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  border: 1px solid var(--zf-border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.zf-page-list li {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--zf-border);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.zf-page-list li:last-child { border-bottom: none; }
-.zf-page-list li.active { background: var(--zf-blue); color: #ffffff; }
-.zf-page-list li.active .zf-mini { color: #ffffff; opacity: 0.8; }
-
-.zf-mini {
-  font-size: 0.75rem;
-  color: var(--zf-gray-mid);
-}
-
-.zf-page-tools { display: flex; gap: 0.25rem; }
-
-.zf-icon-btn {
-  border: 1px solid var(--zf-border);
-  background: #ffffff;
-  border-radius: 4px;
-  width: 26px; height: 26px;
-  line-height: 1;
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0;
-}
-
-.zf-icon-btn:hover { background: var(--zf-gray-light); }
-.zf-icon-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 1px; }
-
-/* -------- Canvas / page -------- */
-.zf-canvas-wrap {
-  display: flex;
-  justify-content: center;
-  background: var(--zf-gray-light);
-  padding: 1.5rem;
-  border-radius: 6px;
-}
-
-.zf-page {
-  width: 480px;
-  min-height: 640px;
-  background: #ffffff;
-  border: 1px solid var(--zf-border);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  padding: 1.5rem;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.zf-page-heading {
-  font-family: var(--zf-serif);
-  font-size: 1.5rem;
-  border: none;
-  border-bottom: 2px solid var(--zf-ink);
-  padding: 0.25rem 0;
-  width: 100%;
-  outline: none;
-  background: transparent;
-}
-
-.zf-page-body {
-  flex: 1;
-  border: none;
-  resize: vertical;
-  font-family: var(--zf-serif);
-  font-size: 1rem;
-  line-height: 1.5;
-  width: 100%;
-  outline: none;
-  background: transparent;
-}
-
-.zf-page-image {
-  max-width: 100%;
-  border-radius: 4px;
-}
-
-.zf-inline-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-.zf-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  color: var(--zf-gray-mid);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.zf-input {
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--zf-border);
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.zf-field { margin-bottom: 0.75rem; }
-
-/* -------- Reader -------- */
-.zf-reader {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
-.zf-reader-page {
-  background: #ffffff;
-  border: 1px solid var(--zf-border);
-  border-radius: 6px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-
-.zf-reader-page h2 {
-  font-family: var(--zf-serif);
-  font-size: 1.75rem;
-  margin-top: 0;
-  border-bottom: 2px solid var(--zf-ink);
-  padding-bottom: 0.25rem;
-}
-
-.zf-reader-page .zf-reader-body {
-  font-family: var(--zf-serif);
-  line-height: 1.6;
-  font-size: 1.05rem;
-  white-space: pre-wrap;
-}
-
-.zf-reader-page img { max-width: 100%; border-radius: 4px; margin: 0.75rem 0; }
-
-.zf-pager {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-/* -------- Print -------- */
-@media print {
-  .zf-header, .zf-no-print, .zf-pager { display: none !important; }
-  body { background: #ffffff; }
-  .zf-reader-page {
-    box-shadow: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    page-break-after: always;
-  }
-}
+         We set it on the root so every element inheriting --zf-page-scale
+         gets the same physical scale. This keeps absolute positioning
+         origins consistent through the entire print layout. */
+      /* For print, override the mini-page's padding and font-size with
+         physical units instead of scale-multiplied px. This gives us
+         correct physical dimensions on paper (0.1in padding, 10pt text)
+         without touching the mini-page's layout box, which keeps the
+         aspect ratio correct. */
+      .zf-mini-page {
+        padding: 0.1in !important;
+        font-size: 10pt !important;
+      }
+      /* In print, icons size against the physical width (in inches) that
+         was set inline via --zf-icon-w-in. Screen uses the inline px value;
+         print uses this physical value. */
+      .zf-mini-page .zf-positioned-icon,
+      .zf-mini-page .zf-block-icon,
+      .zf-mini-page .zf-icon-element {
+        font-size: var(--zf-icon-w-in, 1em) !important;
+      }
+      /* Strip every wrapper's padding/margin/max-width so the sheet can
+         actually fill the paper edge to edge. Do NOT set width: 100% on
+         .zf-sheet -- its size is set to the paper dimensions (11in x 8.5in)
+         by the dynamically injected paperCss, and overriding it here would
+         force it to be the size of its parent and break the layout. */
+      #app, #app > div, .zf-main, .zf-sheet-view {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .zf-sheet {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      /* Keep the sheet's own coordinate origin at its top-left. The sheet is
+         position:relative already, so absolutely positioned descendants use
+         its padding box as their reference. This is the same origin used by
+         the on-screen preview, so positions match. */
+      .zf-sheet { position: relative !important; }
+      /* The mini-page inside each slot MUST have its padding-box origin at
+         the same relative position as on screen. Since --zf-page-scale is
+         now 1 everywhere in print, and the padding is 0.1in physical on
+         paper, the origin is 0.1in from the mini-page's edge - matching the
+         screen preview proportionally. */
+      /* Hide everything except the sheet itself */
+      html, body { margin: 0 !important; padding: 0 !important; background: #ffffff !important; }
+      /* The sheet must have no margin so the fold lines land on the exact
+         physical center of the paper. */
+      .zf-sheet-view, .zf-sheet, .zf-slot { margin: 0 !important; padding: 0 !important; }
+      body > *:not(#app) { display: none !important; }
+      #app > div > header,
+      #app .zf-main > div:not(:has(.zf-sheet-view)),
+      #app .zf-main > section:not(:has(.zf-sheet-view)),
+      #app .zf-main > section > *:not(.zf-sheet-view) {
+        display: none !important;
+      }
+      /* Show only the active sheet view */
+      .zf-sheet-view { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+      .zf-sheet-view > .zf-no-print { display: none !important; }
+      .zf-sheet {
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        page-break-inside: avoid;
+        page-break-after: avoid;
+      }
+      .zf-slot { border: none !important; }
+      .zf-slot-label { display: none !important; }
+    }
+    @media print {
+      .zf-header, .zf-no-print, .zf-pager { display: none !important; }
+      body { background: #ffffff; margin: 0; padding: 0; }
+      .zf-reader-page { box-shadow: none; border: none; padding: 0; margin: 0; page-break-after: always; }
+    }
+  
