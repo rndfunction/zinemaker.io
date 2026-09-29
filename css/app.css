@@ -18,6 +18,10 @@
       --zf2-paper: #ffffff;
       --zf2-wash: #f4f4f1;
       --zf2-wash-2: #ebebe6;
+      /* The surface the page sits on. A step or two darker than the paper so
+         the white/cream page reads as an object on a desk, without heavy
+         contrast. */
+      --zf2-canvas-desk: #dedad2;
       --zf2-line: #d6d6d0;
       --zf2-line-strong: #14171a;
       --zf2-accent: #c8102e;
@@ -31,7 +35,7 @@
       --zf2-shadow-side: 0 4px 14px rgba(20,23,26,0.10);
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; font-family: var(--zf-font); color: var(--zf-ink); background: #ffffff; }
+    html, body { margin: 0; padding: 0; font-family: var(--zf-font); color: var(--zf-ink); background: var(--zf2-wash, #f4f4f1); }
     button, input, textarea, select { font-family: inherit; }
     a { color: var(--zf-blue); }
     .zf-header { background: var(--zf-blue-dark); color: #ffffff; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -160,8 +164,47 @@
     .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
     .zf-error { color: var(--zf-red); font-size: 0.9rem; }
     .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
-    .zf-editor { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; align-items: start; }
+    .zf-editor { display: grid; grid-template-columns: 240px 1fr auto; gap: 1.25rem; align-items: start; }
     .zf-canvas-col { min-width: 0; }
+    /* Vertical right rail: formatting + insert controls. Sits in the open
+       space to the right of the tall canvas. Buttons match the "+ Add sheet"
+       button style (white, blue text, soft border). */
+    .zf-rail {
+      display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem;
+      width: max-content;
+      position: sticky; top: 0.75rem;
+    }
+    .zf-rail-group {
+      display: flex; flex-direction: column; gap: 0.4rem;
+      padding: 0.5rem; background: #ffffff;
+      border: 1px solid var(--zf-border); border-radius: 8px;
+    }
+    .zf-rail-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 36px;
+      background: #ffffff; color: var(--zf-blue);
+      border: 1px solid var(--zf-border); border-radius: 6px;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+    }
+    .zf-rail-btn:hover { background: var(--zf-gray-light); }
+    .zf-rail-btn:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-rail-btn iconify-icon { font-size: 1.15rem; }
+    .zf-rail-color { position: relative; }
+    .zf-rail-color input[type="color"] {
+      position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .zf-rail-font-wrap {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 36px; position: relative;
+      background: #ffffff; color: var(--zf-blue);
+      border: 1px solid var(--zf-border); border-radius: 6px; cursor: pointer;
+    }
+    .zf-rail-font-wrap:hover { background: var(--zf-gray-light); }
+    .zf-rail-font-wrap iconify-icon { font-size: 1.15rem; }
+    .zf-rail-font {
+      position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .zf-rail-sep { height: 1px; background: transparent; }
     /* Always-visible format bar above the insert bar. */
     .zf-format-bar {
       display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
@@ -247,8 +290,12 @@
        the canvas column needs real room before neighbor ghosts fit beside
        the page. Hide them on narrower viewports rather than let them
        overlap the editable page. */
-    @media (max-width: 1500px) { .zf-ghost-page { display: none; } }
-    .zf-editor.zf-inspector-is-collapsed .zf-ghost-page { display: block; }
+    /* The page is ~414px wide and each ghost ~130px, so ghosts need roughly
+       the page plus both flanks (~840px) of clear canvas. The editor chrome
+       is just the 240px page sidebar (the tools panel is an overlay), so a
+       ~1200px viewport gives the canvas enough room. Below that, hide them
+       rather than let them overlap the page. */
+    @media (max-width: 1200px) { .zf-ghost-page { display: none; } }
 
     /* ---- Right inspector panel: an overlay, not a grid column, so the
        page canvas keeps the full width and stays centered. ---- */
@@ -397,7 +444,7 @@
     .zf-page-list li.active .zf-page-grip { color: #ffffff; opacity: 0.85; }
     .zf-icon-btn { border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px; width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 0.9rem; padding: 0; }
     .zf-icon-btn:hover { background: var(--zf-gray-light); }
-    .zf-canvas-wrap { display: flex; justify-content: center; background: var(--zf-gray-light); padding: 1.5rem; border-radius: 6px; }
+    .zf-canvas-wrap { display: flex; justify-content: center; background: var(--zf2-canvas-desk, #dedad2); padding: 1.5rem; border-radius: 6px; }
     .zf-page { width: 480px; min-height: 640px; background: #ffffff; border: 1px solid var(--zf-border); box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
     .zf-page-heading { font-family: var(--zf-page-heading-font, var(--zf-serif)); font-size: 1.5rem; border: none; border-bottom: 2px solid var(--zf-page-accent, var(--zf-ink)); padding: 0.25rem 0; width: 100%; outline: none; background: transparent; color: inherit; }
     .zf-page-body { flex: 1; border: none; resize: vertical; font-family: var(--zf-page-body-font, var(--zf-serif)); font-size: 1rem; line-height: 1.5; width: 100%; outline: none; background: transparent; color: inherit; }

@@ -62,19 +62,18 @@ change models -- extra pages are kept and simply won't print.
 
 ## Project structure
 
-    index.html                 App shell, all Vue component templates,
-                               and the main application script
+    index.html                 App shell, every Vue component template,
+                               and the application script (all views and
+                               state live here)
     css/app.css                All styles, including print styles and
                                the design tokens
-    js/main.js                 Entry point (ES module)
-    js/store.js                Shared reactive store
-    js/util.js                 Shared helpers (sanitizing, image
-                               compression, element style computation)
+    js/util.js                 Shared helpers (HTML sanitizing, image
+                               compression, element style computation,
+                               debug logging)
     js/zine-models.js          Imposition model registry
     js/zine-themes.js          Page theme registry (paper, ink, type)
     js/zine-library.js         localStorage-backed zine library
-    js/components/             Vue components (shell, editor, reader,
-                               icon picker)
+    js/components/ZineIconPicker.js   Icon picker modal
     mockups/                   Standalone design mockups (not loaded by
                                the app): theme studies and layout
                                candidates

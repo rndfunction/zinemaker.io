@@ -202,43 +202,6 @@
       </aside>
 
       <div class="zf-canvas-col">
-        <div class="zf-format-bar" role="toolbar" aria-label="Text formatting">
-          <button type="button" class="zf-fmt-btn" title="Bold (Ctrl+B)" @mousedown.prevent @click="execCmdOnActive('bold')"><b>B</b></button>
-          <button type="button" class="zf-fmt-btn" title="Italic (Ctrl+I)" @mousedown.prevent @click="execCmdOnActive('italic')"><i>I</i></button>
-          <button type="button" class="zf-fmt-btn" title="Underline (Ctrl+U)" @mousedown.prevent @click="execCmdOnActive('underline')"><u>U</u></button>
-          <span class="zf-fmt-sep" aria-hidden="true"></span>
-          <label class="zf-fmt-color" title="Text / element color">
-            <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
-            <input type="color" value="#1b1b1b" @input="applyColor($event.target.value)" />
-          </label>
-          <button type="button" class="zf-fmt-btn zf-fmt-reset" title="Reset to theme color" @click="resetColor">Reset color</button>
-          <span class="zf-fmt-sep" aria-hidden="true"></span>
-          <select class="zf-fmt-font" title="Font" @change="applyFont($event.target.value)" aria-label="Font">
-            <option value="">Font</option>
-            <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-            <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino</option>
-            <option value="'Times New Roman', Times, serif">Times</option>
-            <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans</option>
-            <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
-            <option value="'Courier New', Courier, monospace">Courier</option>
-            <option value="Impact, 'Arial Black', sans-serif">Impact</option>
-          </select>
-        </div>
-        <div class="zf-insert-bar" role="toolbar" aria-label="Add elements">
-          <label class="zf-insert-btn" title="Add an image to this page">
-            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
-            <span>Image</span>
-            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
-          </label>
-          <button class="zf-insert-btn" @click="addTextBox" title="Add a text box to this page">
-            <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
-            <span>Text box</span>
-          </button>
-          <button class="zf-insert-btn" @click="openIconPicker" title="Add an icon to this page">
-            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
-            <span>Icon</span>
-          </button>
-        </div>
         <div class="zf-canvas-empty-hint" v-if="isEmptyPage(active)">
           Start your page: type a heading, then write below. Use the tools on the right to add an image, icon, or text box.
         </div>
@@ -348,6 +311,47 @@
           </div>
         </div>
       </div>
+
+      <aside class="zf-rail" aria-label="Formatting and insert tools">
+        <div class="zf-rail-group" role="toolbar" aria-label="Text formatting">
+          <button type="button" class="zf-rail-btn" title="Bold (Ctrl+B)" aria-label="Bold" @mousedown.prevent @click="execCmdOnActive('bold')"><b>B</b></button>
+          <button type="button" class="zf-rail-btn" title="Italic (Ctrl+I)" aria-label="Italic" @mousedown.prevent @click="execCmdOnActive('italic')"><i>I</i></button>
+          <button type="button" class="zf-rail-btn" title="Underline (Ctrl+U)" aria-label="Underline" @mousedown.prevent @click="execCmdOnActive('underline')"><u>U</u></button>
+          <label class="zf-rail-btn zf-rail-color" title="Text or element color" aria-label="Color">
+            <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
+            <input type="color" value="#1b1b1b" @input="applyColor($event.target.value)" aria-label="Choose color" />
+          </label>
+          <button type="button" class="zf-rail-btn" title="Reset to theme color" aria-label="Reset color" @click="resetColor">
+            <iconify-icon icon="ph:arrow-counter-clockwise" aria-hidden="true"></iconify-icon>
+          </button>
+          <label class="zf-rail-font-wrap" title="Font">
+            <iconify-icon icon="ph:text-aa" aria-hidden="true"></iconify-icon>
+            <select class="zf-rail-font" @change="applyFont($event.target.value)" aria-label="Font">
+              <option value="">Font</option>
+              <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+              <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino</option>
+              <option value="'Times New Roman', Times, serif">Times</option>
+              <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans</option>
+              <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+              <option value="'Courier New', Courier, monospace">Courier</option>
+              <option value="Impact, 'Arial Black', sans-serif">Impact</option>
+            </select>
+          </label>
+        </div>
+        <div class="zf-rail-sep" aria-hidden="true"></div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Add elements">
+          <label class="zf-rail-btn" title="Add an image" aria-label="Add image">
+            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
+            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
+          </label>
+          <button type="button" class="zf-rail-btn" @click="addTextBox" title="Add a text box" aria-label="Add text box">
+            <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="openIconPicker" title="Add an icon" aria-label="Add icon">
+            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
+          </button>
+        </div>
+      </aside>
 
       <div class="zf-inspector-backdrop" v-if="inspectorOpen" @click="inspectorOpen = false" aria-hidden="true"></div>
       <button class="zf-inspector-tab" v-if="!inspectorOpen" @click="inspectorOpen = true"
