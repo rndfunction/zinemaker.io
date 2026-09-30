@@ -1,0 +1,13 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "examples": [
+    {
+      "id": "welcome-to-zine-forge",
+      "title": "Welcome to Zine Forge",
+      "author": "Zine Forge",
+      "blurb": "A tiny zine that explains itself. Fold it, read it, then make your own.",
+      "file": "welcome-to-zine-forge.json"
+    }
+  ]
+}

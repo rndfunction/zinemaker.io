@@ -6,7 +6,7 @@
   <title>Zine Forge - Make and share zines</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
-  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <script src="js/zine-models.js"></script>
   <script src="js/zine-themes.js"></script>
   <script src="js/zine-library.js"></script>
@@ -192,6 +192,38 @@
             <input type="file" accept=".json,application/json" style="display:none;" @change="onImportFile" :key="'imp-' + fileInputKey" />
           </label>
         </div>
+
+        <div class="zf-sidebar-layers">
+          <button class="zf-sidebar-section-head" @click="layersOpen = !layersOpen" :aria-expanded="layersOpen">
+            <span>Layers <span class="zf-mini">&mdash; {{ layers.length }}</span></span>
+            <span aria-hidden="true">{{ layersOpen ? '\u25be' : '\u25b8' }}</span>
+          </button>
+          <div v-show="layersOpen" class="zf-sidebar-layers-body">
+            <div v-if="!layers.length" class="zf-muted" style="font-size:0.8rem;">No objects on this page yet.</div>
+            <ul class="zf-layers-list" v-else>
+              <li v-for="(layer, li) in layers" :key="layer.id"
+                  draggable="true"
+                  :class="[{ active: (layer.kind === 'textBox' ? active.activeTextBoxId === layer.id : active.activeImageId === layer.id) }, layerDragClass(li)]"
+                  @click="selectLayer(layer)"
+                  @dragstart="onLayerDragStart($event, li)"
+                  @dragover="onLayerDragOver($event, li)"
+                  @dragleave="onLayerDragLeave($event, li)"
+                  @drop="onLayerDrop($event, li)"
+                  @dragend="onLayerDragEnd">
+                <iconify-icon class="zf-layer-ico"
+                  :icon="layer.kind === 'textBox' ? 'ph:text-t' : (layer.kind === 'icon' ? 'ph:star' : 'ph:image')"
+                  aria-hidden="true"></iconify-icon>
+                <span class="zf-layer-label">{{ layerLabel(layer) }}</span>
+                <span class="zf-layer-tools">
+                  <button class="zf-icon-btn" @click.stop="toggleLayerHidden(layer)" :title="layer.el.hidden ? 'Show layer' : 'Hide layer'" :aria-label="layer.el.hidden ? 'Show layer' : 'Hide layer'">
+                    <iconify-icon :icon="layer.el.hidden ? 'ph:eye-slash' : 'ph:eye'" aria-hidden="true"></iconify-icon>
+                  </button>
+                  <button class="zf-icon-btn" @click.stop="removeLayer(layer)" title="Delete layer" aria-label="Delete layer">&times;</button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </aside>
 
       <div class="zf-canvas-col">
@@ -227,18 +259,19 @@
                  contenteditable="true"
                  @input="onBodyInput"
                  @paste="onBodyPaste"
+                 @focus="clearElementSelection"
+                 @mousedown="clearElementSelection"
                  data-placeholder="Write your zine page here..."></div>
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
-              <div class="zf-textbox"
+              <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
                    :class="{ 'zf-textbox-selected': active.activeTextBoxId === box.id }"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                    @mousedown="onTextBoxMouseDown($event, box)"
                    @click.stop="selectTextBox(box)"
-                   @keydown.delete.prevent="deleteSelectedElement"
-                   @keydown.backspace.prevent="deleteSelectedElement">
+                   @keydown="onTextBoxKeydown($event, box)">
                 <div class="zf-textbox-content"
                      :data-zf-text-content-id="box.id"
                      contenteditable="true"
@@ -254,7 +287,7 @@
             </template>
 
             <template v-for="img in (active.images || [])" :key="'ovl-' + img.id">
-              <div v-if="img.wrap === 'free' || !img.wrap"
+              <div v-if="(img.wrap === 'free' || !img.wrap) && !img.hidden"
                    class="zf-img-wrap"
                    tabindex="0"
                    :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id }"
@@ -310,9 +343,9 @@
           <button type="button" class="zf-rail-btn" title="Bold (Ctrl+B)" aria-label="Bold" @mousedown.prevent @click="execCmdOnActive('bold')"><b>B</b></button>
           <button type="button" class="zf-rail-btn" title="Italic (Ctrl+I)" aria-label="Italic" @mousedown.prevent @click="execCmdOnActive('italic')"><i>I</i></button>
           <button type="button" class="zf-rail-btn" title="Underline (Ctrl+U)" aria-label="Underline" @mousedown.prevent @click="execCmdOnActive('underline')"><u>U</u></button>
-          <label class="zf-rail-btn zf-rail-color" title="Text or element color" aria-label="Color">
+          <label class="zf-rail-btn zf-rail-color" title="Text or element color" aria-label="Color" @mousedown.prevent>
             <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
-            <input type="color" value="#1b1b1b" @input="applyColor($event.target.value)" aria-label="Choose color" />
+            <input type="color" value="#1b1b1b" @mousedown.prevent @input="applyColor($event.target.value)" aria-label="Choose color" />
           </label>
           <button type="button" class="zf-rail-btn" title="Reset to theme color" aria-label="Reset color" @click="resetColor">
             <iconify-icon icon="ph:arrow-counter-clockwise" aria-hidden="true"></iconify-icon>
@@ -344,6 +377,17 @@
             <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
           </button>
         </div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Selected element actions">
+          <button type="button" class="zf-rail-btn" @click="copySelected" title="Copy selected element (Ctrl+C)" aria-label="Copy selected element">
+            <iconify-icon icon="ph:copy" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="pasteElement" title="Paste element (Ctrl+V)" aria-label="Paste element">
+            <iconify-icon icon="ph:clipboard" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="duplicateSelectedElement" title="Duplicate selected element (Ctrl+D)" aria-label="Duplicate selected element">
+            <iconify-icon icon="ph:stack" aria-hidden="true"></iconify-icon>
+          </button>
+        </div>
       </aside>
 
       <div class="zf-inspector-backdrop" v-if="inspectorOpen" @click="inspectorOpen = false" aria-hidden="true"></div>
@@ -358,6 +402,7 @@
             <span v-else>&lsaquo;</span>
           </button>
         </div>
+
         <div class="zf-format-toolbar">
           <button type="button" class="zf-icon-btn" title="Bold (Ctrl+B)" @mousedown.prevent @click="execCmdOnActive('bold')">
             <iconify-icon icon="ph:text-b-bold"></iconify-icon>
@@ -513,6 +558,107 @@
         images: [],
         textBoxes: []
       };
+    }
+    // Build store pages from a zine file's pages array. Accepts both the
+    // rich export format (images[]/textBoxes[]) and the older single-image
+    // format (image/imageX/imageY/...), normalizing to the rich shape.
+    // Shared by file import, the shared-link loader, and the examples loader.
+    function zfBuildPagesFromData(pages) {
+      if (!Array.isArray(pages)) return [zfEmptyPage()];
+      var built = pages.map(function (p, i) {
+        var page = {
+          id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
+          heading: p.heading || '',
+          body: p.body || '',
+          image: p.image || '',
+          imageX: typeof p.imageX === 'number' ? p.imageX : 0,
+          imageY: typeof p.imageY === 'number' ? p.imageY : 0,
+          imageW: typeof p.imageW === 'number' ? p.imageW : 1.5,
+          imageRot: typeof p.imageRot === 'number' ? p.imageRot : 0,
+          imageWrap: p.imageWrap || 'free'
+        };
+        var imgs = [];
+        if (Array.isArray(p.images)) imgs = imgs.concat(p.images);
+        if (Array.isArray(p.icons)) imgs = imgs.concat(p.icons);
+        // Export writes icons in BOTH images[] (with kind) and a separate
+        // icons[] array. Merge them but drop duplicates by id so each icon
+        // appears once (preferring the images[] copy that carries kind).
+        var seenIds = {};
+        imgs = imgs.filter(function (im) {
+          if (!im || !im.id) return true;
+          if (seenIds[im.id]) return false;
+          seenIds[im.id] = true;
+          return true;
+        });
+        page.images = imgs.map(function (im) {
+          return {
+            id: im.id || ('i-' + Math.random().toString(36).slice(2, 8)),
+            src: im.src,
+            kind: im.kind || 'photo',
+            x: typeof im.x === 'number' ? im.x : 0,
+            y: typeof im.y === 'number' ? im.y : 0,
+            w: typeof im.w === 'number' ? im.w : 1.5,
+            rot: typeof im.rot === 'number' ? im.rot : 0,
+            wrap: im.wrap || 'free',
+            z: typeof im.z === 'number' ? im.z : 0,
+            color: im.color || '',
+            hidden: !!im.hidden
+          };
+        });
+        page.textBoxes = Array.isArray(p.textBoxes) ? p.textBoxes.map(function (tb) {
+          return {
+            id: tb.id || ('t-' + Math.random().toString(36).slice(2, 8)),
+            html: tb.html || '',
+            x: typeof tb.x === 'number' ? tb.x : 0,
+            y: typeof tb.y === 'number' ? tb.y : 0,
+            w: typeof tb.w === 'number' ? tb.w : 1.8,
+            rot: typeof tb.rot === 'number' ? tb.rot : 0,
+            fontSize: typeof tb.fontSize === 'number' ? tb.fontSize : 1.0,
+            z: typeof tb.z === 'number' ? tb.z : 0,
+            color: tb.color || '',
+            hidden: !!tb.hidden
+          };
+        }) : [];
+        if (window.zfMigratePage) window.zfMigratePage(page);
+        return page;
+      });
+      return built.length ? built : [zfEmptyPage()];
+    }
+    // Apply a parsed zine object (from a file, URL, or share link) to the
+    // store. Returns true on success. Shared by import and example loading.
+    function zfApplyZineData(parsed) {
+      if (!parsed || !Array.isArray(parsed.pages)) return false;
+      store.title = parsed.title || 'Untitled Zine';
+      store.author = parsed.author || '';
+      if (parsed.modelId && window.ZFModels) store.modelId = parsed.modelId;
+      if (parsed.themeId && window.ZFThemes) store.themeId = parsed.themeId;
+      if (typeof parsed.marginIn === 'number') store.marginIn = parsed.marginIn;
+      store.pages = zfBuildPagesFromData(parsed.pages);
+      store.activePageId = store.pages[0].id;
+      return true;
+    }
+    // Fetch and load a bundled example zine (file name relative to /zines/).
+    // Global so any component (editor rail, library) can trigger it.
+    function zfLoadExample(file) {
+      store.status = 'Loading example...';
+      return fetch('zines/' + file)
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (parsed) {
+          if (!zfApplyZineData(parsed)) throw new Error('Bad zine file');
+          store.view = 'editor';
+          store.status = 'Loaded example: ' + (parsed.title || file);
+          setTimeout(function () {
+            if (store.status.indexOf('Loaded example') === 0) store.status = '';
+          }, 2500);
+          return true;
+        })
+        .catch(function (e) {
+          store.status = 'Could not load example: ' + e.message;
+          return false;
+        });
     }
     // -------- Image dimension cache --------
     // Cache natural sizes keyed by data URL so we don't decode repeatedly.
@@ -1306,6 +1452,119 @@
         return base;
       },
       // -------- Z-order helpers --------
+      // Clear any placed-element selection when the user starts working with
+      // the page body text, so element handles don't linger while typing.
+      clearElementSelection: function () {
+        var page = this.active;
+        if (!page) return;
+        page.activeImageId = null;
+        page.activeTextBoxId = null;
+      },
+      // -------- Layers (drag to reorder) --------
+      layerDragClass: function (i) {
+        if (this.layerDropIndex !== i || this.layerDragIndex < 0) return '';
+        return this.layerDragIndex < i ? 'zf-drop-below' : 'zf-drop-above';
+      },
+      onLayerDragStart: function (evt, i) {
+        this.layerDragIndex = i;
+        try { evt.dataTransfer.effectAllowed = 'move'; evt.dataTransfer.setData('text/plain', String(i)); } catch (e) {}
+      },
+      onLayerDragOver: function (evt, i) {
+        if (this.layerDragIndex < 0) return;
+        evt.preventDefault();
+        this.layerDropIndex = i;
+      },
+      onLayerDragLeave: function (evt, i) {
+        if (this.layerDropIndex === i) this.layerDropIndex = -1;
+      },
+      onLayerDrop: function (evt, i) {
+        evt.preventDefault();
+        var from = this.layerDragIndex;
+        var to = i;
+        this.layerDragIndex = -1;
+        this.layerDropIndex = -1;
+        if (from < 0 || from === to) return;
+        // Rebuild the layer order, then reassign z top-to-bottom so the
+        // list (front at top) matches stacking order with no gaps.
+        var order = this.layers.slice();
+        var moved = order.splice(from, 1)[0];
+        order.splice(to, 0, moved);
+        var total = order.length;
+        for (var k = 0; k < total; k++) {
+          order[k].el.z = (total - k) * 10;
+        }
+      },
+      onLayerDragEnd: function () {
+        this.layerDragIndex = -1;
+        this.layerDropIndex = -1;
+      },
+      // -------- Layers --------
+      // Every object on the current page (images, icons, text boxes) as a
+      // single list sorted front-to-back (highest z first).
+      pageElements: function (page) {
+        if (!page) return [];
+        return (page.images || []).concat(page.textBoxes || []);
+      },
+      selectLayer: function (layer) {
+        var page = this.active;
+        if (!page || !layer) return;
+        if (layer.kind === 'textBox') {
+          page.activeTextBoxId = layer.el.id;
+          page.activeImageId = null;
+        } else {
+          page.activeImageId = layer.el.id;
+          page.activeTextBoxId = null;
+        }
+      },
+      layerLabel: function (layer) {
+        var el = layer.el;
+        if (layer.kind === 'textBox') {
+          var t = (el.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          return t ? (t.length > 24 ? t.slice(0, 24) + '...' : t) : 'Text box';
+        }
+        if (el.kind === 'icon') return 'Icon: ' + (el.src || '').replace('ph:', '');
+        return 'Image';
+      },
+      // Swap a specific element's z with the next higher/lower element.
+      swapLayerZ: function (el, dir) {
+        var page = this.active;
+        if (!page || !el) return;
+        var all = this.pageElements(page);
+        var myZ = (typeof el.z === 'number') ? el.z : 0;
+        var target = null;
+        for (var i = 0; i < all.length; i++) {
+          if (all[i] === el) continue;
+          var iz = (typeof all[i].z === 'number') ? all[i].z : 0;
+          if (dir > 0 && iz > myZ && (target === null || iz < target)) target = iz;
+          if (dir < 0 && iz < myZ && (target === null || iz > target)) target = iz;
+        }
+        if (target === null) return;
+        for (var j = 0; j < all.length; j++) {
+          if (all[j] === el) continue;
+          var jz = (typeof all[j].z === 'number') ? all[j].z : 0;
+          if (jz === target) all[j].z = myZ;
+        }
+        el.z = target;
+      },
+      moveLayer: function (layer, dir) { this.swapLayerZ(layer.el, dir); },
+      toggleLayerHidden: function (layer) {
+        if (!layer || !layer.el) return;
+        layer.el.hidden = !layer.el.hidden;
+      },
+      removeLayer: function (layer) {
+        var page = this.active;
+        if (!page || !layer) return;
+        var el = layer.el;
+        if (layer.kind === 'textBox' && Array.isArray(page.textBoxes)) {
+          var ti = page.textBoxes.indexOf(el);
+          if (ti >= 0) page.textBoxes.splice(ti, 1);
+          if (page.activeTextBoxId === el.id) page.activeTextBoxId = null;
+        } else if (Array.isArray(page.images)) {
+          var ii = page.images.indexOf(el);
+          if (ii >= 0) page.images.splice(ii, 1);
+          if (page.activeImageId === el.id) page.activeImageId = null;
+        }
+      },
       bringToFront: function () {
         var el = this.activeImage || this.activeTextBox;
         if (!el) return;
@@ -1391,6 +1650,83 @@
           if (iIdx >= 0) { page.images.splice(iIdx, 1); page.activeImageId = null; return; }
         }
       },
+      // Keydown on a text box wrapper. Delete/Backspace removes the whole box
+      // ONLY when the wrapper itself is focused (the element is "selected").
+      // When the inner contenteditable is focused (you are typing), the event
+      // is left alone so the browser edits text normally.
+      onTextBoxKeydown: function (evt, box) {
+        if (evt.key !== 'Delete' && evt.key !== 'Backspace') return;
+        var t = evt.target;
+        // If the event originated inside the editable content, let it be.
+        if (t && t.classList && t.classList.contains('zf-textbox-content')) return;
+        evt.preventDefault();
+        this.deleteSelectedElement();
+      },
+      // Copy the selected element (image, icon, or text box) into a shared
+      // in-memory buffer. The buffer persists across page changes so you can
+      // copy on one page and paste on another.
+      copySelected: function () {
+        var page = this.active;
+        if (!page) return;
+        if (page.activeTextBoxId && Array.isArray(page.textBoxes)) {
+          for (var i = 0; i < page.textBoxes.length; i++) {
+            if (page.textBoxes[i].id === page.activeTextBoxId) {
+              window.zfClipboard = { type: 'textBox', data: JSON.parse(JSON.stringify(page.textBoxes[i])) };
+              store.status = 'Copied text box.';
+              setTimeout(function () { if (store.status === 'Copied text box.') store.status = ''; }, 1500);
+              return;
+            }
+          }
+        }
+        if (page.activeImageId && Array.isArray(page.images)) {
+          for (var j = 0; j < page.images.length; j++) {
+            if (page.images[j].id === page.activeImageId) {
+              window.zfClipboard = { type: 'image', data: JSON.parse(JSON.stringify(page.images[j])) };
+              store.status = 'Copied element.';
+              setTimeout(function () { if (store.status === 'Copied element.') store.status = ''; }, 1500);
+              return;
+            }
+          }
+        }
+      },
+      // Paste the clipboard buffer onto the current page, offset slightly and
+      // selected so it can be moved or restyled immediately.
+      pasteElement: function () {
+        var clip = window.zfClipboard;
+        if (!clip || !clip.data) return;
+        var page = this.active;
+        if (!page) return;
+        var d = clip.data;
+        if (clip.type === 'textBox') {
+          if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
+          var box = JSON.parse(JSON.stringify(d));
+          box.id = zfNewTextBoxId();
+          box.x = (typeof d.x === 'number' ? d.x : 0) + 0.15;
+          box.y = (typeof d.y === 'number' ? d.y : 0) + 0.15;
+          box.z = (typeof d.z === 'number' ? d.z : 0) + 1;
+          page.textBoxes.push(box);
+          page.activeTextBoxId = box.id;
+          page.activeImageId = null;
+          // Push the pasted box's HTML into its contenteditable (the DOM is
+          // not v-html-bound, so new boxes start empty without this).
+          var selfSync = this;
+          this.$nextTick(function () { selfSync.syncTextBoxDom(); });
+        } else {
+          if (!Array.isArray(page.images)) page.images = [];
+          var img = JSON.parse(JSON.stringify(d));
+          img.id = zfNewImageId();
+          img.x = (typeof d.x === 'number' ? d.x : 0) + 0.15;
+          img.y = (typeof d.y === 'number' ? d.y : 0) + 0.15;
+          img.z = (typeof d.z === 'number' ? d.z : 0) + 1;
+          page.images.push(img);
+          page.activeImageId = img.id;
+          page.activeTextBoxId = null;
+          var self = this;
+          this.$nextTick(function () { self.injectShapeSpacer(); });
+        }
+        store.status = 'Pasted.';
+        setTimeout(function () { if (store.status === 'Pasted.') store.status = ''; }, 1500);
+      },
       duplicateSelectedElement: function () {
         var page = this.active;
         if (!page) return;
@@ -1410,6 +1746,8 @@
               };
               page.textBoxes.push(copy);
               page.activeTextBoxId = copy.id;
+              var selfTb = this;
+              this.$nextTick(function () { selfTb.syncTextBoxDom(); });
               return;
             }
           }
@@ -1907,29 +2245,41 @@
           }
         }
       },
+      captureTextSelection: function () {
+        // Save the current document selection before the color picker steals
+        // focus (its mousedown is prevented, but the picker UI can still
+        // collapse it).
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+          this._savedTextSel = sel.getRangeAt(0).cloneRange ? sel : null;
+          try {
+            var r = sel.getRangeAt(0);
+            var clone = document.createRange();
+            clone.setStart(r.startContainer, r.startOffset);
+            clone.setEnd(r.endContainer, r.endOffset);
+            var savedSel = window.getSelection();
+            // Store as a lightweight holder we can re-apply.
+            this._savedRange = clone;
+          } catch (e) { this._savedRange = null; }
+        }
+      },
       applyColor: function (c) {
         if (!c) return;
         var el = document.activeElement;
         var inTextBox = el && el.classList && el.classList.contains('zf-textbox-content');
         var sel = window.getSelection ? window.getSelection() : null;
         var hasTextSel = sel && sel.rangeCount > 0 && !sel.isCollapsed;
-        // 0) A selected icon or text box takes priority: clicking the swatch
-        // blurs the element, but a stale text selection must not hijack it.
-        // Look the element up by its explicit id on the active page rather
-        // than relying on the activeImage/activeTextBox computeds, which can
-        // fall back to the last item and recolor the wrong element.
+        // If the live selection is empty, fall back to the selection saved on
+        // color-input mousedown (clicking the input can collapse it).
+        if (!hasTextSel && this._savedTextSel && this._savedTextSel.rangeCount > 0 && !this._savedTextSel.isCollapsed) {
+          try { sel.removeAllRanges(); sel.addRange(this._savedTextSel.getRangeAt(0)); hasTextSel = true; } catch (e) {}
+        }
         var page0 = this.active;
-        if (!inTextBox && page0 && page0.activeTextBoxId && Array.isArray(page0.textBoxes)) {
-          for (var b0 = 0; b0 < page0.textBoxes.length; b0++) {
-            if (page0.textBoxes[b0].id === page0.activeTextBoxId) { page0.textBoxes[b0].color = c; return; }
-          }
-        }
-        if (!inTextBox && page0 && page0.activeImageId && Array.isArray(page0.images)) {
-          for (var i0 = 0; i0 < page0.images.length; i0++) {
-            if (page0.images[i0].id === page0.activeImageId) { page0.images[i0].color = c; return; }
-          }
-        }
-        // 1) Text within a text box
+        // Priority is based on what is focused RIGHT NOW, not a stale element
+        // id. A live text selection (body or text box) wins; only when there
+        // is no text selection do we color a selected element.
+        //
+        // 1) Text within a text box (editing)
         if (inTextBox) {
           try { document.execCommand('foreColor', false, c); } catch (e) {}
           var page = this.active;
@@ -1941,16 +2291,27 @@
           }
           return;
         }
-        // 2) Text selection in the page body (or anywhere contenteditable)
+        // 2) Live text selection in the page body (or anywhere contenteditable)
         if (hasTextSel) {
           try { document.execCommand('foreColor', false, c); } catch (e) {}
           var bodyEl = this.$refs.bodyEditor;
-          if (bodyEl && document.activeElement === bodyEl) {
+          if (bodyEl && (document.activeElement === bodyEl || bodyEl.contains(sel.anchorNode))) {
             store.activePage().body = zfSanitizeHtml(zfStripSpacers(bodyEl.innerHTML));
+            if (page0) { page0.activeImageId = null; page0.activeTextBoxId = null; }
           }
           return;
         }
-        // 3) A selected element (icon or text box) takes the color as a property
+        // 3) No text selection: color the selected element by its explicit id.
+        if (page0 && page0.activeTextBoxId && Array.isArray(page0.textBoxes)) {
+          for (var b0 = 0; b0 < page0.textBoxes.length; b0++) {
+            if (page0.textBoxes[b0].id === page0.activeTextBoxId) { page0.textBoxes[b0].color = c; return; }
+          }
+        }
+        if (page0 && page0.activeImageId && Array.isArray(page0.images)) {
+          for (var i0 = 0; i0 < page0.images.length; i0++) {
+            if (page0.images[i0].id === page0.activeImageId) { page0.images[i0].color = c; return; }
+          }
+        }
         if (this.activeTextBox) { this.setTextBoxColor(c); return; }
         if (this.activeImage) { this.setIconColor(c); return; }
       },
@@ -2019,14 +2380,28 @@
       },
       onTextBoxMouseDown: function (evt, box) {
         if (!box) return;
+        var page = this.active;
+        var alreadyActive = page && page.activeTextBoxId === box.id;
         if (evt.target && evt.target.isContentEditable) {
-          // Let the user type without hijacking the click for a drag.
-          // Still select it so the controls update.
+          // Two-state interaction: the first click selects the box (so it can
+          // be moved or deleted); a second click enters text editing.
+          if (!alreadyActive) {
+            evt.preventDefault();
+            this.selectTextBox(box);
+            var wrap = evt.currentTarget;
+            if (wrap && wrap.focus) { try { wrap.focus(); } catch (e) {} }
+            return;
+          }
+          // Already active: let the user type normally.
           this.selectTextBox(box);
           return;
         }
         evt.preventDefault();
         this.selectTextBox(box);
+        var self = this;
+        if (evt.currentTarget && evt.currentTarget.focus) {
+          try { evt.currentTarget.focus(); } catch (e) {}
+        }
         this.imageDrag = {
           imgId: box.id,
           mode: 'move',
@@ -2276,19 +2651,21 @@
               body: p.body,
               images: (p.images || []).map(function (im) {
                 return {
-                  id: im.id, src: im.src,
-                  x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap
+                  id: im.id, src: im.src, kind: im.kind || 'photo',
+                  x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap,
+                  z: im.z, color: im.color, hidden: !!im.hidden
                 };
               }),
               textBoxes: (p.textBoxes || []).map(function (tb) {
                 return {
                   id: tb.id, html: tb.html,
                   x: tb.x, y: tb.y, w: tb.w, rot: tb.rot,
-                  fontSize: tb.fontSize
+                  fontSize: tb.fontSize,
+                  z: tb.z, color: tb.color, hidden: !!tb.hidden
                 };
               }),
               icons: (p.images || []).filter(function (im) { return im.kind === 'icon'; }).map(function (im) {
-                return { id: im.id, src: im.src, x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap, z: im.z, color: im.color };
+                return { id: im.id, src: im.src, x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap, z: im.z, color: im.color, hidden: !!im.hidden };
               })
             };
           })
@@ -2312,31 +2689,34 @@
         fr.onload = function () {
           try {
             var parsed = JSON.parse(fr.result);
-            if (!parsed || !Array.isArray(parsed.pages)) throw new Error("Not a zine file");
-            store.title = parsed.title || "Untitled Zine";
-            store.author = parsed.author || "";
-            if (parsed.modelId && window.ZFModels) store.modelId = parsed.modelId;
-            if (parsed.themeId && window.ZFThemes) store.themeId = parsed.themeId;
-            if (typeof parsed.marginIn === "number") store.marginIn = parsed.marginIn;
-            store.pages = parsed.pages.map(function (p, i) {
-              return {
-                id: "p" + i + "-" + Math.random().toString(36).slice(2, 7),
-                heading: p.heading || "", body: p.body || "", image: p.image || "",
-                imageX: typeof p.imageX === "number" ? p.imageX : 0,
-                imageY: typeof p.imageY === "number" ? p.imageY : 0,
-                imageW: typeof p.imageW === "number" ? p.imageW : 1.5,
-                imageRot: typeof p.imageRot === "number" ? p.imageRot : 0,
-                imageWrap: p.imageWrap || "free"
-              };
-            });
-            if (!store.pages.length) store.pages = [zfEmptyPage()];
-            store.activePageId = store.pages[0].id;
+            if (!zfApplyZineData(parsed)) throw new Error("Not a zine file");
             store.status = "Imported " + file.name;
             setTimeout(function () { if (store.status.indexOf("Imported ") === 0) store.status = ""; }, 2500);
           } catch (e) { store.status = "Could not import: " + e.message; }
           self.fileInputKey++;
         };
         fr.readAsText(file);
+      },
+      // Load a bundled example zine by file name (relative to /zines/).
+      loadExampleFromUrl: function (file) {
+        var self = this;
+        store.status = "Loading example...";
+        fetch("zines/" + file)
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then(function (parsed) {
+            if (!zfApplyZineData(parsed)) throw new Error("Bad zine file");
+            store.view = "editor";
+            store.status = "Loaded example: " + (parsed.title || file);
+            setTimeout(function () {
+              if (store.status.indexOf("Loaded example") === 0) store.status = "";
+            }, 2500);
+          })
+          .catch(function (e) {
+            store.status = "Could not load example: " + e.message;
+          });
       },
       toggleDebugFlow: function () { this.debugFlow = !this.debugFlow; }
     };
@@ -2353,7 +2733,10 @@
           debugFlow: false,
           iconPickerOpen: false,
           iconPickerQuery: '',
-          inspectorOpen: false
+          inspectorOpen: false,
+          layerDragIndex: -1,
+          layerDropIndex: -1,
+          layersOpen: true
         };
       },
       computed: {
@@ -2369,6 +2752,19 @@
         nextPage: function () {
           var i = this.activeIndex;
           return (i >= 0 && i < store.pages.length - 1) ? store.pages[i + 1] : null;
+        },
+        layers: function () {
+          var page = this.active;
+          if (!page) return [];
+          var out = [];
+          (page.images || []).forEach(function (im) {
+            out.push({ id: im.id, kind: im.kind === 'icon' ? 'icon' : 'image', el: im, z: (typeof im.z === 'number' ? im.z : 0) });
+          });
+          (page.textBoxes || []).forEach(function (tb) {
+            out.push({ id: tb.id, kind: 'textBox', el: tb, z: (typeof tb.z === 'number' ? tb.z : 0) });
+          });
+          out.sort(function (a, b) { return b.z - a.z; });
+          return out;
         },
         activeImage: function () {
           var p = this.active;
@@ -2578,6 +2974,8 @@
         window.ZFEditorActions = {
           delete: function () { self.deleteSelectedElement(); },
           duplicate: function () { self.duplicateSelectedElement(); },
+          copy: function () { self.copySelected(); },
+          paste: function () { self.pasteElement(); },
           hasSelection: function () {
             var p = self.active;
             if (!p) return false;
@@ -2625,7 +3023,14 @@
     var ZineLibrary = {
       name: 'ZineLibrary',
       data: function () {
-        return { store: store };
+        return { store: store, examples: [] };
+      },
+      created: function () {
+        var self = this;
+        fetch('zines/index.json')
+          .then(function (r) { return r.ok ? r.json() : { examples: [] }; })
+          .then(function (data) { self.examples = (data && data.examples) || []; })
+          .catch(function () { self.examples = []; });
       },
       computed: {
         entries: function () {
@@ -2636,6 +3041,7 @@
         }
       },
       methods: {
+        loadExample: function (file) { zfLoadExample(file); },
         openZine: function (id) { store.loadFromLibrary(id); },
         duplicate: function (id) { store.duplicateInLibrary(id); },
         remove: function (id) { store.deleteFromLibrary(id); },
@@ -2718,6 +3124,24 @@
             '</div>' +
           '</div>' +
 
+          '<div v-if="examples.length" class="zf-examples">' +
+            '<h3 class="zf-examples-title">Examples</h3>' +
+            '<div class="zf-muted" style="margin-bottom:0.5rem;">Try a finished zine, then make it your own.</div>' +
+            '<div class="zf-library-grid">' +
+              '<div v-for="ex in examples" :key="ex.id" class="zf-lib-card">' +
+                '<div class="zf-lib-preview" style="background:var(--zf2-wash-2);">' +
+                  '<span>{{ ex.title }}</span>' +
+                '</div>' +
+                '<div class="zf-lib-body">' +
+                  '<div class="zf-lib-title">{{ ex.title }}</div>' +
+                  '<div class="zf-lib-meta">{{ ex.blurb }}</div>' +
+                '</div>' +
+                '<div class="zf-lib-actions">' +
+                  '<button class="primary" @click="loadExample(ex.file)">Load</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
           '<div v-if="!entries.length" class="zf-empty">' +
             'No saved zines yet. Start writing in the editor and your draft will appear here automatically.' +
           '</div>' +
@@ -3141,119 +3565,6 @@
           };
         },
         printSheet: function () { window.print(); },
-        printRaster: function () {
-          // Rasterize the sheet at high DPI and inject it into a hidden
-          // in-page print overlay. We use an in-page overlay (rather than a
-          // pop-up window) because sandboxed preview iframes often block
-          // window.open and cross-origin frame access.
-          var self = this;
-          var m = this.model;
-          if (!m) { zfLog('printRaster: no model'); return; }
-          var sheetEl = this.$el.querySelector('.zf-sheet');
-          if (!sheetEl) { zfLog('printRaster: no sheet'); return; }
-          if (typeof html2canvas !== 'function') {
-            zfLog('printRaster: html2canvas not loaded');
-            alert('Could not load the image-print library. Check your network connection and try again.');
-            return;
-          }
-
-          // Physical paper dimensions.
-          var unit = m.paper.unit === 'in' ? 'in' : 'mm';
-          var paperW = m.paper.width + unit;
-          var paperH = m.paper.height + unit;
-
-          // Screen sheet size for scaling.
-          var rect = sheetEl.getBoundingClientRect();
-          var pxPerInchTarget = 300;
-          var paperWidthIn = (m.paper.unit === 'in') ? m.paper.width : (m.paper.width / 25.4);
-          var targetWidthPx = pxPerInchTarget * paperWidthIn;
-          var scale = Math.max(2, targetWidthPx / rect.width);
-
-          zfLog('printRaster: scale=' + scale.toFixed(2) + ' targetW=' + Math.round(targetWidthPx));
-
-          html2canvas(sheetEl, {
-            backgroundColor: '#ffffff',
-            scale: scale,
-            useCORS: true,
-            allowTaint: true,
-            // foreignObjectRendering uses an internal iframe, which fails in
-            // sandboxed preview iframes (cross-origin). Turn it off and rely
-            // on html2canvas' DOM-walk renderer instead.
-            foreignObjectRendering: false,
-            logging: false
-          }).then(function (canvas) {
-            var dataUrl = canvas.toDataURL('image/png');
-
-            // Remove any previous overlay.
-            var old = document.getElementById('zf-print-overlay');
-            if (old) old.parentNode.removeChild(old);
-            var oldStyle = document.getElementById('zf-print-style');
-            if (oldStyle) oldStyle.parentNode.removeChild(oldStyle);
-
-            // Create the print overlay.
-            var overlay = document.createElement('div');
-            overlay.id = 'zf-print-overlay';
-            var img = document.createElement('img');
-            img.src = dataUrl;
-            img.alt = 'Printable zine sheet';
-            overlay.appendChild(img);
-            document.body.appendChild(overlay);
-
-            // Inject a style element that:
-            //  - Sizes @page to the paper dimensions with no margin
-            //  - Hides everything except the overlay in print
-            //  - Sizes the image to fill the paper exactly
-            var styleEl = document.createElement('style');
-            styleEl.id = 'zf-print-style';
-            styleEl.textContent =
-              '@page { size: ' + paperW + ' ' + paperH + '; margin: 0; }\n' +
-              '#zf-print-overlay {\n' +
-              '  position: fixed;\n' +
-              '  left: 0; top: 0; right: 0; bottom: 0;\n' +
-              '  background: #ffffff;\n' +
-              '  z-index: 100000;\n' +
-              '  display: none;\n' +
-              '  align-items: center;\n' +
-              '  justify-content: center;\n' +
-              '}\n' +
-              '#zf-print-overlay img {\n' +
-              '  display: block;\n' +
-              '  width: 100vw;\n' +
-              '  height: 100vh;\n' +
-              '  object-fit: contain;\n' +
-              '}\n' +
-              '@media print {\n' +
-              '  body > *:not(#zf-print-overlay) { display: none !important; }\n' +
-              '  #zf-print-overlay { display: flex !important; position: static !important; }\n' +
-              '  #zf-print-overlay img { width: ' + paperW + '; height: ' + paperH + '; object-fit: fill; }\n' +
-              '}\n';
-            document.head.appendChild(styleEl);
-
-            // Give the image a moment to load, then trigger print.
-            var triggerPrint = function () {
-              try { window.focus(); } catch (e) {}
-              try { window.print(); } catch (e) {
-                zfLog('window.print failed: ' + e.message);
-              }
-              // Clean up after the print dialog closes.
-              setTimeout(function () {
-                var o = document.getElementById('zf-print-overlay');
-                if (o && o.parentNode) o.parentNode.removeChild(o);
-                var s = document.getElementById('zf-print-style');
-                if (s && s.parentNode) s.parentNode.removeChild(s);
-              }, 1500);
-            };
-            if (img.complete) {
-              setTimeout(triggerPrint, 50);
-            } else {
-              img.onload = function () { setTimeout(triggerPrint, 50); };
-              img.onerror = function () { zfLog('printRaster: image failed to load'); };
-            }
-          }).catch(function (err) {
-            zfLog('printRaster error: ' + (err && err.message ? err.message : err));
-            alert('Image print failed: ' + (err && err.message ? err.message : err));
-          });
-        },
         installPaperCss: function () {
           var id = 'zf-paper-css';
           var el = document.getElementById(id);
@@ -3468,6 +3779,21 @@
             evt.preventDefault();
             if (window.ZFEditorActions && window.ZFEditorActions.duplicate) {
               window.ZFEditorActions.duplicate();
+            }
+            return;
+          } else if (key === 'c') {
+            // Ctrl+C / Cmd+C: copy the selected element. Only intercept when
+            // an element is selected, so copying actual text still works.
+            if (window.ZFEditorActions && window.ZFEditorActions.hasSelection && window.ZFEditorActions.hasSelection()) {
+              evt.preventDefault();
+              window.ZFEditorActions.copy();
+            }
+            return;
+          } else if (key === 'v') {
+            // Ctrl+V / Cmd+V: paste the buffered element.
+            if (window.zfClipboard && window.ZFEditorActions && window.ZFEditorActions.paste) {
+              evt.preventDefault();
+              window.ZFEditorActions.paste();
             }
             return;
           }

@@ -67,7 +67,15 @@ function zfMigrateAllPages(pages) {
 }
 
 // -------- HTML sanitization --------
-var ZF_ALLOWED_TAGS = { STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, STRIKE: 1, BR: 1, DIV: 1, P: 1 };
+var ZF_ALLOWED_TAGS = { STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, STRIKE: 1, BR: 1, DIV: 1, P: 1, SPAN: 1, FONT: 1 };
+// Only these color forms are allowed through, so a pasted/typed style can
+// never smuggle a url(), expression(), or other CSS.
+var ZF_COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%]+\)|[a-zA-Z]{3,20})$/;
+function zfSafeColor(val) {
+  if (!val) return '';
+  var v = String(val).trim();
+  return ZF_COLOR_RE.test(v) ? v : '';
+}
 
 function zfSanitizeHtml(html) {
   if (!html) return '';
@@ -88,9 +96,24 @@ function zfSanitizeHtml(html) {
         node.replaceChild(text, child);
         continue;
       }
+      // Capture a validated color BEFORE stripping attributes, since the
+      // removal below would otherwise delete it.
+      var keepColor = '';
+      if (tag === 'SPAN') {
+        var st = (child.getAttribute('style') || '');
+        var m = st.match(/color\s*:\s*([^;]+)/i);
+        if (m) keepColor = zfSafeColor(m[1]);
+      } else if (tag === 'FONT') {
+        keepColor = zfSafeColor(child.getAttribute('color'));
+      }
       var attrs = Array.prototype.slice.call(child.attributes || []);
       for (var j = 0; j < attrs.length; j++) {
         child.removeAttribute(attrs[j].name);
+      }
+      // Re-apply the single validated color so inline text color survives.
+      if (keepColor) {
+        if (tag === 'SPAN') child.setAttribute('style', 'color: ' + keepColor);
+        else if (tag === 'FONT') child.setAttribute('color', keepColor);
       }
       walk(child);
     }

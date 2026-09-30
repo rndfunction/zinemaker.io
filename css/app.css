@@ -92,6 +92,40 @@
       outline: 3px solid var(--zf2-focus); outline-offset: 2px;
     }
 
+    /* ---- Layers (left sidebar, below the page list) ---- */
+    .zf-sidebar-layers { margin-top: 0.75rem; }
+    .zf-sidebar-section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; background: transparent; border: none; cursor: pointer;
+      padding: 0.35rem 0; font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.06em; font-weight: 700; color: var(--zf-gray-mid);
+    }
+    .zf-sidebar-section-head:hover { color: var(--zf-ink); }
+    .zf-sidebar-section-head:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+    .zf-sidebar-layers-body { margin-top: 0.35rem; }
+    .zf-layers { margin-bottom: 0.75rem; }
+    .zf-layers-title {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 700; color: var(--zf-gray-mid); margin-bottom: 0.35rem;
+    }
+    .zf-layers-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow: hidden; }
+    .zf-layers-list li {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--zf-border);
+      font-size: 0.85rem; cursor: pointer; background: #ffffff;
+    }
+    .zf-layers-list li:last-child { border-bottom: none; }
+    .zf-layers-list li:hover { background: var(--zf-gray-light); }
+    .zf-layers-list li.active { background: var(--zf-blue); color: #ffffff; }
+    .zf-layers-list li.active .zf-icon-btn { color: #ffffff; border-color: rgba(255,255,255,0.5); }
+    .zf-layer-ico { font-size: 1rem; flex: 0 0 auto; }
+    .zf-layer-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .zf-layer-tools { display: flex; gap: 0.15rem; flex: 0 0 auto; }
+    .zf-layer-tools .zf-icon-btn { width: 22px; height: 22px; font-size: 0.8rem; }
+    .zf-layers-list li[draggable="true"] { cursor: grab; }
+    .zf-layers-list li.zf-drop-above { box-shadow: inset 0 2px 0 var(--zf-blue); }
+    .zf-layers-list li.zf-drop-below { box-shadow: inset 0 -2px 0 var(--zf-blue); }
+
     /* ---- Settings button (clearly an action, not a heading) ---- */
     .zf-settings-btn {
       display: inline-flex; align-items: center; gap: 0.45rem;

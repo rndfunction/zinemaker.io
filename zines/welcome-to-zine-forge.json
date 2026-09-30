@@ -1,0 +1,84 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "exported": "2026-09-29T00:00:00.000Z",
+  "title": "Welcome to Zine Forge",
+  "author": "Zine Forge",
+  "modelId": "mini-8",
+  "themeId": "classic",
+  "marginIn": 0.12,
+  "pages": [
+    {
+      "heading": "Welcome",
+      "body": "This is a zine. It is eight small pages printed on one sheet of paper, folded and cut so the pages read in order.\n\nUse the arrows in Read to flip through it.",
+      "images": [
+        { "id": "i-cover-1", "src": "ph:hand-waving", "kind": "icon", "x": 1.0, "y": 2.6, "w": 0.7, "rot": -8, "wrap": "free", "z": 2, "color": "#c8102e" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "Make it yours",
+      "body": "Everything here is editable. Click a page on the left, then type. Your work saves itself as you go.",
+      "images": [
+        { "id": "i-p2-1", "src": "ph:pencil-simple", "kind": "icon", "x": 0.3, "y": 0.4, "w": 0.5, "rot": 0, "wrap": "free", "z": 2, "color": "#8b6b3a" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "Add things",
+      "body": "Use the rail on the right to add an image, a text box, or an icon. Icons are drawn in, so they stay crisp at any size.",
+      "images": [
+        { "id": "i-p3-1", "src": "ph:star", "kind": "icon", "x": 1.7, "y": 2.8, "w": 0.8, "rot": 10, "wrap": "free", "z": 2, "color": "#c8102e" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "Style it",
+      "body": "Select text to make it bold, italic, or a new color. Select an icon to recolor it. The theme sets the paper and ink.",
+      "images": [
+        { "id": "i-p4-1", "src": "ph:palette", "kind": "icon", "x": 0.4, "y": 2.9, "w": 0.6, "rot": -6, "wrap": "free", "z": 2, "color": "#2f6db5" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "A text box",
+      "body": "Text boxes float anywhere on the page. Drag them, resize them, rotate them. This little note is one:",
+      "images": [],
+      "textBoxes": [
+        { "id": "t-p5-1", "html": "Make a mess. Clean it up later.", "x": 0.4, "y": 2.5, "w": 1.9, "rot": -3, "fontSize": 1.1, "z": 3, "color": "#c8102e" }
+      ],
+      "icons": []
+    },
+    {
+      "heading": "Watch the space",
+      "body": "Each page has a soft budget. The bar under the canvas fills as you write, so your words fit the paper when you print.",
+      "images": [
+        { "id": "i-p6-1", "src": "ph:gauge", "kind": "icon", "x": 1.5, "y": 2.9, "w": 0.7, "rot": 0, "wrap": "free", "z": 2, "color": "#1a7f37" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "Print it",
+      "body": "The Print tab shows the sheet: which page lands where, and how it folds. Print at 100%, fold, cut, and you have a zine.",
+      "images": [
+        { "id": "i-p7-1", "src": "ph:printer", "kind": "icon", "x": 0.5, "y": 2.8, "w": 0.7, "rot": 4, "wrap": "free", "z": 2, "color": "#1a2b4a" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    },
+    {
+      "heading": "Now go",
+      "body": "That is the whole thing. Start a new zine, or open this one and bend it into something of your own.\n\n-- Zine Forge",
+      "images": [
+        { "id": "i-p8-1", "src": "ph:rocket-launch", "kind": "icon", "x": 1.2, "y": 2.7, "w": 0.8, "rot": -10, "wrap": "free", "z": 2, "color": "#c8102e" }
+      ],
+      "textBoxes": [],
+      "icons": []
+    }
+  ]
+}
