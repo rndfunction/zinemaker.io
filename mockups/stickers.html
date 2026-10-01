@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sticker preview</title>
+<style>
+  body { margin: 0; padding: 2rem; background: #f4f4f1; font-family: "Public Sans", sans-serif; }
+  h1 { font-size: 1rem; color: #5c6570; text-transform: uppercase; letter-spacing: 0.1em; }
+  .row { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+  .label { font-size: 0.75rem; color: #5c6570; }
+
+  /* The sticker base: a flat die-cut that sits close to the page. A tight
+     contact shadow (not a floaty card shadow) plus a soft gloss highlight
+     in the upper-left read as a vinyl sticker catching light. */
+  /* Flat die-cut sticker: solid color, white bleed edge, and a tight
+     contact shadow so it sits on the page. No gradients. */
+  .sticker {
+    position: relative;
+    width: 120px; height: 120px;
+    background: var(--sticker-bg, #e94f4f);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+    border: 4px solid #ffffff;
+    box-sizing: border-box;
+  }
+
+  /* Shapes */
+  .shape-circle { border-radius: 50%; }
+  .shape-oval { width: 160px; border-radius: 50%; }
+  .shape-square { border-radius: 8px; }
+  .shape-heart {
+    background: #e94f4f;
+    border: none; box-shadow: none; width: 120px; height: 108px;
+  }
+  .shape-heart::before, .shape-heart::after {
+    content: ""; position: absolute; width: 60px; height: 96px;
+    background: #e94f4f; border-radius: 60px 60px 0 0;
+    top: 0; box-shadow: 0 -3px 6px rgba(0,0,0,0.12);
+  }
+  .shape-heart::before { left: 60px; transform: rotate(-45deg); transform-origin: 0 100%; }
+  .shape-heart::after { left: 0; transform: rotate(45deg); transform-origin: 100% 100%; }
+
+  /* A die-cut star: the white edge follows the points via stacked
+     drop-shadows (which trace the clip-path), then a soft contact shadow. */
+  .shape-starburst {
+    border: none; box-shadow: none; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .shape-starburst .burst {
+    width: 132px; height: 132px;
+    background: var(--sticker-bg, #e94f4f);
+    clip-path: polygon(50% 0%, 63% 31%, 100% 30%, 72% 53%, 83% 88%, 50% 69%, 17% 88%, 28% 53%, 0% 30%, 37% 31%);
+    filter:
+      drop-shadow(0 0 0 #ffffff)
+      drop-shadow(0 0 1px #ffffff)
+      drop-shadow(0 1px 1px rgba(0,0,0,0.20));
+  }
+
+  /* Colors */
+  .c-red { --sticker-bg: #e94f4f; }
+  .c-blue { --sticker-bg: #3b7dd8; }
+  .c-yellow { --sticker-bg: #f6cf3a; }
+  .c-green { --sticker-bg: #5cb85c; }
+  .c-pink { --sticker-bg: #f08bb4; }
+  .c-black { --sticker-bg: #23272f; }
+</style>
+</head>
+<body>
+  <h1>Sticker shapes</h1>
+  <div class="row">
+    <div class="cell"><div class="sticker shape-circle"></div><span class="label">Circle</span></div>
+    <div class="cell"><div class="sticker shape-oval"></div><span class="label">Oval</span></div>
+    <div class="cell"><div class="sticker shape-square"></div><span class="label">Rounded square</span></div>
+    <div class="cell"><div class="shape-starburst"><div class="burst"></div></div><span class="label">Starburst</span></div>
+  </div>
+
+  <h1>Colors (circle)</h1>
+  <div class="row">
+    <div class="cell"><div class="sticker shape-circle c-red"></div><span class="label">red</span></div>
+    <div class="cell"><div class="sticker shape-circle c-blue"></div><span class="label">blue</span></div>
+    <div class="cell"><div class="sticker shape-circle c-yellow"></div><span class="label">yellow</span></div>
+    <div class="cell"><div class="sticker shape-circle c-green"></div><span class="label">green</span></div>
+    <div class="cell"><div class="sticker shape-circle c-pink"></div><span class="label">pink</span></div>
+    <div class="cell"><div class="sticker shape-circle c-black"></div><span class="label">black</span></div>
+  </div>
+</body>
+</html>

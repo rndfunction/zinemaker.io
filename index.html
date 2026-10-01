@@ -32,6 +32,11 @@
         <div class="zf2-masthead-actions">
           <button class="zf2-ghost" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
           <button class="zf2-ghost" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+          <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
+          <label class="zf2-ghost" style="cursor:pointer;" title="Load a previously exported .zine.json file">
+            Import
+            <input type="file" accept=".json,application/json" style="display:none;" @change="onImport" />
+          </label>
           <button class="zf2-ghost" @click="store.settingsOpen = !store.settingsOpen" :aria-expanded="store.settingsOpen" title="Toggle zine settings" aria-haspopup="dialog">
             <iconify-icon icon="ph:gear-six" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
             Settings
@@ -80,6 +85,12 @@
           <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
                class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')"
                :style="readerFreeImageStyleFor(img)" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+               class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')"
+               :style="stickyStyle(img, readerFreeImageStyleFor(img))" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+               class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')"
+               :style="stickerStyle(img, readerFreeImageStyleFor(img))" aria-hidden="true"></div>
           <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
                class="zf-mini-image zf-positioned" :src="img.src" alt="Page illustration"
                :style="readerFreeImageStyleFor(img)" />
@@ -88,7 +99,7 @@
                :style="Object.assign({}, readerFreeImageStyleFor(img), { color: img.color || 'inherit' })"></iconify-icon>
         </template>
         <template v-for="box in (page.textBoxes || [])" :key="'r-tb-' + box.id">
-          <div class="zf-textbox zf-textbox-readonly" :style="readerTextBoxStyleFor(box)">
+          <div class="zf-textbox zf-textbox-readonly" :class="{ 'zf-stamp': box.kind === 'stamp' }" :style="readerTextBoxStyleFor(box)">
             <div class="zf-textbox-content" v-html="box.html"></div>
           </div>
         </template>
@@ -148,6 +159,7 @@
             <input id="zf-zine-author" class="zf-input" v-model="store.author" />
           </div>
         </div>
+
         <div class="zf-muted" style="margin-bottom:0.5rem;">
           {{ store.pages.length }} page<span v-if="store.pages.length !== 1">s</span> filled
           <span v-if="activeModel"> &middot; this model uses {{ activeModel.pagesPerSheet }} per sheet
@@ -188,15 +200,7 @@
           </li>
         </ul>
         <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
-          <button class="zf-btn" style="border-color:var(--zf-border);" @click="fillAllWithLorem" title="Fill every page with sample text">Fill all with lorem</button>
           <button class="zf-btn" style="border-color:var(--zf-border);" @click="clearAllText" title="Clear all page body text">Clear all</button>
-        </div>
-        <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
-          <button class="zf-btn" style="border-color:var(--zf-border);" @click="exportJson" title="Download this zine as a JSON file">Export .json</button>
-          <label class="zf-btn" style="border-color:var(--zf-border);cursor:pointer;" title="Load a previously exported .zine.json file">
-            Import .json
-            <input type="file" accept=".json,application/json" style="display:none;" @change="onImportFile" :key="'imp-' + fileInputKey" />
-          </label>
         </div>
 
         <div class="zf-sidebar-layers">
@@ -266,13 +270,12 @@
                  @input="onBodyInput"
                  @paste="onBodyPaste"
                  @focus="clearElementSelection"
-                 @mousedown="clearElementSelection"
-                 data-placeholder="Write your zine page here..."></div>
+                 @mousedown="clearElementSelection"></div>
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                   :class="{ 'zf-textbox-selected': active.activeTextBoxId === box.id }"
+                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp' }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                    @mousedown="onTextBoxMouseDown($event, box)"
@@ -304,6 +307,8 @@
                    @keydown.backspace.prevent="deleteSelectedElement">
                  <div v-if="img.kind === 'tape'" class="zf-tape" :class="'zf-tape-' + (img.color || 'beige')" aria-hidden="true"></div>
                  <div v-else-if="img.kind === 'scrap'" class="zf-scrap" :class="'zf-scrap-' + (img.color || 'kraft')" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'sticky'" class="zf-sticky" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, {})" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'sticker'" class="zf-sticker" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, {})" aria-hidden="true"></div>
                  <img v-else-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
                  <iconify-icon v-else class="zf-icon-element" :icon="img.src" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }"></iconify-icon>
                 <span class="zf-img-handle zf-img-handle-resize"
@@ -328,22 +333,7 @@
           @select="addIcon"
           @close="closeIconPicker"></zine-icon-picker>
 
-        <div class="zf-budget" :class="budgetClass" v-if="budget">
-          <div class="zf-budget-row">
-            <span class="zf-budget-num">{{ wordCount }} / {{ budget.words }} words</span>
-            <span class="zf-budget-num">{{ lineCount }} / {{ budget.lines }} lines</span>
-            <span class="zf-budget-num">{{ charCount }} / {{ budget.chars }} chars</span>
-          </div>
-          <div class="zf-budget-bar" :class="barClass" style="margin-top:0.35rem;">
-            <div :style="{ width: barWidth }"></div>
-          </div>
-          <div v-if="worstPct >= 100" style="margin-top:0.25rem;">
-            This page is over the space budget for a {{ activeModel.page.width }}x{{ activeModel.page.height }} {{ activeModel.page.unit }} mini-page. Trim text or split across pages.
-          </div>
-          <div v-else-if="worstPct >= 85" style="margin-top:0.25rem;">
-            Getting close to the space limit for this mini-page.
-          </div>
-        </div>
+
       </div>
 
       <aside class="zf-rail" aria-label="Formatting and insert tools">
@@ -355,9 +345,7 @@
             <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
             <input type="color" value="#1b1b1b" @mousedown.prevent @input="applyColor($event.target.value)" aria-label="Choose color" />
           </label>
-          <button type="button" class="zf-rail-btn" title="Reset to theme color" aria-label="Reset color" @click="resetColor">
-            <iconify-icon icon="ph:arrow-counter-clockwise" aria-hidden="true"></iconify-icon>
-          </button>
+
           <label class="zf-rail-font-wrap" title="Font">
             <iconify-icon icon="ph:text-aa" aria-hidden="true"></iconify-icon>
             <select class="zf-rail-font" @change="applyFont($event.target.value)" aria-label="Font">
@@ -391,6 +379,9 @@
             <div class="zf-decor-menu" v-if="decorMenuOpen">
               <button type="button" @click="addTape(); decorMenuOpen = false">Tape</button>
               <button type="button" @click="addScrap(); decorMenuOpen = false">Paper scrap</button>
+              <button type="button" @click="addSticky(); decorMenuOpen = false">Sticky note</button>
+              <button type="button" @click="addStamp(); decorMenuOpen = false">Stamp</button>
+              <button type="button" @click="addSticker(); decorMenuOpen = false">Sticker</button>
             </div>
           </div>
         </div>
@@ -439,7 +430,7 @@
         </div>
 
         <div class="zf-inline-tools" style="margin-top:0.5rem;">
-          <button class="zf-btn zf-btn-secondary" @click="fillWithLorem" title="Fill this page with sample text sized to fit the budget">Fill with lorem</button>
+
         </div>
 
         <div v-if="activeImage && !activeTextBox" class="zf-image-controls">
@@ -476,6 +467,13 @@
             <label class="zf-image-control-label">Icon color</label>
             <input type="color" :value="activeImage.color || '#1b1b1b'" @input="setIconColor($event.target.value)" style="width:40px;height:26px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" />
             <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setIconColor('')">Use theme color</button>
+          </div>
+          <div class="zf-image-control-row" v-if="activeImage.kind === 'sticker'">
+            <label class="zf-image-control-label">Shape</label>
+            <button class="zf-btn" :style="shapeBtnStyle('circle')" @click="setStickerShape('circle')">Circle</button>
+            <button class="zf-btn" :style="shapeBtnStyle('oval')" @click="setStickerShape('oval')">Oval</button>
+            <button class="zf-btn" :style="shapeBtnStyle('square')" @click="setStickerShape('square')">Square</button>
+            <button class="zf-btn" :style="shapeBtnStyle('starburst')" @click="setStickerShape('starburst')">Star</button>
           </div>
           <div class="zf-image-control-row">
             <label class="zf-image-control-label">Layer</label>
@@ -1136,9 +1134,23 @@
       return null;
     }
     var zfSaved = zfLoad();
+    // A fresh zine starts with a full sheet's worth of blank pages for the
+    // current model, so users don't have to click "Add page" repeatedly.
+    function zfBlankPagesForModel(modelId) {
+      var per = 8;
+      try {
+        if (window.ZFModels) {
+          var m = window.ZFModels.getModel(modelId || 'mini-8');
+          if (m && m.pagesPerSheet) per = m.pagesPerSheet;
+        }
+      } catch (e) {}
+      var arr = [];
+      for (var i = 0; i < per; i++) arr.push(zfEmptyPage());
+      return arr;
+    }
     var zfInitial = (zfSaved && zfSaved.pages && zfSaved.pages.length)
       ? zfMigrateAllPages(zfSaved.pages)
-      : [zfEmptyPage()];
+      : zfBlankPagesForModel(zfSaved && zfSaved.modelId);
     zfLog('initial pages=' + zfInitial.length);
 
     var store = Vue.reactive({
@@ -1220,7 +1232,7 @@
       newZine: function () {
         if (this.currentZineId && this.saveToLibrary) this.saveToLibrary();
         this.currentZineId = window.ZFLibrary ? window.ZFLibrary.newId() : null;
-        this.title = 'Untitled Zine'; this.author = ''; this.pages = [zfEmptyPage()];
+        this.title = 'Untitled Zine'; this.author = ''; this.pages = zfBlankPagesForModel(this.modelId);
         this.activePageId = this.pages[0].id; this.view = 'editor';
         if (window.ZFLibrary) this.library = window.ZFLibrary.list();
       },
@@ -1423,7 +1435,13 @@
         }
       },
       methods: {
-        goEditor: function () { store.setView("editor"); },
+        onExport: function () { if (window.ZFExportJson) window.ZFExportJson(); },
+        onImport: function (evt) {
+          var f = evt.target.files && evt.target.files[0];
+          if (f && window.ZFImportFromFile) window.ZFImportFromFile(f);
+          evt.target.value = '';
+        },
+        goEditor: function () { store.setView('editor'); },
         goReader: function () { store.setView("reader"); },
         goSheet: function () { store.setView("sheet"); },
         goLibrary: function () { store.setView("library"); },
@@ -1537,12 +1555,18 @@
       layerLabel: function (layer) {
         var el = layer.el;
         if (layer.kind === 'textBox') {
+          if (el.kind === 'stamp') {
+            var st = (el.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            return 'Stamp: ' + (st || 'stamp');
+          }
           var t = (el.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
           return t ? (t.length > 24 ? t.slice(0, 24) + '...' : t) : 'Text box';
         }
         if (el.kind === 'icon') return 'Icon: ' + (el.src || '').replace('ph:', '');
         if (el.kind === 'tape') return 'Tape';
         if (el.kind === 'scrap') return 'Paper scrap';
+        if (el.kind === 'sticky') return 'Sticky note';
+        if (el.kind === 'sticker') return 'Sticker';
         return 'Image';
       },
       // Swap a specific element's z with the next higher/lower element.
@@ -1592,6 +1616,69 @@
         page.activeImageId = tape.id;
         page.activeTextBoxId = null;
       },
+      addSticker: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.images)) page.images = [];
+        var sticker = {
+          id: zfNewImageId(),
+          kind: 'sticker',
+          src: '',
+          shape: 'circle',
+          x: 0.6,
+          y: 0.6,
+          w: 0.9,
+          h: 0.9,
+          rot: 0,
+          wrap: 'free',
+          color: '#e94f4f'
+        };
+        page.images.push(sticker);
+        page.activeImageId = sticker.id;
+        page.activeTextBoxId = null;
+      },
+      addStamp: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
+        var stamp = {
+          id: zfNewTextBoxId(),
+          kind: 'stamp',
+          html: 'APPROVED',
+          x: 0.4,
+          y: 1.0,
+          w: 1.6,
+          rot: -8,
+          fontSize: 1.0,
+          z: (typeof page.textBoxes.length === 'number') ? page.textBoxes.length * 10 : 0,
+          color: '#c8102e'
+        };
+        page.textBoxes.push(stamp);
+        page.activeTextBoxId = stamp.id;
+        page.activeImageId = null;
+        var self = this;
+        this.$nextTick(function () { self.syncTextBoxDom(); });
+      },
+      addSticky: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.images)) page.images = [];
+        var note = {
+          id: zfNewImageId(),
+          kind: 'sticky',
+          src: '',
+          x: 0.6,
+          y: 0.6,
+          w: 1.1,
+          h: 1.1,
+          rot: -3,
+          wrap: 'free',
+          color: 'yellow'
+        };
+        page.images.push(note);
+        page.activeImageId = note.id;
+        page.activeTextBoxId = null;
+      },
       addScrap: function () {
         var page = this.active;
         if (!page) return;
@@ -1611,6 +1698,38 @@
         page.images.push(scrap);
         page.activeImageId = scrap.id;
         page.activeTextBoxId = null;
+      },
+      // Merge a sticky note's positioning style with a custom background
+      // color when its `color` is a hex value (set by the color picker).
+      // Named variants still work via the zf-sticky-<name> class.
+      // Set a sticker's fill color (hex from the color picker) via a CSS var.
+      setStickerShape: function (shape) {
+        var img = this.activeImage;
+        if (!img || img.kind !== 'sticker') return;
+        img.shape = shape;
+      },
+      shapeBtnStyle: function (shape) {
+        var on = this.activeImage && this.activeImage.shape === shape;
+        return {
+          borderColor: 'var(--zf-border)',
+          fontSize: '0.8rem',
+          background: on ? 'var(--zf-blue)' : '#ffffff',
+          color: on ? '#ffffff' : 'var(--zf-blue-dark)'
+        };
+      },
+      stickerStyle: function (img, base) {
+        var out = Object.assign({}, base || {});
+        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+          out['--zf-sticker-bg'] = img.color;
+        }
+        return out;
+      },
+      stickyStyle: function (img, base) {
+        var out = Object.assign({}, base || {});
+        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+          out['--zf-sticky-bg'] = img.color;
+        }
+        return out;
       },
       toggleLayerHidden: function (layer) {
         if (!layer || !layer.el) return;
@@ -1800,15 +1919,12 @@
           for (var i = 0; i < page.textBoxes.length; i++) {
             if (page.textBoxes[i].id === page.activeTextBoxId) {
               var src = page.textBoxes[i];
-              var copy = {
-                id: zfNewTextBoxId(),
-                html: src.html,
-                x: (src.x || 0) + 0.15,
-                y: (src.y || 0) + 0.15,
-                w: src.w, rot: src.rot,
-                fontSize: src.fontSize,
-                z: (typeof src.z === "number" ? src.z : 0) + 1
-              };
+              // Deep-copy the whole element so kind/color/fontFamily/etc survive.
+              var copy = JSON.parse(JSON.stringify(src));
+              copy.id = zfNewTextBoxId();
+              copy.x = (src.x || 0) + 0.15;
+              copy.y = (src.y || 0) + 0.15;
+              copy.z = (typeof src.z === "number" ? src.z : 0) + 1;
               page.textBoxes.push(copy);
               page.activeTextBoxId = copy.id;
               var selfTb = this;
@@ -1822,14 +1938,14 @@
           for (var j = 0; j < page.images.length; j++) {
             if (page.images[j].id === page.activeImageId) {
               var srcImg = page.images[j];
-              var copyImg = {
-                id: zfNewImageId(),
-                src: srcImg.src,
-                x: (srcImg.x || 0) + 0.15,
-                y: (srcImg.y || 0) + 0.15,
-                w: srcImg.w, rot: srcImg.rot, wrap: srcImg.wrap,
-                z: (typeof srcImg.z === "number" ? srcImg.z : 0) + 1
-              };
+              // Deep-copy the whole element so kind/shape/color/h/hidden all
+              // survive. Cherry-picking fields previously dropped `kind`, which
+              // made duplicated icons/decorations render as broken images.
+              var copyImg = JSON.parse(JSON.stringify(srcImg));
+              copyImg.id = zfNewImageId();
+              copyImg.x = (srcImg.x || 0) + 0.15;
+              copyImg.y = (srcImg.y || 0) + 0.15;
+              copyImg.z = (typeof srcImg.z === "number" ? srcImg.z : 0) + 1;
               page.images.push(copyImg);
               page.activeImageId = copyImg.id;
               var self = this;
@@ -1943,11 +2059,17 @@
         var dx = evt.clientX - cx;
         var dy = evt.clientY - cy;
         var startDist = Math.sqrt(dx * dx + dy * dy) || 1;
+        // Elements with an explicit height (tape, scraps, sticky notes) resize
+        // freely in both axes; photos/icons keep the locked-ratio resize.
+        var freeAxis = (typeof img.h === "number");
         this.imageDrag = {
           imgId: img.id,
-          mode: "resize",
+          mode: freeAxis ? "resize-free" : "resize",
           startDist: startDist,
           baseW: (typeof img.w === "number") ? img.w : 1.5,
+          baseH: (typeof img.h === "number") ? img.h : 1,
+          startX: evt.clientX,
+          startY: evt.clientY,
           cx: cx,
           cy: cy
         };
@@ -2035,6 +2157,21 @@
           var dyIn = (evt.clientY - this.imageDrag.startY) / pxPerInch;
           img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
           img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
+        } else if (mode === "resize-free") {
+          // Independent width and height: horizontal drag changes w, vertical
+          // drag changes h. Uses a projection so the element grows with the
+          // cursor rather than as a distance ratio.
+          var px = 96 * this.imageScale;
+          var fdx = (evt.clientX - this.imageDrag.startX) / px;
+          var fdy = (evt.clientY - this.imageDrag.startY) / px;
+          var fw = this.imageDrag.baseW + fdx;
+          var fh = this.imageDrag.baseH + fdy;
+          if (fw < 0.15) fw = 0.15;
+          if (fw > 24) fw = 24;
+          if (fh < 0.1) fh = 0.1;
+          if (fh > 24) fh = 24;
+          img.w = Math.round(fw * 100) / 100;
+          img.h = Math.round(fh * 100) / 100;
         } else if (mode === "resize") {
           var dx = evt.clientX - this.imageDrag.cx;
           var dy = evt.clientY - this.imageDrag.cy;
@@ -2752,6 +2889,11 @@
       onImportFile: function (evt) {
         var file = evt.target.files && evt.target.files[0];
         if (!file) return;
+        this.importFromFile(file);
+        this.fileInputKey++;
+      },
+      importFromFile: function (file) {
+        if (!file) return;
         var fr = new FileReader();
         var self = this;
         fr.onload = function () {
@@ -3051,6 +3193,10 @@
             return !!(p.activeImageId || p.activeTextBoxId);
           }
         };
+        // Expose zine-level import/export so the masthead (AppShell) can call
+        // them even though the logic lives on the editor component.
+        window.ZFExportJson = function () { self.exportJson(); };
+        window.ZFImportFromFile = function (file) { self.importFromFile(file); };
       },
       watch: {
         // When the active page changes (or its body is replaced by undo),
@@ -3713,6 +3859,12 @@
                     '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'scrap\'" ' +
                       'class="zf-scrap zf-positioned" :class="\'zf-scrap-\' + (img.color || \'kraft\')" ' +
                       ':style="slotFreeImageStyleFor(img, s)"></div>' +
+                    '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'sticky\'" ' +
+                      'class="zf-sticky zf-positioned" :class="\'zf-sticky-\' + (img.color || \'yellow\')" ' +
+                      ':style="stickyStyle(img, slotFreeImageStyleFor(img, s))"></div>' +
+                    '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'sticker\'" ' +
+                      'class="zf-sticker zf-positioned" :class="\'zf-sticker-\' + (img.shape || \'circle\')" ' +
+                      ':style="stickerStyle(img, slotFreeImageStyleFor(img, s))"></div>' +
                     '<img v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind !== \'icon\'" ' +
                       'class="zf-mini-image zf-positioned" :src="img.src" alt="" ' +
                       ':style="slotFreeImageStyleFor(img, s)" />' +
@@ -3725,7 +3877,7 @@
                     '</div>' +
                   '</template>' +
                   '<template v-for="box in (s.page.textBoxes || [])" :key="\'sl-tb-\' + box.id">' +
-                    '<div class="zf-textbox zf-textbox-readonly" :style="slotTextBoxStyleFor(box, s)">' +
+                    '<div class="zf-textbox zf-textbox-readonly" :class="{ \'zf-stamp\': box.kind === \'stamp\' }" :style="slotTextBoxStyleFor(box, s)">' +
                       '<div class="zf-textbox-content" v-html="box.html"></div>' +
                     '</div>' +
                   '</template>' +

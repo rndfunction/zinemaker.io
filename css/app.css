@@ -337,7 +337,7 @@
       position: fixed;
       top: 0; right: 0;
       height: 100vh;
-      width: 300px;
+      width: 340px;
       z-index: 200;
       display: flex; flex-direction: column; gap: 0.5rem;
       padding: 0.9rem;
@@ -903,6 +903,66 @@
     .zf-scrap-white { background: #f3efe6; }
     .zf-scrap-news { background: #e8e4d8; background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0 1px, transparent 1px 5px); }
     .zf-scrap-pink { background: #e9c4c0; }
+
+    /* ---- Stickers (flat die-cut shapes) ---- */
+    .zf-img-wrap:has(.zf-sticker) { aspect-ratio: auto; }
+    .zf-sticker {
+      display: block; width: 100%; height: 100%;
+      background: var(--zf-sticker-bg, #e94f4f);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+      border: 4px solid #ffffff;
+      box-sizing: border-box;
+    }
+    .zf-sticker-circle { border-radius: 50%; }
+    .zf-sticker-oval { border-radius: 50%; }
+    .zf-sticker-square { border-radius: 8px; }
+    .zf-sticker-starburst {
+      border: none;
+      clip-path: polygon(50% 0%, 63% 31%, 100% 30%, 72% 53%, 83% 88%, 50% 69%, 17% 88%, 28% 53%, 0% 30%, 37% 31%);
+      /* White die-cut edge (traces the clip-path), then a contact shadow that
+         matches the other sticker shapes (box-shadow: 0 1px 2px). */
+      filter:
+        drop-shadow(0 0 0 #ffffff)
+        drop-shadow(0 0 1px #ffffff)
+        drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+    }
+
+    /* ---- Stamps ---- */
+    .zf-textbox.zf-stamp {
+      border: 3px double currentColor;
+      border-radius: 4px;
+      padding: 0.25em 0.5em;
+      opacity: 0.82;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-align: center;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+    }
+    .zf-textbox.zf-stamp .zf-textbox-content {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* ---- Sticky notes (paper, not a card) ---- */
+    .zf-img-wrap:has(.zf-sticky) { aspect-ratio: auto; }
+    .zf-sticky {
+      display: block; width: 100%; height: 100%;
+      /* Base color comes from --zf-sticky-bg (set inline for custom colors,
+         or by the variant classes below). The sheen is an overlay gradient
+         so it reads as paper catching light for ANY base color. */
+      background-color: var(--zf-sticky-bg, #f4e08a);
+      background-image: linear-gradient(135deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.03) 45%, rgba(0,0,0,0.04) 100%);
+      /* Paper-thin shadow that hugs the surface instead of floating. */
+      box-shadow: 1px 1px 1px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.12);
+    }
+    .zf-sticky-yellow { --zf-sticky-bg: #f4e08a; }
+    .zf-sticky-pink { --zf-sticky-bg: #f2a9b8; }
+    .zf-sticky-blue { --zf-sticky-bg: #a2d2ec; }
+    .zf-sticky-green { --zf-sticky-bg: #a9df94; }
+    .zf-sticky-orange { --zf-sticky-bg: #f3c184; }
 
     /* ---- Decorations submenu ---- */
     .zf-decor-wrap { position: relative; }
