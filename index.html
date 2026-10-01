@@ -74,7 +74,13 @@
         </template>
         <div class="zf-mini-body" ref="bodyReader" v-html="bodyHtml"></div>
         <template v-for="img in (page.images || [])" :key="'r-free-' + img.id">
-          <img v-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+          <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+               class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')"
+               :style="readerFreeImageStyleFor(img)" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+               class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')"
+               :style="readerFreeImageStyleFor(img)" aria-hidden="true"></div>
+          <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
                class="zf-mini-image zf-positioned" :src="img.src" alt="Page illustration"
                :style="readerFreeImageStyleFor(img)" />
           <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
@@ -296,7 +302,9 @@
                    @click.stop="selectImage(img)"
                    @keydown.delete.prevent="deleteSelectedElement"
                    @keydown.backspace.prevent="deleteSelectedElement">
-                 <img v-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
+                 <div v-if="img.kind === 'tape'" class="zf-tape" :class="'zf-tape-' + (img.color || 'beige')" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'scrap'" class="zf-scrap" :class="'zf-scrap-' + (img.color || 'kraft')" aria-hidden="true"></div>
+                 <img v-else-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
                  <iconify-icon v-else class="zf-icon-element" :icon="img.src" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }"></iconify-icon>
                 <span class="zf-img-handle zf-img-handle-resize"
                       title="Drag to resize"
@@ -376,6 +384,15 @@
           <button type="button" class="zf-rail-btn" @click="openIconPicker" title="Add an icon" aria-label="Add icon">
             <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
           </button>
+          <div class="zf-decor-wrap">
+            <button type="button" class="zf-rail-btn" @click="decorMenuOpen = !decorMenuOpen" :aria-expanded="decorMenuOpen" title="Add a decoration" aria-label="Add decoration">
+              <iconify-icon icon="streamline-freehand:office-tape-2" aria-hidden="true"></iconify-icon>
+            </button>
+            <div class="zf-decor-menu" v-if="decorMenuOpen">
+              <button type="button" @click="addTape(); decorMenuOpen = false">Tape</button>
+              <button type="button" @click="addScrap(); decorMenuOpen = false">Paper scrap</button>
+            </div>
+          </div>
         </div>
         <div class="zf-rail-group" role="toolbar" aria-label="Selected element actions">
           <button type="button" class="zf-rail-btn" @click="copySelected" title="Copy selected element (Ctrl+C)" aria-label="Copy selected element">
@@ -598,6 +615,7 @@
             x: typeof im.x === 'number' ? im.x : 0,
             y: typeof im.y === 'number' ? im.y : 0,
             w: typeof im.w === 'number' ? im.w : 1.5,
+            h: (typeof im.h === 'number') ? im.h : undefined,
             rot: typeof im.rot === 'number' ? im.rot : 0,
             wrap: im.wrap || 'free',
             z: typeof im.z === 'number' ? im.z : 0,
@@ -1523,6 +1541,8 @@
           return t ? (t.length > 24 ? t.slice(0, 24) + '...' : t) : 'Text box';
         }
         if (el.kind === 'icon') return 'Icon: ' + (el.src || '').replace('ph:', '');
+        if (el.kind === 'tape') return 'Tape';
+        if (el.kind === 'scrap') return 'Paper scrap';
         return 'Image';
       },
       // Swap a specific element's z with the next higher/lower element.
@@ -1547,6 +1567,51 @@
         el.z = target;
       },
       moveLayer: function (layer, dir) { this.swapLayerZ(layer.el, dir); },
+      addTape: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.images)) page.images = [];
+        var tape = {
+          id: zfNewImageId(),
+          kind: 'tape',
+          src: '',
+          x: 0.5,
+          y: 0.5,
+          w: 0.9,
+          h: 0.34,
+          rot: -4,
+          wrap: 'free',
+          z: (function () {
+            var maxZ = 0;
+            var all = this.pageElements ? this.pageElements(page) : page.images;
+            return 0;
+          }).call(this),
+          color: 'beige'
+        };
+        page.images.push(tape);
+        page.activeImageId = tape.id;
+        page.activeTextBoxId = null;
+      },
+      addScrap: function () {
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.images)) page.images = [];
+        var scrap = {
+          id: zfNewImageId(),
+          kind: 'scrap',
+          src: '',
+          x: 0.4,
+          y: 0.6,
+          w: 1.4,
+          h: 1.0,
+          rot: 5,
+          wrap: 'free',
+          color: 'kraft'
+        };
+        page.images.push(scrap);
+        page.activeImageId = scrap.id;
+        page.activeTextBoxId = null;
+      },
       toggleLayerHidden: function (layer) {
         if (!layer || !layer.el) return;
         layer.el.hidden = !layer.el.hidden;
@@ -1977,7 +2042,10 @@
           var ratio = dist / this.imageDrag.startDist;
           var newW = this.imageDrag.baseW * ratio;
           if (newW < 0.25) newW = 0.25;
-          if (newW > 8) newW = 8;
+          // Generous upper bound so tape (and images) can span past the page
+          // edge, the way real zine tape runs off the paper. The mini-page's
+          // overflow:hidden trims anything outside the page for print.
+          if (newW > 24) newW = 24;
           img.w = Math.round(newW * 100) / 100;
         } else if (mode === "resize-scaled") {
           // Text box: scale width and font size together.
@@ -2652,7 +2720,7 @@
               images: (p.images || []).map(function (im) {
                 return {
                   id: im.id, src: im.src, kind: im.kind || 'photo',
-                  x: im.x, y: im.y, w: im.w, rot: im.rot, wrap: im.wrap,
+                  x: im.x, y: im.y, w: im.w, h: im.h, rot: im.rot, wrap: im.wrap,
                   z: im.z, color: im.color, hidden: !!im.hidden
                 };
               }),
@@ -2736,7 +2804,8 @@
           inspectorOpen: false,
           layerDragIndex: -1,
           layerDropIndex: -1,
-          layersOpen: true
+          layersOpen: true,
+          decorMenuOpen: false
         };
       },
       computed: {
@@ -3194,7 +3263,8 @@
           return base;
         },
         readerFreeImageStyleFor: function (img) {
-          if (!img || !img.src) return {};
+          if (!img) return {};
+          if (!img.src && img.kind !== 'tape' && img.kind !== 'scrap') return {};
           var m = store.model();
           if (!m) return {};
           return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
@@ -3468,7 +3538,10 @@
         },
         slotFreeImageStyleFor: function (img, s) {
           var m = this.model;
-          if (!m || !img || !img.src) return {};
+          if (!m || !img) return {};
+          // Tape and scrap are decorative: they have no src but still need
+          // position/size/rotation.
+          if (!img.src && img.kind !== 'tape' && img.kind !== 'scrap') return {};
           return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
         },
         slotTextBoxStyleFor: function (box, s) {
@@ -3634,7 +3707,13 @@
                   '</template>' +
                   '<div class="zf-mini-body" :data-slot-page="s.pageNum" v-html="s.bodyHtml" style="position: relative;"></div>' +
                   '<template v-for="img in (s.page.images || [])" :key="\'sl-free-\' + img.id">' +
-                    '<img v-if="(img.wrap === \'free\' || !img.wrap) && img.kind !== \'icon\'" ' +
+                    '<div v-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'tape\'" ' +
+                      'class="zf-tape zf-positioned" :class="\'zf-tape-\' + (img.color || \'beige\')" ' +
+                      ':style="slotFreeImageStyleFor(img, s)"></div>' +
+                    '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'scrap\'" ' +
+                      'class="zf-scrap zf-positioned" :class="\'zf-scrap-\' + (img.color || \'kraft\')" ' +
+                      ':style="slotFreeImageStyleFor(img, s)"></div>' +
+                    '<img v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind !== \'icon\'" ' +
                       'class="zf-mini-image zf-positioned" :src="img.src" alt="" ' +
                       ':style="slotFreeImageStyleFor(img, s)" />' +
                     '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'icon\'" ' +

@@ -871,6 +871,54 @@
     .zf-img-wrap:has(.zf-icon-element) {
       aspect-ratio: 1;
     }
+    /* ---- Tape ---- */
+    .zf-img-wrap:has(.zf-tape) { aspect-ratio: auto; }
+    .zf-tape {
+      display: block;
+      width: 100%;
+      /* Fill the wrapper, whose size now comes from the element's w/h. */
+      height: 100%;
+      background:
+        repeating-linear-gradient(115deg, rgba(255,255,255,0.18) 0 6px, rgba(255,255,255,0) 6px 12px),
+        rgba(233, 221, 184, 0.72);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.18), inset 0 0 12px rgba(255,255,255,0.25);
+      border-left: 1px dashed rgba(120,110,80,0.25);
+      border-right: 1px dashed rgba(120,110,80,0.25);
+    }
+    .zf-tape-white { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.35) 0 6px, rgba(255,255,255,0.1) 6px 12px), rgba(255,255,255,0.55); }
+    .zf-tape-red { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.2) 0 6px, rgba(255,255,255,0) 6px 12px), rgba(200, 16, 46, 0.72); }
+    .zf-tape-black { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.12) 0 6px, rgba(255,255,255,0) 6px 12px), rgba(20, 23, 26, 0.8); }
+
+    /* ---- Paper scraps (torn-edge rectangle) ---- */
+    .zf-img-wrap:has(.zf-scrap) { aspect-ratio: auto; }
+    .zf-scrap {
+      display: block; width: 100%;
+      height: 100%;
+      background: #d9cbb0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+      /* jagged top and bottom edges to read as torn paper */
+      clip-path: polygon(0% 6%, 4% 2%, 9% 7%, 15% 3%, 22% 8%, 30% 4%, 38% 9%, 47% 5%, 56% 9%, 65% 4%, 74% 8%, 82% 3%, 90% 7%, 96% 4%, 100% 8%, 100% 94%, 95% 98%, 88% 93%, 80% 97%, 71% 92%, 62% 97%, 53% 93%, 44% 98%, 35% 93%, 26% 97%, 18% 92%, 10% 97%, 3% 93%, 0% 96%);
+    }
+    .zf-scrap-kraft { background: #cdb48c; }
+    .zf-scrap-white { background: #f3efe6; }
+    .zf-scrap-news { background: #e8e4d8; background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0 1px, transparent 1px 5px); }
+    .zf-scrap-pink { background: #e9c4c0; }
+
+    /* ---- Decorations submenu ---- */
+    .zf-decor-wrap { position: relative; }
+    .zf-decor-menu {
+      position: absolute; right: 110%; top: 0;
+      display: flex; flex-direction: column; gap: 0.25rem;
+      background: #ffffff; border: 2px solid var(--zf2-line-strong);
+      border-radius: 8px; padding: 0.35rem; box-shadow: 0 8px 20px rgba(20,23,26,0.2);
+      z-index: 300; white-space: nowrap;
+    }
+    .zf-decor-menu button {
+      background: transparent; border: none; text-align: left; cursor: pointer;
+      padding: 0.4rem 0.6rem; border-radius: 5px; font-size: 0.85rem; color: var(--zf-ink);
+    }
+    .zf-decor-menu button:hover { background: var(--zf-gray-light); }
+    .zf-decor-menu button:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
     .zf-mini-image.zf-flow-image {
       border-radius: calc(0.02in * var(--zf-page-scale, 1));
     }
@@ -1155,6 +1203,12 @@
       .zf-mini-page {
         padding: var(--zf-page-margin, 0.1in) !important;
         font-size: 10pt !important;
+        /* Print on white paper regardless of the theme's paper color. Ink on
+           the whole sheet wastes toner and leaves an ugly border where the
+           printer's margin falls outside the print area. Variety should come
+           from the paper people print on, not from background fill. */
+        background: #ffffff !important;
+        --zf-page-paper: #ffffff !important;
       }
       /* In print, icons size against the physical width (in inches) that
          was set inline via --zf-icon-w-in. Screen uses the inline px value;

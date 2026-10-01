@@ -249,6 +249,10 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
   if (el.kind === "icon") {
     style.fontSize = ((w / pageW) * 13.333 * 1.4).toFixed(4) + "em";
     style.height = (w / pageW * 100).toFixed(4) + "%";
+  } else if (typeof el.h === "number") {
+    // Decorative elements (tape, scraps) carry an explicit height, so their
+    // two resize axes are independent.
+    style.height = (el.h / pageH * 100).toFixed(4) + "%";
   } else {
     style.height = "auto";
   }
