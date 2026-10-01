@@ -1320,7 +1320,12 @@
         display: none !important;
       }
       /* Show only the active sheet view */
-      .zf-sheet-view { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+      .zf-sheet-side + .zf-sheet-side { margin-top: 1.5rem; }
+    .zf-sheet-side-label {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+      font-weight: 700; color: var(--zf-gray-mid); margin-bottom: 0.35rem; text-align: center;
+    }
+    .zf-sheet-view { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
       .zf-sheet-view > .zf-no-print { display: none !important; }
       .zf-sheet {
         box-shadow: none !important;

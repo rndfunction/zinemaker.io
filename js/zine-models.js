@@ -38,6 +38,12 @@
       // (g, j, p, q, y) that hang below the last baseline and would
       // otherwise be clipped by the mini-page's overflow boundary.
       budget: { chars: 900, lines: 23, words: 150 },
+      guides: [
+        { type: 'fold', axis: 'v', pos: 25 },
+        { type: 'fold', axis: 'v', pos: 50 },
+        { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+      ],
       instructions: [
         'Print this sheet in landscape, single-sided, at 100% (no scaling).',
         'Fold in half (mountain fold), then unfold.',
@@ -65,6 +71,12 @@
         { page: 8, col: 2, row: 1, rotation: 0 },
         { page: 1, col: 3, row: 1, rotation: 0 }
       ],
+      guides: [
+        { type: 'fold', axis: 'v', pos: 25 },
+        { type: 'fold', axis: 'v', pos: 50 },
+        { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+      ],
       budget: { chars: 900, lines: 23, words: 150 },
       instructions: [
         'Print this sheet in landscape, single-sided, at 100% (no scaling).',
@@ -87,8 +99,38 @@
         { page: 1, col: 0, row: 0, rotation: 0 }
       ],
       budget: { chars: 5500, lines: 90, words: 900 },
+      guides: [],
       instructions: [
         'Print as a standard portrait page. One printed page equals one zine page.'
+      ]
+    },
+    {
+      id: 'half-fold-4',
+      label: '4-page half-fold (1 sheet, 2 sides)',
+      // Landscape letter, folded once across the middle into a half-letter
+      // booklet. Two half-letter pages per side, printed on both sides.
+      paper: { width: 11, height: 8.5, unit: 'in', orientation: 'landscape' },
+      page: { width: 5.5, height: 8.5, unit: 'in' },
+      pagesPerSheet: 2,
+      sides: 2,
+      // Front (outside): back cover on the left, front cover on the right.
+      slots: [
+        { page: 4, col: 0, row: 0, rotation: 0 },
+        { page: 1, col: 1, row: 0, rotation: 0 }
+      ],
+      // Back (inside): pages 2 and 3.
+      slotsBack: [
+        { page: 2, col: 0, row: 0, rotation: 0 },
+        { page: 3, col: 1, row: 0, rotation: 0 }
+      ],
+      guides: [
+        { type: 'fold', axis: 'v', pos: 50 }
+      ],
+      budget: { chars: 2600, lines: 42, words: 420 },
+      instructions: [
+        'Print double-sided, flipping on the SHORT edge, landscape, at 100%.',
+        'Fold the sheet in half across the middle so page 1 is the front cover.',
+        'Page 2 is inside-left, page 3 is inside-right, page 4 is the back cover.'
       ]
     }
   ];

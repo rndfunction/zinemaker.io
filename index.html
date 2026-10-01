@@ -41,6 +41,7 @@
             <iconify-icon icon="ph:gear-six" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
             Settings
           </button>
+          <button class="zf2-ghost" @click="onClearAll" title="Remove all content from every page">Clear all</button>
           <button class="zf2-ghost" @click="onNew">New</button>
         </div>
       </header>
@@ -58,6 +59,72 @@
         <section v-show="store.view === 'sheet'"><zine-sheet></zine-sheet></section>
         <section v-show="store.view === 'library'"><zine-library></zine-library></section>
       </main>
+
+      <div class="zf-modal-backdrop" v-if="store.newZineOpen" @click.self="cancelNewZine">
+        <div class="zf-modal" role="dialog" aria-label="Start a new zine">
+          <div class="zf-modal-header">
+            <h2>Start a new zine</h2>
+            <button class="zf-modal-close" @click="cancelNewZine" aria-label="Close">&times;</button>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-new-model">Format</label>
+            <select id="zf-new-model" class="zf-input" v-model="store.pendingModelId">
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+            </select>
+          </div>
+          <div class="zf-muted" style="font-size:0.8rem;margin-bottom:1rem;">
+            This replaces your current zine with blank pages in the chosen format.
+          </div>
+          <div class="zf-header-actions" style="justify-content:flex-end;">
+            <button class="zf-btn" style="border-color:var(--zf-border);" @click="cancelNewZine">Cancel</button>
+            <button class="zf-btn zf-btn-primary" @click="confirmNewZine">Create</button>
+          </div>
+        </div>
+      </div>
+      <div class="zf-settings-backdrop" v-if="store.settingsOpen" @click="store.settingsOpen = false" aria-hidden="true"></div>
+      <div class="zf-settings-slide" :class="{ open: store.settingsOpen }" role="dialog" aria-label="Zine settings" @keydown.esc="store.settingsOpen = false">
+        <div class="zf-settings-slide-head">
+          <strong>Zine settings</strong>
+          <button class="zf-icon-btn" @click="store.settingsOpen = false" aria-label="Close settings">&times;</button>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-model">Zine model</label>
+          <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="store.setModel($event.target.value)">
+            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-theme">Theme</label>
+          <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="store.setTheme($event.target.value)">
+            <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
+          <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
+                 :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>
+          <input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01"
+                 :value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />
+          <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can't reach. Content outside this area may be clipped.</div>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-safe-edge">Edge safety margin ({{ store.safeEdgeIn }} in)</label>
+          <input id="zf-zine-safe-edge" type="range" min="0" max="0.75" step="0.01"
+                 :value="store.safeEdgeIn" @input="store.setSafeEdge($event.target.value)" style="width:100%;" />
+          <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Extra padding auto-applied to the outer edge of corner pages so your printer doesn't clip them.</div>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-title">Zine title</label>
+          <input id="zf-zine-title" class="zf-input" v-model="store.title" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-author">Author</label>
+          <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+        </div>
+      </div>
     </div>
   </template>
 
@@ -115,62 +182,12 @@
   <template id="zine-editor-template">
     <div class="zf-editor">
       <aside>
-        <div class="zf-settings-backdrop" v-if="store.settingsOpen" @click="store.settingsOpen = false" aria-hidden="true"></div>
-        <div class="zf-settings-slide" :class="{ open: store.settingsOpen }" role="dialog" aria-label="Zine settings" @keydown.esc="store.settingsOpen = false">
-          <div class="zf-settings-slide-head">
-            <strong>Zine settings</strong>
-            <button class="zf-icon-btn" @click="store.settingsOpen = false" aria-label="Close settings">&times;</button>
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-model">Zine model</label>
-            <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="onModelChange">
-              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
-            </select>
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-theme">Theme</label>
-            <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="onThemeChange">
-              <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
-            </select>
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
-            <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
-                   :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>
-            <input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01"
-                   :value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />
-            <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can't reach. Content outside this area may be clipped.</div>
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-safe-edge">Edge safety margin ({{ store.safeEdgeIn }} in)</label>
-            <input id="zf-zine-safe-edge" type="range" min="0" max="0.75" step="0.01"
-                   :value="store.safeEdgeIn" @input="store.setSafeEdge($event.target.value)" style="width:100%;" />
-            <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Extra padding auto-applied to the outer edge of corner pages so your printer doesn't clip them.</div>
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-title">Zine title</label>
-            <input id="zf-zine-title" class="zf-input" v-model="store.title" />
-          </div>
-          <div class="zf-field">
-            <label class="zf-label" for="zf-zine-author">Author</label>
-            <input id="zf-zine-author" class="zf-input" v-model="store.author" />
-          </div>
-        </div>
 
-        <div class="zf-muted" style="margin-bottom:0.5rem;">
-          {{ store.pages.length }} page<span v-if="store.pages.length !== 1">s</span> filled
-          <span v-if="activeModel"> &middot; this model uses {{ activeModel.pagesPerSheet }} per sheet
-            <span v-if="store.pagesNeeded() > store.pages.length"> (add {{ store.pagesNeeded() - store.pages.length }} more to fill a sheet)</span>
-          </span>
-        </div>
-        <div class="zf-fill-hint" v-if="needsToFill > 0">
-          This sheet needs <strong>{{ needsToFill }}</strong> more page<span v-if="needsToFill !== 1">s</span> before it will print as a complete zine.
-        </div>
-        <div class="zf-fill-hint complete" v-else>
-          This zine has enough pages for {{ Math.ceil(store.pages.length / activeModel.pagesPerSheet) || 1 }} printed sheet<span v-if="(Math.ceil(store.pages.length / activeModel.pagesPerSheet) || 1) !== 1">s</span>.
+        <div class="zf-field" style="margin-bottom:0.25rem;">
+          <label class="zf-label" for="zf-sidebar-model">Model</label>
+          <select id="zf-sidebar-model" class="zf-input" :value="store.modelId" @change="store.setModel($event.target.value)">
+            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+          </select>
         </div>
         <div class="zf-label" style="margin-top:0.75rem;">Pages</div>
         <ul class="zf-page-list">
@@ -199,9 +216,7 @@
             <span class="zf-page-add-label" v-else>+ Add sheet ({{ activeModel ? activeModel.pagesPerSheet : '' }} pages)</span>
           </li>
         </ul>
-        <div style="margin-top:0.5rem;display:flex;gap:0.35rem;flex-wrap:wrap;">
-          <button class="zf-btn" style="border-color:var(--zf-border);" @click="clearAllText" title="Clear all page body text">Clear all</button>
-        </div>
+
 
         <div class="zf-sidebar-layers">
           <button class="zf-sidebar-section-head" @click="layersOpen = !layersOpen" :aria-expanded="layersOpen">
@@ -348,15 +363,20 @@
 
           <label class="zf-rail-font-wrap" title="Font">
             <iconify-icon icon="ph:text-aa" aria-hidden="true"></iconify-icon>
-            <select class="zf-rail-font" @change="applyFont($event.target.value)" aria-label="Font">
-              <option value="">Font</option>
-              <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+              <select class="zf-rail-font" @change="applyFont($event.target.value)" aria-label="Font">
+                <option value="Georgia, 'Times New Roman', serif">Georgia</option>
               <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino</option>
               <option value="'Times New Roman', Times, serif">Times</option>
+              <option value="Garamond, 'Iowan Old Style', Georgia, serif">Garamond</option>
               <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans</option>
               <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
-              <option value="'Courier New', Courier, monospace">Courier</option>
+              <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System UI</option>
+              <option value="Verdana, Geneva, Tahoma, sans-serif">Verdana</option>
+              <option value="'Trebuchet MS', 'Helvetica Neue', Helvetica, Arial, sans-serif">Trebuchet MS</option>
               <option value="Impact, 'Arial Black', sans-serif">Impact</option>
+              <option value="'Arial Black', 'Arial Bold', Gadget, sans-serif">Arial Black</option>
+              <option value="'Courier New', Courier, monospace">Courier</option>
+              <option value="ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace">Monospace</option>
             </select>
           </label>
         </div>
@@ -513,14 +533,20 @@
           <div class="zf-image-control-row">
             <label class="zf-image-control-label">Font</label>
             <select class="zf-input" style="flex:1;font-size:0.85rem;" :value="activeTextBox.fontFamily || ''" @change="setTextBoxFontFamily($event.target.value)">
-              <option value="">Use theme default</option>
-              <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
-              <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino (serif)</option>
-              <option value="'Times New Roman', Times, serif">Times (serif)</option>
-              <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans (sans)</option>
-              <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica (sans)</option>
-              <option value="'Courier New', Courier, monospace">Courier (mono)</option>
-              <option value="Impact, 'Arial Black', sans-serif">Impact (bold)</option>
+            <option value="">Use theme default</option>
+            <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+            <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino (serif)</option>
+            <option value="'Times New Roman', Times, serif">Times (serif)</option>
+            <option value="Garamond, 'Iowan Old Style', Georgia, serif">Garamond (serif)</option>
+            <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans (sans)</option>
+            <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica (sans)</option>
+            <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System UI (sans)</option>
+            <option value="Verdana, Geneva, Tahoma, sans-serif">Verdana (sans)</option>
+            <option value="'Trebuchet MS', 'Helvetica Neue', Helvetica, Arial, sans-serif">Trebuchet MS (sans)</option>
+            <option value="Impact, 'Arial Black', sans-serif">Impact (bold)</option>
+            <option value="'Arial Black', 'Arial Bold', Gadget, sans-serif">Arial Black (bold)</option>
+            <option value="'Courier New', Courier, monospace">Courier (mono)</option>
+            <option value="ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace">Monospace (mono)</option>
               <option value="'Comic Sans MS', cursive">Comic (casual)</option>
             </select>
           </div>
@@ -642,6 +668,57 @@
     }
     // Apply a parsed zine object (from a file, URL, or share link) to the
     // store. Returns true on success. Shared by import and example loading.
+    // Build one sheet slot's render data: rect, page scale, safe edges, and
+    // the page content. Shared by the front (slots) and back (slotsBack) of a
+    // sheet so two-sided models use identical logic.
+    function zfBuildSlot(m, slot, pages) {
+      var rect = window.ZFModels.slotRect(m, slot);
+      var page = pages[slot.page - 1];
+      var unit = m.page.unit || 'in';
+      var pageInchesW = unit === 'mm' ? m.page.width / 25.4 : m.page.width;
+      var physicalCssW = pageInchesW * 96;
+      var sheetHeight = 560;
+      var aspect = m.paper.width / m.paper.height;
+      var sheetWidth = sheetHeight * aspect;
+      var grid = window.ZFModels.gridSize(m);
+      var slotRenderedW = sheetWidth / grid.cols;
+      var slotScale = slotRenderedW / physicalCssW;
+      var touchesPaperTop = (slot.row === 0);
+      var touchesPaperBottom = (slot.row === grid.rows - 1);
+      var touchesPaperLeft = (slot.col === 0);
+      var touchesPaperRight = (slot.col === grid.cols - 1);
+      var safeEdges = { top: false, right: false, bottom: false, left: false };
+      var rot = ((slot.rotation % 360) + 360) % 360;
+      if (rot === 0) {
+        safeEdges.top = touchesPaperTop; safeEdges.right = touchesPaperRight;
+        safeEdges.bottom = touchesPaperBottom; safeEdges.left = touchesPaperLeft;
+      } else if (rot === 180) {
+        safeEdges.top = touchesPaperBottom; safeEdges.right = touchesPaperLeft;
+        safeEdges.bottom = touchesPaperTop; safeEdges.left = touchesPaperRight;
+      } else if (rot === 90) {
+        safeEdges.top = touchesPaperLeft; safeEdges.right = touchesPaperTop;
+        safeEdges.bottom = touchesPaperRight; safeEdges.left = touchesPaperBottom;
+      } else if (rot === 270) {
+        safeEdges.top = touchesPaperRight; safeEdges.right = touchesPaperBottom;
+        safeEdges.bottom = touchesPaperLeft; safeEdges.left = touchesPaperTop;
+      }
+      return {
+        key: 's-' + slot.page,
+        pageNum: slot.page,
+        rotation: slot.rotation,
+        rect: rect,
+        page: page,
+        isEmpty: !page || (
+          !page.heading && !page.body && !page.image &&
+          !(page.images && page.images.length) &&
+          !(page.textBoxes && page.textBoxes.length)
+        ),
+        pageScale: slotScale,
+        pageMargin: store.marginIn + 'in',
+        safeEdges: safeEdges,
+        bodyHtml: page ? (page.body || '') : ''
+      };
+    }
     function zfApplyZineData(parsed) {
       if (!parsed || !Array.isArray(parsed.pages)) return false;
       store.title = parsed.title || 'Untitled Zine';
@@ -1138,14 +1215,19 @@
     // current model, so users don't have to click "Add page" repeatedly.
     function zfBlankPagesForModel(modelId) {
       var per = 8;
+      var sides = 1;
       try {
         if (window.ZFModels) {
           var m = window.ZFModels.getModel(modelId || 'mini-8');
           if (m && m.pagesPerSheet) per = m.pagesPerSheet;
+          if (m && typeof m.sides === 'number' && m.sides > 0) sides = m.sides;
         }
       } catch (e) {}
+      // A two-sided model needs pagesPerSheet * sides pages to fill both
+      // printed sides (e.g. the 4-page half-fold = 2 per side * 2 sides).
+      var total = per * sides;
       var arr = [];
-      for (var i = 0; i < per; i++) arr.push(zfEmptyPage());
+      for (var i = 0; i < total; i++) arr.push(zfEmptyPage());
       return arr;
     }
     var zfInitial = (zfSaved && zfSaved.pages && zfSaved.pages.length)
@@ -1162,6 +1244,8 @@
       status: '',
       lastSavedAt: 0,
       settingsOpen: false,
+      newZineOpen: false,
+      pendingModelId: '',
       modelId: (zfSaved && zfSaved.modelId) ? zfSaved.modelId : 'mini-8',
       themeId: (zfSaved && zfSaved.themeId) ? zfSaved.themeId : 'classic',
       currentZineId: (zfSaved && zfSaved.currentZineId) ? zfSaved.currentZineId : null,
@@ -1235,6 +1319,11 @@
         this.title = 'Untitled Zine'; this.author = ''; this.pages = zfBlankPagesForModel(this.modelId);
         this.activePageId = this.pages[0].id; this.view = 'editor';
         if (window.ZFLibrary) this.library = window.ZFLibrary.list();
+      },
+      // Start a new zine in a chosen model (seeds the right number of pages).
+      newZineInModel: function (modelId) {
+        if (modelId && modelId !== this.modelId) this.modelId = modelId;
+        this.newZine();
       },
       setView: function (v) { this.view = v; },
 
@@ -1388,6 +1477,24 @@
 
       setModel: function (id) {
         if (!window.ZFModels) return;
+        if (id === this.modelId) return;
+        // If the zine already has content, warn: switching changes the page
+        // size but does NOT resize existing content.
+        var hasContent = (this.pages || []).some(function (p) {
+          return (p.heading && p.heading.trim()) ||
+                 (p.body && p.body.trim()) ||
+                 (p.images && p.images.length) ||
+                 (p.textBoxes && p.textBoxes.length) ||
+                 (p.image);
+        });
+        if (hasContent) {
+          var ok = confirm(
+            'Switch zine format to "' + window.ZFModels.getModel(id).label + '"?\n\n' +
+            'Your pages are kept, but the page size changes. Existing content is ' +
+            'NOT resized, so it may need adjusting for the new format.'
+          );
+          if (!ok) return;
+        }
         this.modelId = id;
         this.status = 'Zine model set to: ' + window.ZFModels.getModel(id).label;
         var self = this;
@@ -1432,10 +1539,14 @@
           var mins = Math.floor(secs / 60);
           if (mins < 60) return 'Saved ' + mins + 'm ago';
           return 'Saved';
-        }
+        },
+        // Model + theme lists for the global settings panel.
+        models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
+        themes: function () { return (window.ZFThemes) ? window.ZFThemes.listThemes() : []; }
       },
       methods: {
         onExport: function () { if (window.ZFExportJson) window.ZFExportJson(); },
+        onClearAll: function () { if (window.ZFClearAll) window.ZFClearAll(); },
         onImport: function (evt) {
           var f = evt.target.files && evt.target.files[0];
           if (f && window.ZFImportFromFile) window.ZFImportFromFile(f);
@@ -1446,7 +1557,15 @@
         goSheet: function () { store.setView("sheet"); },
         goLibrary: function () { store.setView("library"); },
         onNew: function () {
-          if (confirm("Start a new zine? Unsaved changes will be lost.")) store.newZine();
+          store.pendingModelId = store.modelId;
+          store.newZineOpen = true;
+        },
+        confirmNewZine: function () {
+          store.newZineOpen = false;
+          store.newZineInModel(store.pendingModelId);
+        },
+        cancelNewZine: function () {
+          store.newZineOpen = false;
         },
         onUndo: function () {
           if (window.ZFUndo) window.ZFUndo();
@@ -3197,6 +3316,11 @@
         // them even though the logic lives on the editor component.
         window.ZFExportJson = function () { self.exportJson(); };
         window.ZFImportFromFile = function (file) { self.importFromFile(file); };
+        window.ZFClearAll = function () { self.clearAllText(); };
+        window.ZFNewZine = function () {
+          store.pendingModelId = store.modelId;
+          store.newZineOpen = true;
+        };
       },
       watch: {
         // When the active page changes (or its body is replaced by undo),
@@ -3257,6 +3381,7 @@
       },
       methods: {
         loadExample: function (file) { zfLoadExample(file); },
+        newZineClick: function () { if (window.ZFNewZine) window.ZFNewZine(); },
         openZine: function (id) { store.loadFromLibrary(id); },
         duplicate: function (id) { store.duplicateInLibrary(id); },
         remove: function (id) { store.deleteFromLibrary(id); },
@@ -3312,7 +3437,7 @@
           return Math.min(100, Math.round(100 * bytes / cap));
         },
         storageClass: function () {
-          var p = this.storagePct;
+          var p = this.storagePct();
           if (p >= 80) return 'over';
           if (p >= 60) return 'warn';
           return '';
@@ -3325,17 +3450,17 @@
               '<h2>Your library</h2>' +
               '<div class="zf-muted">{{ entries.length }} saved zine<span v-if="entries.length !== 1">s</span> in this browser.</div>' +
               '<div class="zf-muted" style="margin-top:0.25rem;display:flex;align-items:center;gap:0.5rem;">' +
-                '<span>Storage: {{ storageUsedMb }} MB of ~5 MB used</span>' +
-                '<span class="zf-budget-bar" :class="storageClass" style="width:120px;">' +
-                  '<div :style="{ width: storagePct + \'%\' }"></div>' +
+                '<span>Storage: {{ storageUsedMb() }} MB of ~5 MB used</span>' +
+                '<span class="zf-budget-bar" :class="storageClass()" style="width:120px;">' +
+                  '<div :style="{ width: storagePct() + \'%\' }"></div>' +
                 '</span>' +
               '</div>' +
-              '<div v-if="storagePct >= 80" class="zf-muted" style="color:var(--zf-red);margin-top:0.25rem;">' +
+              '<div v-if="storagePct() >= 80" class="zf-muted" style="color:var(--zf-red);margin-top:0.25rem;">' +
                 'Storage is getting full. Export and delete old zines to free space.' +
               '</div>' +
             '</div>' +
             '<div class="zf-header-actions" style="gap:0.5rem;">' +
-              '<button class="zf-btn zf-btn-primary" @click="store.newZine()">New zine</button>' +
+              '<button class="zf-btn zf-btn-primary" @click="newZineClick()">New zine</button>' +
             '</div>' +
           '</div>' +
 
@@ -3410,7 +3535,9 @@
         },
         readerFreeImageStyleFor: function (img) {
           if (!img) return {};
-          if (!img.src && img.kind !== 'tape' && img.kind !== 'scrap') return {};
+          // Decorative kinds have no src but still need position/size/rotation.
+          var decorKinds = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
+          if (!img.src && !decorKinds[img.kind]) return {};
           var m = store.model();
           if (!m) return {};
           return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
@@ -3607,71 +3734,25 @@
         slots: function () {
           var m = this.model;
           if (!m || !window.ZFModels) return [];
-          return m.slots.map(function (slot) {
-            var rect = window.ZFModels.slotRect(m, slot);
-            var page = store.pages[slot.page - 1];
-            // Compute a page scale for this slot: slot is 1 column wide.
-            // The slot's rendered width is (sheetWidthPx / cols). The physical
-            // mini-page width in CSS px is (page width in inches * 96).
-            // But since the sheet is landscape and slots sit rotated, keep it
-            // simple: scale by (sheetRenderedWidthPx / cols) / physicalPageWidthPx.
-            var unit = m.page.unit || 'in';
-            var pageInchesW = unit === 'mm' ? m.page.width / 25.4 : m.page.width;
-            var physicalCssW = pageInchesW * 96;
-            // sheet is fixed at 560 tall by display height; width follows aspect.
-            var sheetHeight = 560;
-            var aspect = m.paper.width / m.paper.height;
-            var sheetWidth = sheetHeight * aspect;
-            var grid = window.ZFModels.gridSize(m);
-            var slotRenderedW = sheetWidth / grid.cols;
-            var slotScale = slotRenderedW / physicalCssW;
-
-            // Which paper edges does this slot touch? These need extra
-            // "safe edge" padding so the printer's unprintable border
-            // doesn't clip them.
-            var touchesPaperTop = (slot.row === 0);
-            var touchesPaperBottom = (slot.row === grid.rows - 1);
-            var touchesPaperLeft = (slot.col === 0);
-            var touchesPaperRight = (slot.col === grid.cols - 1);
-            // The mini-page is rotated by slot.rotation. Translate paper
-            // edges into mini-page LOCAL edges.
-            var safeEdges = { top: false, right: false, bottom: false, left: false };
-            var rot = ((slot.rotation % 360) + 360) % 360;
-            if (rot === 0) {
-              safeEdges.top = touchesPaperTop;
-              safeEdges.right = touchesPaperRight;
-              safeEdges.bottom = touchesPaperBottom;
-              safeEdges.left = touchesPaperLeft;
-            } else if (rot === 180) {
-              safeEdges.top = touchesPaperBottom;
-              safeEdges.right = touchesPaperLeft;
-              safeEdges.bottom = touchesPaperTop;
-              safeEdges.left = touchesPaperRight;
-            } else if (rot === 90) {
-              safeEdges.top = touchesPaperLeft;
-              safeEdges.right = touchesPaperTop;
-              safeEdges.bottom = touchesPaperRight;
-              safeEdges.left = touchesPaperBottom;
-            } else if (rot === 270) {
-              safeEdges.top = touchesPaperRight;
-              safeEdges.right = touchesPaperBottom;
-              safeEdges.bottom = touchesPaperLeft;
-              safeEdges.left = touchesPaperTop;
-            }
-
-            return {
-              key: 's-' + slot.page,
-              pageNum: slot.page,
-              rotation: slot.rotation,
-              rect: rect,
-              page: page,
-              isEmpty: !page || (!page.heading && !page.body && !page.image),
-              pageScale: slotScale,
-              pageMargin: store.marginIn + 'in',
-              safeEdges: safeEdges,
-              bodyHtml: page ? (page.body || '') : ''
-            };
-          });
+          var pages = store.pages;
+          return m.slots.map(function (slot) { return zfBuildSlot(m, slot, pages); });
+        },
+        slotsBack: function () {
+          var m = this.model;
+          if (!m || !window.ZFModels || !Array.isArray(m.slotsBack)) return [];
+          var pages = store.pages;
+          return m.slotsBack.map(function (slot) { return zfBuildSlot(m, slot, pages); });
+        },
+        hasBack: function () {
+          return this.slotsBack.length > 0;
+        },
+        // One entry per printable side. Front always; back when the model
+        // defines slotsBack. Lets the sheet template loop over sides without
+        // duplicating the slot markup.
+        sheetSides: function () {
+          var sides = [{ label: 'Front', slots: this.slots }];
+          if (this.hasBack) sides.push({ label: 'Back', slots: this.slotsBack });
+          return sides;
         }
       },
       methods: {
@@ -3685,10 +3766,28 @@
         slotFreeImageStyleFor: function (img, s) {
           var m = this.model;
           if (!m || !img) return {};
-          // Tape and scrap are decorative: they have no src but still need
-          // position/size/rotation.
-          if (!img.src && img.kind !== 'tape' && img.kind !== 'scrap') return {};
+          // Decorative elements (tape, scraps, sticky notes, stickers) have no
+          // src but still need position/size/rotation.
+          var decorKinds = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
+          if (!img.src && !decorKinds[img.kind]) return {};
           return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
+        },
+        // Merge a decorative element's position style with its custom color
+        // (hex from the color picker) so sticky notes and stickers recolor in
+        // the sheet view. Mirrors the editor component's helpers.
+        stickyStyle: function (img, base) {
+          var out = Object.assign({}, base || {});
+          if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+            out['--zf-sticky-bg'] = img.color;
+          }
+          return out;
+        },
+        stickerStyle: function (img, base) {
+          var out = Object.assign({}, base || {});
+          if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+            out['--zf-sticker-bg'] = img.color;
+          }
+          return out;
         },
         slotTextBoxStyleFor: function (box, s) {
           var m = this.model;
@@ -3824,20 +3923,21 @@
               '<button class="zf-btn zf-btn-primary" @click="printSheet">Print this sheet</button>' +
             '</div>' +
           '</div>' +
+          '<div v-for="(side, si) in sheetSides" :key="\'side-\' + si" class="zf-sheet-side">' +
+            '<div v-if="sheetSides.length > 1" class="zf-sheet-side-label zf-no-print">{{ side.label }}</div>' +
           '<div class="zf-sheet" :style="sheetStyle">' +
             '<div class="zf-sheet-inner">' +
               '<div class="zf-sheet-guides">' +
-                '<template v-if="store.showFoldLines">' +
-                  '<div class="zf-fold-h"></div>' +
-                  '<div class="zf-fold-v" style="left:25%;"></div>' +
-                  '<div class="zf-fold-v" style="left:50%;"></div>' +
-                  '<div class="zf-fold-v" style="left:75%;"></div>' +
-                '</template>' +
-                '<template v-if="store.showCutLines">' +
-                  '<div class="zf-cut-h" style="left:25%;right:25%;top:50%;"></div>' +
+                '<template v-for="(g, gi) in (model && model.guides ? model.guides : [])" :key="\'g-\' + gi">' +
+                  '<div v-if="g.type === \'fold\' && store.showFoldLines" ' +
+                    ':class="g.axis === \'v\' ? \'zf-fold-v\' : \'zf-fold-h\'" ' +
+                    ':style="(g.axis === \'v\' ? \'left:\' : \'top:\') + g.pos + \'%\'"></div>' +
+                  '<div v-else-if="g.type === \'cut\' && store.showCutLines" ' +
+                    ':class="g.axis === \'v\' ? \'zf-cut-v\' : \'zf-cut-h\'" ' +
+                    ':style="(g.axis === \'v\' ? \'top:\' + (g.from||0) + \'%;bottom:\' + (100-(g.to||100)) + \'%;left:\' : \'left:\' + (g.from||0) + \'%;right:\' + (100-(g.to||100)) + \'%;top:\') + g.pos + \'%\'"></div>' +
                 '</template>' +
               '</div>' +
-              '<div v-for="s in slots" :key="s.key" class="zf-slot" :style="Object.assign({}, s.rect, themeStyle)">' +
+              '<div v-for="s in side.slots" :key="s.key" class="zf-slot" :style="Object.assign({}, s.rect, themeStyle)">' +
               '<div class="zf-mini-page zf-slot-rot" :style="slotMiniPageStyle(s)">' +
                 '<span v-if="showPageNumbers && s.pageNum > 1" class="zf-slot-page-num">{{ s.pageNum - 1 }}</span>' +
                 '<template v-if="!s.isEmpty">' +
@@ -3887,6 +3987,7 @@
               '</div>' +
 
             '</div>' +
+          '</div>' +
           '</div>' +
 
           '<div class="zf-instructions zf-no-print" v-if="model && model.instructions">' +
