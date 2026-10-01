@@ -5,8 +5,8 @@
     {
       "id": "welcome-to-zine-forge",
       "title": "Welcome to Zine Forge",
-      "author": "Zine Forge",
-      "blurb": "A tiny zine that explains itself. Fold it, read it, then make your own.",
+      "author": "",
+      "blurb": "A friendly little zine that teaches you how to make zines with Zine Forge.",
       "file": "welcome-to-zine-forge.json"
     }
   ]
