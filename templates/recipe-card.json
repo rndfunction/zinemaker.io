@@ -1,0 +1,88 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "kind": "template",
+  "templateId": "recipe-card",
+  "exported": "2026-10-03T00:00:00.000Z",
+  "title": "Recipe zine",
+  "author": "",
+  "modelId": "mini-8",
+  "themeId": "classic",
+  "marginIn": 0.12,
+  "pages": [
+    {
+      "heading": "Recipe zine",
+      "body": "",
+      "images": [
+        { "id": "i-rc-01-img", "src": "https://picsum.photos/seed/recipetitle/600/400", "kind": "photo", "x": 0.2, "y": 1.5, "w": 2.35, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-rc-01-sub", "kind": "", "role": "caption", "html": "A little book of things I like to cook", "x": 0.2, "y": 0.35, "w": 2.35, "rot": 0, "fontSize": 0.75, "align": "center", "z": 10, "hidden": false },
+        { "id": "t-rc-01-credit", "kind": "", "role": "caption", "html": "by Your Name", "x": 0.2, "y": 3.5, "w": 2.35, "rot": 0, "fontSize": 0.7, "align": "center", "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "Recipe name",
+      "body": "",
+      "images": [
+        { "id": "i-rc-02-img", "src": "https://picsum.photos/seed/recipe02/600/400", "kind": "photo", "x": 0.2, "y": 0.7, "w": 2.35, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-rc-02-meta", "kind": "", "role": "caption", "html": "Serves 2 - 20 minutes", "x": 0.2, "y": 2.35, "w": 2.35, "rot": 0, "fontSize": 0.7, "align": "center", "z": 10, "hidden": false },
+        { "id": "t-rc-02-ing", "kind": "", "role": "body", "html": "<b>Ingredients</b><br>- 1 cup something<br>- 2 tbsp something else<br>- a pinch of salt", "x": 0.2, "y": 2.75, "w": 2.35, "rot": 0, "fontSize": 0.75, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "Method",
+      "body": "",
+      "images": [],
+      "textBoxes": [
+        { "id": "t-rc-03-steps", "kind": "", "role": "body", "html": "1. Do the first thing.<br><br>2. Then the second thing, carefully.<br><br>3. Finish it up and serve.", "x": 0.2, "y": 0.9, "w": 2.35, "rot": 0, "fontSize": 0.8, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "Another recipe",
+      "body": "",
+      "images": [
+        { "id": "i-rc-04-img", "src": "https://picsum.photos/seed/recipe04/600/400", "kind": "photo", "x": 0.2, "y": 0.7, "w": 2.35, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-rc-04-ing", "kind": "", "role": "body", "html": "<b>Ingredients</b><br>- a handful of this<br>- a splash of that<br>- salt and pepper", "x": 0.2, "y": 2.35, "w": 2.35, "rot": 0, "fontSize": 0.75, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "Method",
+      "body": "",
+      "images": [],
+      "textBoxes": [
+        { "id": "t-rc-05-steps", "kind": "", "role": "body", "html": "1. Prep everything first.<br><br>2. Cook it slowly.<br><br>3. Taste, adjust, enjoy.", "x": 0.2, "y": 0.9, "w": 2.35, "rot": 0, "fontSize": 0.8, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "My favorite",
+      "body": "",
+      "images": [
+        { "id": "i-rc-06-img", "src": "https://picsum.photos/seed/recipe06/600/400", "kind": "photo", "x": 0.2, "y": 1.0, "w": 2.35, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-rc-06-note", "kind": "", "role": "caption", "html": "The one I make when I want to feel at home.", "x": 0.2, "y": 2.7, "w": 2.35, "rot": 0, "fontSize": 0.72, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "Notes",
+      "body": "",
+      "images": [],
+      "textBoxes": [
+        { "id": "t-rc-07-notes", "kind": "", "role": "body", "html": "Swap in whatever you have on hand.<br><br>This keeps for a few days in the fridge.<br><br>Best shared with someone.", "x": 0.2, "y": 1.0, "w": 2.35, "rot": 0, "fontSize": 0.8, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "The end",
+      "body": "",
+      "images": [],
+      "textBoxes": [
+        { "id": "t-rc-08-cta", "kind": "", "role": "body", "html": "Thanks for reading!<br><br>Find more at: your-handle", "x": 0.25, "y": 2.9, "w": 2.25, "rot": 0, "fontSize": 0.8, "align": "center", "z": 10, "hidden": false }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "kind": "templates",
+  "templates": [
+    {
+      "id": "recipe-card",
+      "title": "Recipe zine",
+      "blurb": "A little recipe book - a cover, then a recipe per page with ingredients and method.",
+      "file": "recipe-card.json"
+    },
+    {
+      "id": "comic-panels",
+      "title": "Comic (experimental)",
+      "blurb": "Panel layouts for comics and storyboards. Still in progress.",
+      "file": "comic-panels.json"
+    }
+  ]
+}

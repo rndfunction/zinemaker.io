@@ -78,6 +78,47 @@ change models -- extra pages are kept and simply won't print.
                                the app): theme studies and layout
                                candidates
 
+## Data shapes
+
+These shapes are the contract between the editor, the library, and the
+exported `.zine.json` files. If you add a new per-page field, it must
+survive a save/load round trip (see the note below).
+
+**Zine record** (what `ZFLibrary.upsert` stores, and what `loadFromLibrary`
+reads back):
+
+    {
+      id, title, author,
+      themeId, modelId, marginIn,
+      pages: [ <page>, ... ],
+      updatedAt
+    }
+
+**Page:**
+
+    {
+      id,                       // regenerated on load; must be unique in-session
+      heading, body,            // core text
+      images: [ <element>, ... ],   // photos, icons, tape, scraps, stickies
+      textBoxes: [ <text box>, ... ]
+    }
+
+**Element** (entry in `pages[].images`): `{ id, kind, src, x, y, w, h?, rot,
+z?, color?, shape?, wrap?, hidden? }`. `kind` is one of `photo`, `icon`,
+`tape`, `scrap`, `sticky`, `sticker`.
+
+**Text box** (entry in `pages[].textBoxes`): `{ id, html, x, y, w, rot,
+fontSize?, lineHeight?, align?, color?, fontFamily?, z?, kind?, hidden? }`.
+
+> **Round-trip invariant.** Page objects must be stored and loaded
+> *whole*. `ZFLibrary.upsert`, `ZFLibrary.duplicate`, and
+> `loadFromLibrary` must copy the full page (spreading the existing object
+> and only normalizing the core fields) -- never rebuild a page from just
+> `{ heading, body, image }`. Rebuilding drops `images` and `textBoxes`
+> silently, which destroys every tape strip, sticky note, icon, and
+> positioned text box on save. Legacy single-`image` pages are upgraded by
+> `zfMigrateAllPages` in `js/util.js` on load.
+
 ## Design notes
 
 - **One renderer, three views.** The editor canvas, the reader page, and

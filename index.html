@@ -11,6 +11,7 @@
   <script src="js/zine-themes.js"></script>
   <script src="js/zine-library.js"></script>
   <script src="js/util.js"></script>
+  <script src="js/components/ZfErrorBoundary.js"></script>
   <script src="js/components/ZineIconPicker.js"></script>
   <link rel="stylesheet" href="css/app.css" />
 </head>
@@ -22,7 +23,14 @@
       <header class="zf2-masthead">
         <div class="zf2-masthead-titles">
           <span class="zf2-kicker">Zine &middot; {{ store.view }}</span>
-          <h1 class="zf2-title">{{ store.title || 'Untitled Zine' }}</h1>
+          <input
+            class="zf2-title zf2-title-input"
+            v-model="store.title"
+            placeholder="Untitled Zine"
+            aria-label="Zine title"
+            title="Click to rename this zine"
+            maxlength="80"
+          />
           <div class="zf2-meta">
             <span v-if="store.author">by {{ store.author }}</span>
             <span v-if="store.author" aria-hidden="true">&middot;</span>
@@ -30,6 +38,11 @@
           </div>
         </div>
         <div class="zf2-masthead-actions">
+          <button class="zf2-ghost" @click="goLibrary" :aria-current="store.view === 'library'" title="Browse your saved zines">
+            <iconify-icon icon="ph:books" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Library
+          </button>
+          <span class="zf2-masthead-sep" aria-hidden="true"></span>
           <button class="zf2-ghost" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
           <button class="zf2-ghost" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
           <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
@@ -49,15 +62,14 @@
         <button class="zf2-tab" :aria-current="store.view === 'editor'" @click="goEditor">Editor</button>
         <button class="zf2-tab" :aria-current="store.view === 'reader'" @click="goReader">Read</button>
         <button class="zf2-tab" :aria-current="store.view === 'sheet'" @click="goSheet">Print</button>
-        <button class="zf2-tab" :aria-current="store.view === 'library'" @click="goLibrary">Library</button>
       </nav>
 
       <main class="zf-main">
         <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
-        <section v-show="store.view === 'editor'"><zine-editor></zine-editor></section>
-        <section v-show="store.view === 'reader'"><zine-reader></zine-reader></section>
-        <section v-show="store.view === 'sheet'"><zine-sheet></zine-sheet></section>
-        <section v-show="store.view === 'library'"><zine-library></zine-library></section>
+        <section v-show="store.view === 'editor'"><zf-error-boundary><zine-editor></zine-editor></zf-error-boundary></section>
+        <section v-show="store.view === 'reader'"><zf-error-boundary><zine-reader></zine-reader></zf-error-boundary></section>
+        <section v-show="store.view === 'sheet'"><zf-error-boundary><zine-sheet></zine-sheet></zf-error-boundary></section>
+        <section v-show="store.view === 'library'"><zf-error-boundary><zine-library></zine-library></zf-error-boundary></section>
       </main>
 
       <div class="zf-modal-backdrop" v-if="store.newZineOpen" @click.self="cancelNewZine">
@@ -166,7 +178,7 @@
                :style="Object.assign({}, readerFreeImageStyleFor(img), { color: img.color || 'inherit' })"></iconify-icon>
         </template>
         <template v-for="box in (page.textBoxes || [])" :key="'r-tb-' + box.id">
-          <div class="zf-textbox zf-textbox-readonly" :class="{ 'zf-stamp': box.kind === 'stamp' }" :style="readerTextBoxStyleFor(box)">
+          <div class="zf-textbox zf-textbox-readonly" :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel' }" :style="readerTextBoxStyleFor(box)">
             <div class="zf-textbox-content" v-html="box.html"></div>
           </div>
         </template>
@@ -221,7 +233,7 @@
         <div class="zf-sidebar-layers">
           <button class="zf-sidebar-section-head" @click="layersOpen = !layersOpen" :aria-expanded="layersOpen">
             <span>Layers <span class="zf-mini">&mdash; {{ layers.length }}</span></span>
-            <span aria-hidden="true">{{ layersOpen ? '\u25be' : '\u25b8' }}</span>
+            <span aria-hidden="true">{{ layersOpen ? "\u25be" : "\u25b8" }}</span>
           </button>
           <div v-show="layersOpen" class="zf-sidebar-layers-body">
             <div v-if="!layers.length" class="zf-muted" style="font-size:0.8rem;">No objects on this page yet.</div>
@@ -258,6 +270,7 @@
         <div class="zf-canvas-wrap">
           <div class="zf-ghost-page zf-ghost-prev" v-if="prevPage" role="button" tabindex="0"
                @click="goToPageId(prevPage.id)" @keydown.enter="goToPageId(prevPage.id)"
+               :aria-label="'Go to previous page: ' + (prevPage.heading || 'Untitled')"
                :title="'Go to ' + (prevPage.heading || 'previous page')">
             <span class="zf-ghost-label">Page {{ activeIndex }}</span>
             <div class="zf-ghost-title">{{ prevPage.heading || 'Untitled' }}</div>
@@ -290,7 +303,7 @@
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp' }]"
+                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel' }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                    @mousedown="onTextBoxMouseDown($event, box)"
@@ -337,6 +350,7 @@
           </div>
           <div class="zf-ghost-page zf-ghost-next" v-if="nextPage" role="button" tabindex="0"
                @click="goToPageId(nextPage.id)" @keydown.enter="goToPageId(nextPage.id)"
+               :aria-label="'Go to next page: ' + (nextPage.heading || 'Untitled')"
                :title="'Go to ' + (nextPage.heading || 'next page')">
             <span class="zf-ghost-label">Page {{ activeIndex + 2 }}</span>
             <div class="zf-ghost-title">{{ nextPage.heading || 'Untitled' }}</div>
@@ -415,6 +429,13 @@
           <button type="button" class="zf-rail-btn" @click="duplicateSelectedElement" title="Duplicate selected element (Ctrl+D)" aria-label="Duplicate selected element">
             <iconify-icon icon="ph:stack" aria-hidden="true"></iconify-icon>
           </button>
+        </div>
+        <div class="zf-rail-sep" aria-hidden="true"></div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Output">
+          <button type="button" class="zf-rail-btn" @click="store.setView('sheet')" title="Print this zine" aria-label="Print this zine">
+            <iconify-icon icon="ph:printer" aria-hidden="true"></iconify-icon>
+          </button>
+
         </div>
       </aside>
 
@@ -650,12 +671,17 @@
         page.textBoxes = Array.isArray(p.textBoxes) ? p.textBoxes.map(function (tb) {
           return {
             id: tb.id || ('t-' + Math.random().toString(36).slice(2, 8)),
+            kind: tb.kind || '',
+            role: tb.role || '',
             html: tb.html || '',
             x: typeof tb.x === 'number' ? tb.x : 0,
             y: typeof tb.y === 'number' ? tb.y : 0,
             w: typeof tb.w === 'number' ? tb.w : 1.8,
+            h: typeof tb.h === 'number' ? tb.h : undefined,
             rot: typeof tb.rot === 'number' ? tb.rot : 0,
             fontSize: typeof tb.fontSize === 'number' ? tb.fontSize : 1.0,
+            lineHeight: typeof tb.lineHeight === 'number' ? tb.lineHeight : undefined,
+            align: tb.align || '',
             z: typeof tb.z === 'number' ? tb.z : 0,
             color: tb.color || '',
             hidden: !!tb.hidden
@@ -729,6 +755,43 @@
       store.pages = zfBuildPagesFromData(parsed.pages);
       store.activePageId = store.pages[0].id;
       return true;
+    }
+    // Fetch and load a bundled content template (file name relative to
+    // /templates/). Mirrors zfLoadExample, but first saves the current zine
+    // to the Library so the user's work is never lost when a template
+    // replaces it. Global so any component can trigger it.
+    function zfLoadTemplate(file) {
+      if (store.currentZineId && typeof store.saveToLibrary === 'function') {
+        try { store.saveToLibrary(); } catch (e) {}
+      }
+      store.status = 'Loading template...';
+      return fetch('templates/' + file)
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          // Read as text first so an HTML error/SPA-shell response fails
+          // cleanly here instead of throwing out of the click handler
+          // (which Vue would report and the error boundary would catch).
+          return r.text();
+        })
+        .then(function (text) {
+          var parsed = null;
+          try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
+          if (!parsed || !Array.isArray(parsed.pages)) {
+            throw new Error('template file was not valid JSON');
+          }
+          if (!zfApplyZineData(parsed)) throw new Error('bad template file');
+          if (window.ZFLibrary) store.currentZineId = window.ZFLibrary.newId();
+          store.view = 'editor';
+          store.status = 'Loaded template: ' + (parsed.title || file);
+          setTimeout(function () {
+            if (store.status.indexOf('Loaded template') === 0) store.status = '';
+          }, 2500);
+          return true;
+        })
+        .catch(function (e) {
+          store.status = 'Could not load template: ' + (e && e.message ? e.message : e);
+          return false;
+        });
     }
     // Fetch and load a bundled example zine (file name relative to /zines/).
     // Global so any component (editor rail, library) can trigger it.
@@ -1414,13 +1477,20 @@
         this.modelId = rec.modelId || 'mini-8';
         this.marginIn = (typeof rec.marginIn === 'number') ? rec.marginIn : 0.1;
         this.pages = (rec.pages || []).map(function (p, i) {
-          return {
+          // Preserve the full stored page (images, textBoxes, icons, ...) so
+          // decorated content survives a save/load round trip. Only the page
+          // id is regenerated to avoid id collisions across zines. Legacy
+          // pages that only have a single `image` field are migrated below
+          // by zfMigrateAllPages.
+          return Object.assign({}, p, {
             id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
             heading: p.heading || '',
             body: p.body || '',
-            image: p.image || ''
-          };
+            images: Array.isArray(p.images) ? p.images : [],
+            textBoxes: Array.isArray(p.textBoxes) ? p.textBoxes : []
+          });
         });
+        if (window.zfMigrateAllPages) this.pages = window.zfMigrateAllPages(this.pages);
         if (!this.pages.length) this.pages = [zfEmptyPage()];
         this.activePageId = this.pages[0].id;
         this.view = 'editor';
@@ -1518,7 +1588,10 @@
       }
     });
 
-    var AppShell = {
+    // A tiny error boundary. If a child view throws during render, this catches it
+// and shows a calm recovery panel instead of a blank screen. The zine is
+// autosaved, so the copy reassures the user their work is safe.
+var AppShell = {
       data: function () { return { store: store, tick: 0 }; },
       computed: {
         canUndo: function () {
@@ -3342,7 +3415,12 @@
         this.injectShapeSpacer();
         this.syncTextBoxDom();
       },
-      methods: ZF_EDITOR_METHODS,
+      methods: Object.assign({}, ZF_EDITOR_METHODS, {
+        // Wrapper so the template can call this via the component instance
+        // (plain script functions like zfLoadTemplate are not reachable
+        // from Vue templates).
+        loadTemplate: function (file) { return zfLoadTemplate(file); }
+      }),
       template: "#zine-editor-template"
     };
 
@@ -3541,6 +3619,23 @@
           var m = store.model();
           if (!m) return {};
           return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
+        },
+        // Merge a decorative element's position style with its custom color
+        // (hex from the color picker) so sticky notes and stickers recolor in
+        // the reader view. Mirrors the editor and sheet components.
+        stickyStyle: function (img, base) {
+          var out = Object.assign({}, base || {});
+          if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+            out['--zf-sticky-bg'] = img.color;
+          }
+          return out;
+        },
+        stickerStyle: function (img, base) {
+          var out = Object.assign({}, base || {});
+          if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
+            out['--zf-sticker-bg'] = img.color;
+          }
+          return out;
         },
         readerTextBoxStyleFor: function (box) {
           if (!box) return {};
@@ -3977,7 +4072,7 @@
                     '</div>' +
                   '</template>' +
                   '<template v-for="box in (s.page.textBoxes || [])" :key="\'sl-tb-\' + box.id">' +
-                    '<div class="zf-textbox zf-textbox-readonly" :class="{ \'zf-stamp\': box.kind === \'stamp\' }" :style="slotTextBoxStyleFor(box, s)">' +
+                    '<div class="zf-textbox zf-textbox-readonly" :class="{ \'zf-stamp\': box.kind === \'stamp\', \'zf-panel\': box.kind === \'panel\' }" :style="slotTextBoxStyleFor(box, s)">' +
                       '<div class="zf-textbox-content" v-html="box.html"></div>' +
                     '</div>' +
                   '</template>' +
@@ -4036,6 +4131,7 @@
         app.component('zine-sheet', ZineSheet);
         app.component('zine-library', ZineLibrary);
         app.component('zine-icon-picker', window.ZineIconPicker);
+app.component('zf-error-boundary', window.ZfErrorBoundary);
         app.config.errorHandler = function (err, instance, info) {
           zfLog('VUE ERROR: ' + (err && err.message ? err.message : err) + ' | info: ' + info);
         };

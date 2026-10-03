@@ -55,7 +55,15 @@
       themeId: record.themeId || 'classic',
       modelId: record.modelId || 'mini-8',
       pages: (record.pages || []).map(function (p) {
-        return { heading: p.heading || '', body: p.body || '', image: p.image || '' };
+        // Preserve the full page object (images, textBoxes, icons, and any
+        // future fields). Only normalize the core text fields; do not
+        // rebuild the page from scratch or decorated content is lost.
+        return Object.assign({}, p, {
+          heading: p.heading || '',
+          body: p.body || '',
+          images: Array.isArray(p.images) ? p.images : [],
+          textBoxes: Array.isArray(p.textBoxes) ? p.textBoxes : []
+        });
       }),
       updatedAt: record.updatedAt || Date.now()
     };
@@ -79,8 +87,13 @@
       author: src.author,
       themeId: src.themeId,
       modelId: src.modelId,
-      pages: src.pages.map(function (p) {
-        return { heading: p.heading, body: p.body, image: p.image };
+      pages: (src.pages || []).map(function (p) {
+        // Deep-copy the full page so the duplicate carries its decorations
+        // (images, textBoxes, icons) rather than only heading/body/image.
+        var copy = Object.assign({}, p);
+        if (Array.isArray(p.images)) copy.images = p.images.map(function (el) { return Object.assign({}, el); });
+        if (Array.isArray(p.textBoxes)) copy.textBoxes = p.textBoxes.map(function (tb) { return Object.assign({}, tb); });
+        return copy;
       }),
       updatedAt: Date.now()
     };

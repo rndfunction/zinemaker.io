@@ -208,6 +208,24 @@ function zfCompressImageAsync(dataUrl, maxSide, quality, cb) {
 //   pageH     - mini-page height in inches (from the model)
 //   margin    - page margin in inches (store.marginIn)
 //   wrap      - optional boolean, true for block-mode (fills width)
+//
+// The mini-page's base font-size in px is owned by CSS (the unitless
+// --zf-page-base-px custom property on .zf-mini-page). We read it here so
+// the two never drift. Cached after the first successful read; falls back
+// to the historical 13.333 (10pt @ 96dpi) if it is unavailable.
+var ZF_PAGE_BASE_PX_CACHE = null;
+function zfPageBasePx() {
+  if (ZF_PAGE_BASE_PX_CACHE !== null) return ZF_PAGE_BASE_PX_CACHE;
+  var fallback = 13.333;
+  try {
+    var probe = document.querySelector('.zf-mini-page');
+    if (!probe) return fallback;
+    var raw = getComputedStyle(probe).getPropertyValue('--zf-page-base-px');
+    var n = parseFloat(raw);
+    if (!isNaN(n) && n > 0) ZF_PAGE_BASE_PX_CACHE = n;
+  } catch (e) {}
+  return (ZF_PAGE_BASE_PX_CACHE !== null) ? ZF_PAGE_BASE_PX_CACHE : fallback;
+}
 function zfElementStyle(el, pageW, pageH, margin, opts) {
   if (!el) return {};
   opts = opts || {};
@@ -229,9 +247,10 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
     };
     if (el.kind === "icon") {
       // Icon sizes are in em; the mini-page's font-size on screen is
-      // 13.333px * pageScale, and 10pt in print. Factor 1.4 for Phosphor's
-      // internal SVG padding so the visible glyph matches `w` in inches.
-      bs.fontSize = ((w / pageW) * 13.333 * 1.4).toFixed(4) + "em";
+      // zfPageBasePx() * pageScale, and 10pt in print. Factor 1.4 for
+      // Phosphor's internal SVG padding so the visible glyph matches `w`
+      // in inches.
+      bs.fontSize = ((w / pageW) * zfPageBasePx() * 1.4).toFixed(4) + "em";
     }
     return bs;
   }
@@ -247,7 +266,7 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
     zIndex: 100 + z
   };
   if (el.kind === "icon") {
-    style.fontSize = ((w / pageW) * 13.333 * 1.4).toFixed(4) + "em";
+    style.fontSize = ((w / pageW) * zfPageBasePx() * 1.4).toFixed(4) + "em";
     style.height = (w / pageW * 100).toFixed(4) + "%";
   } else if (typeof el.h === "number") {
     // Decorative elements (tape, scraps) carry an explicit height, so their
@@ -275,7 +294,9 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
     left: (x / pageW * 100).toFixed(4) + "%",
     top: (y / pageH * 100).toFixed(4) + "%",
     width: (w / pageW * 100).toFixed(4) + "%",
-    height: "auto",
+    // Text boxes with an explicit height (in inches) get a fixed height so
+    // framed uses like comic panels can hold a shape; others stay auto.
+    height: (typeof box.h === "number" ? (box.h / pageH * 100).toFixed(4) + "%" : "auto"),
     transform: "rotate(" + rot + "deg)",
     transformOrigin: "center center",
     fontSize: (fontSize * 100) + "%",

@@ -1,0 +1,116 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "kind": "template",
+  "templateId": "comic-panels",
+  "exported": "2026-10-03T00:00:00.000Z",
+  "title": "Comic",
+  "author": "",
+  "modelId": "mini-8",
+  "themeId": "zine-white",
+  "marginIn": 0.1,
+  "pages": [
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-01-img", "src": "https://picsum.photos/seed/zinecomic1/600/500", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-01-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 2.19, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-01-title", "kind": "", "role": "title", "html": "<b>YOUR COMIC</b>", "x": 0.1, "y": 2.5, "w": 2.55, "rot": 0, "fontSize": 1.6, "align": "center", "z": 20, "hidden": false },
+        { "id": "t-cp-01-sub", "kind": "", "role": "caption", "html": "A short comic about something true", "x": 0.15, "y": 3.4, "w": 2.45, "rot": 0, "fontSize": 0.7, "align": "center", "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-02-a", "src": "https://picsum.photos/seed/zinecomic2a/500/400", "kind": "photo", "x": 0.17, "y": 0.17, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-02-b", "src": "https://picsum.photos/seed/zinecomic2b/500/400", "kind": "photo", "x": 1.505, "y": 0.17, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-02-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-02-pb", "kind": "panel", "role": "panel", "html": "", "x": 1.435, "y": 0.1, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-02-dlg", "kind": "", "role": "dialogue", "html": "&ldquo;Wait - you mean right now?&rdquo;", "x": 0.3, "y": 1.35, "w": 1.9, "rot": 0, "fontSize": 0.72, "z": 20, "hidden": false },
+        { "id": "t-cp-02-cap", "kind": "", "role": "caption", "html": "It started, like most things, on an ordinary day.", "x": 0.12, "y": 2.15, "w": 2.51, "rot": 0, "fontSize": 0.62, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-03-a", "src": "https://picsum.photos/seed/zinecomic3a/700/400", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-03-b", "src": "https://picsum.photos/seed/zinecomic3b/500/400", "kind": "photo", "x": 0.17, "y": 1.35, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-03-c", "src": "https://picsum.photos/seed/zinecomic3c/500/400", "kind": "photo", "x": 1.505, "y": 1.35, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-03-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 0.78, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-03-pb", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 1.28, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-03-pc", "kind": "panel", "role": "panel", "html": "", "x": 1.435, "y": 1.28, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-03-dlg", "kind": "", "role": "dialogue", "html": "&ldquo;Okay. Okay. I can do this.&rdquo;", "x": 0.25, "y": 2.55, "w": 1.9, "rot": 0, "fontSize": 0.7, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-04-a", "src": "https://picsum.photos/seed/zinecomic4a/500/400", "kind": "photo", "x": 0.17, "y": 0.17, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-04-b", "src": "https://picsum.photos/seed/zinecomic4b/500/400", "kind": "photo", "x": 1.505, "y": 0.17, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-04-c", "src": "https://picsum.photos/seed/zinecomic4c/500/400", "kind": "photo", "x": 0.17, "y": 1.35, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false },
+        { "id": "i-cp-04-d", "src": "https://picsum.photos/seed/zinecomic4d/500/400", "kind": "photo", "x": 1.505, "y": 1.35, "w": 1.075, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-04-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-04-pb", "kind": "panel", "role": "panel", "html": "", "x": 1.435, "y": 0.1, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-04-pc", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 1.28, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-04-pd", "kind": "panel", "role": "panel", "html": "", "x": 1.435, "y": 1.28, "w": 1.215, "h": 1.02, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-05-a", "src": "https://picsum.photos/seed/zinecomic5a/700/400", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-05-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 0.78, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-05-cap", "kind": "", "role": "caption", "html": "That was the moment everything changed.", "x": 0.12, "y": 1.1, "w": 2.51, "rot": 0, "fontSize": 0.62, "z": 20, "hidden": false },
+        { "id": "t-cp-05-dlg", "kind": "", "role": "dialogue", "html": "&ldquo;I&rsquo;m not afraid anymore.&rdquo;", "x": 0.4, "y": 1.75, "w": 1.9, "rot": 0, "fontSize": 0.78, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-06-a", "src": "https://picsum.photos/seed/zinecomic6a/700/600", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-06-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 2.17, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-06-cap", "kind": "", "role": "caption", "html": "To be continued...", "x": 0.12, "y": 2.5, "w": 2.51, "rot": 0, "fontSize": 0.7, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-07-a", "src": "https://picsum.photos/seed/zinecomic7a/700/700", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-07-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 2.52, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-07-cap", "kind": "", "role": "caption", "html": "The end.", "x": 0.12, "y": 2.85, "w": 2.51, "rot": 0, "fontSize": 0.7, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-cp-08-a", "src": "https://picsum.photos/seed/zinecomic8a/700/500", "kind": "photo", "x": 0.17, "y": 0.17, "w": 2.41, "rot": 0, "wrap": "free", "z": 2, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-cp-08-pa", "kind": "panel", "role": "panel", "html": "", "x": 0.1, "y": 0.1, "w": 2.55, "h": 1.83, "rot": 0, "fontSize": 0.7, "z": 10, "hidden": false },
+        { "id": "t-cp-08-cta", "kind": "", "role": "body", "html": "Thanks for reading!<br>Find me at: your-handle", "x": 0.2, "y": 2.2, "w": 2.35, "rot": 0, "fontSize": 0.8, "align": "center", "z": 20, "hidden": false }
+      ]
+    }
+  ]
+}

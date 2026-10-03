@@ -63,14 +63,36 @@
     .zf2-title {
       font-family: var(--zf2-serif); font-size: 1.6rem; line-height: 1.05;
       color: var(--zf2-ink); margin: 0.1rem 0 0; letter-spacing: -0.01em;
+    }
+    /* Inline-editable masthead title: looks like the heading at rest,
+       gains a subtle field affordance on hover/focus. */
+    .zf2-title-input {
+      display: block; width: 100%; max-width: 32rem;
+      background: transparent; border: 1px solid transparent;
+      border-radius: var(--zf2-radius-sm);
+      padding: 0.1rem 0.35rem; margin-left: -0.35rem;
+      font: inherit; font-family: var(--zf2-serif);
+      cursor: text;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .zf2-title-input:hover { border-color: var(--zf2-line-strong); }
+    .zf2-title-input:focus {
+      outline: none; border-color: var(--zf2-accent);
+      background: #ffffff;
+    }
+    .zf2-title-input::placeholder { color: var(--zf2-muted); opacity: 1; }
     .zf2-meta {
       font-size: 0.78rem; color: var(--zf2-muted); margin-top: 0.15rem;
       display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
     }
     .zf2-meta .zf-save-indicator { color: var(--zf2-muted); }
-    .zf2-masthead-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; flex: 0 0 auto; }
+    .zf2-masthead-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; flex: 0 0 auto; align-items: center; }
+    /* Divider between the Library navigation action and the document
+       commands (Undo/Redo/Export/...). */
+    .zf2-masthead-sep {
+      width: 1px; align-self: stretch; min-height: 1.6rem;
+      background: var(--zf2-line-strong); margin: 0 0.25rem;
+    }
     .zf2-ghost {
       background: transparent; color: var(--zf2-ink);
       border: 2px solid var(--zf2-line-strong); border-radius: var(--zf2-radius-sm);
@@ -196,6 +218,15 @@
     .zf-btn-primary:hover { background: #e5a000; }
     .zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
     .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
+    .zf-error-boundary {
+      max-width: 480px; margin: 3rem auto; padding: 1.5rem;
+      text-align: center; border: 1px solid var(--zf-border);
+      border-radius: 8px; background: var(--zf-gray-light);
+    }
+    .zf-error-boundary h2 {
+      font-family: var(--zf-serif); font-size: 1.25rem; margin: 0 0 0.5rem;
+    }
+    .zf-error-boundary p { color: var(--zf-gray-mid); margin: 0 0 1rem; }
     .zf-error { color: var(--zf-red); font-size: 0.9rem; }
     .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
     .zf-editor { display: grid; grid-template-columns: 240px 1fr auto; gap: 1.25rem; align-items: start; }
@@ -297,9 +328,10 @@
       width: 130px; min-height: 230px;
       background: #ffffff; border: 1px solid var(--zf-border); border-radius: 4px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 0.6rem; cursor: pointer; opacity: 0.5;
+      padding: 0.6rem; cursor: pointer; opacity: 0.75;
       display: flex; flex-direction: column; gap: 0.35rem;
-      transition: opacity 0.15s ease, transform 0.15s ease;
+      transition: opacity 0.15s ease, transform 0.15s ease,
+                  box-shadow 0.15s ease, border-color 0.15s ease;
       overflow: hidden;
     }
     /* Flank the centered page (approx 414px wide) rather than the canvas
@@ -309,8 +341,13 @@
        the media query below rather than allowed to overlap the page. */
     .zf-ghost-page.zf-ghost-prev { left: calc(50% - 207px - 140px); }
     .zf-ghost-page.zf-ghost-next { right: calc(50% - 207px - 140px); }
-    .zf-ghost-page:hover { opacity: 0.8; transform: translateY(-50%) scale(1.02); }
-    .zf-ghost-page:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 3px; opacity: 0.9; }
+    .zf-ghost-page:hover {
+      opacity: 1; transform: translateY(-50%) scale(1.03);
+      border-color: var(--zf-accent, #005ea2);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.16);
+    }
+    .zf-ghost-page:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 3px; opacity: 1; }
+
     .zf-ghost-label {
       font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
       font-weight: 700; color: var(--zf-gray-mid);
@@ -589,12 +626,14 @@
        and what you print. The --zf-page-scale variable scales typography from
        physical inches to the on-screen size. */
     .zf-mini-page {
+      /* Base body font size: 10pt physical, scaled by --zf-page-scale.
+         10pt = 13.333px CSS at the standard 96dpi. Kept unitless so JS can
+         read it (see zfPageBasePx in js/util.js); CSS multiplies by 1px. */
+      --zf-page-base-px: 13.333;
       background: var(--zf-page-paper, #ffffff);
       color: var(--zf-page-ink, #1b1b1b);
       font-family: var(--zf-page-body-font, var(--zf-serif));
-      /* Base body font size: 10pt physical, scaled by --zf-page-scale.
-         10pt = 13.333px CSS. */
-      font-size: calc(13.333px * var(--zf-page-scale, 1));
+      font-size: calc(var(--zf-page-base-px) * 1px * var(--zf-page-scale, 1));
       line-height: 1.3;
       /* Margins are user-editable via --zf-page-margin (inches), scaled to
          the current on-screen size by --zf-page-scale. Default 0.1in. */
@@ -925,6 +964,18 @@
         drop-shadow(0 0 0 #ffffff)
         drop-shadow(0 0 1px #ffffff)
         drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+    }
+
+    /* ---- Comic / layout panels ---- */
+    .zf-textbox.zf-panel {
+      border: 2px solid currentColor;
+      border-radius: 2px;
+      padding: 0.35em 0.45em;
+      background: rgba(255,255,255,0.5);
+    }
+    .zf-textbox.zf-panel .zf-textbox-content {
+      text-align: left;
+      line-height: 1.35;
     }
 
     /* ---- Stamps ---- */
