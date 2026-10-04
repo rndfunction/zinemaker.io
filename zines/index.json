@@ -1,12 +1,12 @@
 {
   "specVersion": "1.0",
-  "app": "Zine Maker",
+  "app": "Zine Forge",
   "examples": [
     {
-      "id": "welcome-to-zine-maker",
-      "title": "Welcome to Zine Maker",
+      "id": "welcome-to-zine-forge",
+      "title": "Welcome to Zine Forge",
       "author": "",
-      "blurb": "A friendly little zine that teaches you how to make zines with Zine Maker.",
+      "blurb": "A friendly little zine that teaches you how to make zines with Zine Forge.",
       "file": "welcome-to-zine-forge.json"
     }
   ]

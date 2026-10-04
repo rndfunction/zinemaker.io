@@ -42,6 +42,7 @@
         { type: 'fold', axis: 'v', pos: 25 },
         { type: 'fold', axis: 'v', pos: 50 },
         { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'fold', axis: 'h', pos: 50 },
         { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
       ],
       instructions: [
@@ -75,6 +76,7 @@
         { type: 'fold', axis: 'v', pos: 25 },
         { type: 'fold', axis: 'v', pos: 50 },
         { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'fold', axis: 'h', pos: 50 },
         { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
       ],
       budget: { chars: 900, lines: 23, words: 150 },

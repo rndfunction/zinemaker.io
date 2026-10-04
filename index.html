@@ -6,6 +6,7 @@
   <title>Zine Forge - Make and share zines</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+  <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
 
   <script src="js/zine-models.js"></script>
   <script src="js/zine-themes.js"></script>
@@ -66,10 +67,10 @@
 
       <main class="zf-main">
         <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
-        <section v-show="store.view === 'editor'"><zf-error-boundary><zine-editor></zine-editor></zf-error-boundary></section>
-        <section v-show="store.view === 'reader'"><zf-error-boundary><zine-reader></zine-reader></zf-error-boundary></section>
-        <section v-show="store.view === 'sheet'"><zf-error-boundary><zine-sheet></zine-sheet></zf-error-boundary></section>
-        <section v-show="store.view === 'library'"><zf-error-boundary><zine-library></zine-library></zf-error-boundary></section>
+        <section data-zf-view="editor" v-show="store.view === 'editor'"><zf-error-boundary><zine-editor></zine-editor></zf-error-boundary></section>
+        <section data-zf-view="reader" v-show="store.view === 'reader'"><zf-error-boundary><zine-reader></zine-reader></zf-error-boundary></section>
+        <section data-zf-view="sheet" v-show="store.view === 'sheet'"><zf-error-boundary><zine-sheet></zine-sheet></zf-error-boundary></section>
+        <section data-zf-view="library" v-show="store.view === 'library'"><zf-error-boundary><zine-library></zine-library></zf-error-boundary></section>
       </main>
 
       <div class="zf-modal-backdrop" v-if="store.newZineOpen" @click.self="cancelNewZine">
@@ -360,7 +361,27 @@
         <zine-icon-picker
           :open="iconPickerOpen"
           @select="addIcon"
-          @close="closeIconPicker"></zine-icon-picker>
+          @close="closeIconPicker"></zine-icon-picker>        <div class="zf-modal-backdrop" v-if="qrModalOpen" @click.self="closeQrModal">
+          <div class="zf-modal" role="dialog" aria-label="Add a QR code">
+            <div class="zf-modal-header">
+              <h2>Add a QR code</h2>
+              <button class="zf-modal-close" @click="closeQrModal" aria-label="Close">&times;</button>
+            </div>
+            <div class="zf-field">
+              <label class="zf-label" for="zf-qr-url">Text or link</label>
+              <input id="zf-qr-url" class="zf-input" v-model="qrUrl" type="text"
+                     placeholder="https://example.com" @keydown.enter="generateQr" />
+            </div>
+            <div class="zf-muted" style="font-size:0.8rem;margin-bottom:1rem;">
+              Usually a link, but any short text works - a phone number, a note, or a password.
+              We'll make it into a scannable QR code image you can place on the page.
+            </div>
+            <div class="zf-header-actions" style="justify-content:flex-end;">
+              <button class="zf-btn" style="border-color:var(--zf-border);" @click="closeQrModal">Cancel</button>
+              <button class="zf-btn zf-btn-primary" @click="generateQr">Add QR code</button>
+            </div>
+          </div>
+        </div>
 
 
       </div>
@@ -400,6 +421,9 @@
             <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
             <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
           </label>
+          <button type="button" class="zf-rail-btn" @click="openQrModal" title="Add a QR code from a link" aria-label="Add QR code">
+            <iconify-icon icon="ph:qr-code" aria-hidden="true"></iconify-icon>
+          </button>
           <button type="button" class="zf-rail-btn" @click="addTextBox" title="Add a text box" aria-label="Add text box">
             <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
           </button>
@@ -2220,7 +2244,7 @@ var AppShell = {
           if (this.active) this.active.activeImageId = img.id;
           // Focus the wrapper so Delete/Backspace reach the element handler
           // instead of being swallowed by a contenteditable elsewhere.
-          try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus(); } catch (e) {}
+          try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
           // Re-inject flow spacers so the selection outline moves.
           var self = this;
           this.$nextTick(function () { self.injectShapeSpacer(); });
@@ -2546,6 +2570,72 @@ var AppShell = {
         var self = this;
         this.$nextTick(function () { self.injectShapeSpacer(); });
       },
+      // -------- QR codes --------
+      openQrModal: function () {
+        this.qrUrl = '';
+        this.qrModalOpen = true;
+        var self = this;
+        this.$nextTick(function () {
+          var el = document.getElementById('zf-qr-url');
+          if (el) el.focus();
+        });
+      },
+      closeQrModal: function () {
+        this.qrModalOpen = false;
+      },
+      generateQr: function () {
+        var url = (this.qrUrl || '').trim();
+        if (!url) { store.status = 'Enter a link first.'; return; }
+        if (!window.qrcode) { store.status = 'QR library failed to load.'; return; }
+        var page = this.active;
+        if (!page) return;
+        if (!Array.isArray(page.images)) page.images = [];
+        try {
+          var qr = window.qrcode(0, 'M');
+          qr.addData(url);
+          qr.make();
+          var count = qr.getModuleCount();
+          var scale = 8;
+          var pad = 2;
+          var size = (count + pad * 2) * scale;
+          var canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, size, size);
+          ctx.fillStyle = '#000000';
+          for (var r = 0; r < count; r++) {
+            for (var c = 0; c < count; c++) {
+              if (qr.isDark(r, c)) {
+                ctx.fillRect((c + pad) * scale, (r + pad) * scale, scale, scale);
+              }
+            }
+          }
+          var dataUrl = canvas.toDataURL('image/png');
+          var img = {
+            id: zfNewImageId(),
+            src: dataUrl,
+            kind: 'photo',
+            x: 0.3,
+            y: 0.3,
+            w: 0.9,
+            rot: 0,
+            wrap: 'free',
+            z: 0
+          };
+          page.images.push(img);
+          page.activeImageId = img.id;
+          page.activeTextBoxId = null;
+          this.qrModalOpen = false;
+          store.status = 'QR code added.';
+          var self = this;
+          setTimeout(function () { if (store.status === 'QR code added.') store.status = ''; }, 2000);
+          this.$nextTick(function () { self.injectShapeSpacer(); });
+        } catch (e) {
+          store.status = 'Could not make QR code: ' + (e && e.message ? e.message : e);
+        }
+      },
       addTextBox: function () {
         var page = this.active;
         if (!page) return;
@@ -2797,7 +2887,7 @@ var AppShell = {
         this.selectTextBox(box);
         var self = this;
         if (evt.currentTarget && evt.currentTarget.focus) {
-          try { evt.currentTarget.focus(); } catch (e) {}
+          try { evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
         }
         this.imageDrag = {
           imgId: box.id,
@@ -2881,6 +2971,16 @@ var AppShell = {
           if (!el) return;
           var page = self.active;
           if (!page || !Array.isArray(page.images)) return;
+          // If this page has no flow-wrapped images there is nothing to inject.
+          // Bail BEFORE stripping anything: stripping and re-adding spacers on
+          // every re-render (e.g. selecting an element) momentarily changed the
+          // body's DOM height, which shifted the centered page - a visible
+          // "jump" when the user merely clicked something.
+          var hasFlow = false;
+          for (var fi = 0; fi < page.images.length; fi++) {
+            if (page.images[fi] && page.images[fi].wrap === "flow") { hasFlow = true; break; }
+          }
+          if (!hasFlow) return;
           // Strip every flow injection (spacer, image, wrapper) so removed or
           // wrapped-away images can't leave orphan wrappers behind.
           var stale = el.querySelectorAll("[data-zf-spacer=\"1\"], [data-zf-flow-img=\"1\"], [data-zf-flow-wrap=\"1\"]");
@@ -3135,6 +3235,8 @@ var AppShell = {
           debugFlow: false,
           iconPickerOpen: false,
           iconPickerQuery: '',
+          qrModalOpen: false,
+          qrUrl: '',
           inspectorOpen: false,
           layerDragIndex: -1,
           layerDropIndex: -1,
@@ -3978,20 +4080,58 @@ var AppShell = {
           };
         },
         printSheet: function () { window.print(); },
+        _zfJumpProbe: function () {
+          var self = this;
+          document.addEventListener('click', function () {
+            setTimeout(function () {
+              var page = document.querySelector('.zf-canvas-col .zf-mini-page');
+              var body = document.querySelector('.zf-mini-body.zf-editable');
+              function geo(el, name) {
+                if (!el) return name + '=none';
+                var r = el.getBoundingClientRect();
+                return name + '{t=' + Math.round(r.top) + ',h=' + Math.round(r.height) + ',st=' + el.scrollTop + ',sh=' + el.scrollHeight + '}';
+              }
+              try { console.log('[ZF JUMP] page' + geo(page, '') + ' body' + geo(body, '') + ' winScroll=' + window.scrollY); } catch (e) {}
+            }, 60);
+          }, true);
+        },
         installPaperCss: function () {
-          var id = 'zf-paper-css';
-          var el = document.getElementById(id);
-          if (!el) {
-            el = document.createElement('style');
-            el.id = id;
-            document.head.appendChild(el);
-          }
-          el.textContent = this.paperCss;
+          try {
+            var id = 'zf-paper-css';
+            var el = document.getElementById(id);
+            if (!el) {
+              el = document.createElement('style');
+              el.id = id;
+              document.head.appendChild(el);
+            }
+            // Never overwrite a good @page rule with an empty value. A re-render
+            // can momentarily evaluate paperCss to '' (e.g. model not ready yet);
+            // writing that would strip the print page size and blank the print.
+            var css = this.paperCss;
+            if (css) el.textContent = css;
+          } catch (e) {}
         }
       },
       mounted: function () {
         this.installPaperCss();
         this.sheetInjectFlows();
+        // Re-assert the print page size and flow injections at the moment of
+        // every print. Without this, a second print can be blank because the
+        // DOM/style state left over from the first print is not re-applied.
+        var self = this;
+        this._onBeforePrint = function () {
+          try {
+            self.installPaperCss();
+            self.sheetInjectFlows();
+          } catch (e) {}
+        };
+        window.addEventListener('beforeprint', this._onBeforePrint);
+      },
+      beforeUnmount: function () {
+        if (this._onBeforePrint) {
+          window.removeEventListener('beforeprint', this._onBeforePrint);
+          this._onBeforePrint = null;
+        }
       },
       updated: function () {
         this.installPaperCss();

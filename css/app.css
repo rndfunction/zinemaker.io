@@ -1364,12 +1364,14 @@
          physical center of the paper. */
       .zf-sheet-view, .zf-sheet, .zf-slot { margin: 0 !important; padding: 0 !important; }
       body > *:not(#app) { display: none !important; }
-      #app > div > header,
-      #app .zf-main > div:not(:has(.zf-sheet-view)),
-      #app .zf-main > section:not(:has(.zf-sheet-view)),
-      #app .zf-main > section > *:not(.zf-sheet-view) {
-        display: none !important;
-      }
+      /* Hide every view section except the sheet, which prints. Uses the
+         data-zf-view attribute so it does not depend on :has() or on how
+         deeply the sheet view is nested. */
+      #app .zf-main > section[data-zf-view]:not([data-zf-view="sheet"]) { display: none !important; }
+      #app .zf-main > section[data-zf-view="sheet"] { display: block !important; }
+      #app .zf-main > section[data-zf-view="sheet"] > * { display: block !important; }
+      /* Hide the editor/reader chrome that lives outside the sheet section. */
+      #app > div > header { display: none !important; }
       /* Show only the active sheet view */
       .zf-sheet-side + .zf-sheet-side { margin-top: 1.5rem; }
     .zf-sheet-side-label {
