@@ -86,6 +86,12 @@
               <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
             </select>
           </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-new-template">Template</label>
+            <select id="zf-new-template" class="zf-input" v-model="store.pendingTemplateId">
+              <option v-for="t in store.newZineTemplates" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
           <div class="zf-muted" style="font-size:0.8rem;margin-bottom:1rem;">
             This replaces your current zine with blank pages in the chosen format.
           </div>
@@ -149,7 +155,7 @@
         <div class="zf-muted" v-if="store.author">by {{ store.author }}</div>
       </div>
       <article class="zf-mini-page" v-if="page" :style="Object.assign({}, readerThemeStyle, readerPageStyle)">
-        <h2 class="zf-mini-heading" v-if="page.heading">{{ page.heading }}</h2>
+
         <template v-for="img in (page.images || [])" :key="'r-blk-' + img.id">
           <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
                class="zf-mini-image zf-block-image" :src="img.src" alt="Page illustration"
@@ -287,7 +293,7 @@
             <template v-for="g in safeGuides" :key="g.key">
               <div class="zf-mini-safe-guide" :style="g.style"></div>
             </template>
-            <input class="zf-mini-heading" v-model="active.heading" placeholder="Page heading" maxlength="80" />
+
             <template v-for="img in (active.images || [])" :key="'blk-' + img.id">
               <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
                    class="zf-mini-image zf-block-image"
@@ -310,7 +316,7 @@
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel' }]"
+                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                    @mousedown="onTextBoxMouseDown($event, box)"
@@ -334,7 +340,7 @@
               <div v-if="(img.wrap === 'free' || !img.wrap) && !img.hidden"
                    class="zf-img-wrap"
                    tabindex="0"
-                   :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id }"
+                   :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
                    @mousedown="onImageMouseDownItem($event, img)"
                    @click.stop="selectImage(img)"
@@ -427,6 +433,11 @@
             <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
             <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
           </label>
+          <label class="zf-rail-btn" title="Add a full-page photo (fills the page)" aria-label="Add full-page photo">
+            <iconify-icon icon="ph:image-square" aria-hidden="true"></iconify-icon>
+            <input :key="'fb' + fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChangeFullBleed" />
+          </label>
+          <input ref="replaceInput" type="file" accept="image/*" style="display:none;" @change="onReplaceImageChange" />
           <button type="button" class="zf-rail-btn" @click="openQrModal" title="Add a QR code from a link" aria-label="Add QR code">
             <iconify-icon icon="ph:qr-code" aria-hidden="true"></iconify-icon>
           </button>
@@ -465,7 +476,6 @@
           <button type="button" class="zf-rail-btn" @click="store.setView('sheet')" title="Print this zine" aria-label="Print this zine">
             <iconify-icon icon="ph:printer" aria-hidden="true"></iconify-icon>
           </button>
-
         </div>
       </aside>
 
@@ -661,7 +671,12 @@
         var page = {
           id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
           heading: p.heading || '',
-          body: p.body || '',
+          // Sanitize stored HTML on the way IN so no downstream view
+          // (reader / sheet / library thumb) can render script, event
+          // handlers, or other active content from an imported file,
+          // shared link, template, or example. zfSanitizeHtml is an
+          // allowlist walker defined in /js/util.js.
+          body: zfSanitizeHtml(p.body || ''),
           image: p.image || '',
           imageX: typeof p.imageX === 'number' ? p.imageX : 0,
           imageY: typeof p.imageY === 'number' ? p.imageY : 0,
@@ -695,6 +710,7 @@
             wrap: im.wrap || 'free',
             z: typeof im.z === 'number' ? im.z : 0,
             color: im.color || '',
+            placeholder: !!im.placeholder,
             hidden: !!im.hidden
           };
         });
@@ -703,7 +719,10 @@
             id: tb.id || ('t-' + Math.random().toString(36).slice(2, 8)),
             kind: tb.kind || '',
             role: tb.role || '',
-            html: tb.html || '',
+            // Sanitize text-box HTML on ingress, same rationale as the
+            // page body above. Prevents stored XSS from imported files,
+            // shared links, templates, and examples.
+            html: zfSanitizeHtml(tb.html || ''),
             x: typeof tb.x === 'number' ? tb.x : 0,
             y: typeof tb.y === 'number' ? tb.y : 0,
             w: typeof tb.w === 'number' ? tb.w : 1.8,
@@ -714,6 +733,7 @@
             align: tb.align || '',
             z: typeof tb.z === 'number' ? tb.z : 0,
             color: tb.color || '',
+            overlay: !!tb.overlay,
             hidden: !!tb.hidden
           };
         }) : [];
@@ -1339,6 +1359,15 @@
       settingsOpen: false,
       newZineOpen: false,
       pendingModelId: '',
+      pendingTemplateId: 'standard',
+      // Templates offered in the New Zine modal. "standard" is the default
+      // (blank pages in the chosen format); others load a bundled template.
+      // Only templates listed here are user-visible; adding one is a matter
+      // of adding an entry (file is relative to /templates/).
+      newZineTemplates: [
+        { id: 'standard', label: 'Standard (blank)' },
+        { id: 'photo-zine', label: 'Photo zine', file: 'photo-zine.json' }
+      ],
       modelId: (zfSaved && zfSaved.modelId) ? zfSaved.modelId : 'mini-8',
       themeId: (zfSaved && zfSaved.themeId) ? zfSaved.themeId : 'classic',
       currentZineId: (zfSaved && zfSaved.currentZineId) ? zfSaved.currentZineId : null,
@@ -1387,7 +1416,30 @@
         var idx = this.pages.findIndex(function (p) { return p.id === id; });
         if (idx < 0) return;
         var s = this.pages[idx];
-        var c = { id: 'p' + Math.random().toString(36).slice(2, 9), heading: s.heading, body: s.body, image: s.image };
+        // Deep-copy the whole page so the duplicate carries its decorations
+        // (images, icons, tape, stickers, text boxes) instead of only the
+        // legacy heading/body/image fields. Cherry-picking fields previously
+        // dropped `kind` and every placed element, which made duplicated
+        // decorated pages come out blank except for body text. Mirrors the
+        // deep-copy approach used by duplicateSelectedElement.
+        var c = JSON.parse(JSON.stringify(s));
+        c.id = 'p' + Math.random().toString(36).slice(2, 9);
+        // Give nested element ids fresh values so the copy cannot collide
+        // with (or be selected as) the original's elements.
+        if (Array.isArray(c.images)) {
+          c.images = c.images.map(function (im) {
+            im.id = zfNewImageId();
+            return im;
+          });
+        }
+        if (Array.isArray(c.textBoxes)) {
+          c.textBoxes = c.textBoxes.map(function (tb) {
+            tb.id = zfNewTextBoxId();
+            return tb;
+          });
+        }
+        c.activeImageId = null;
+        c.activeTextBoxId = null;
         this.pages.splice(idx + 1, 0, c);
         this.activePageId = c.id;
       },
@@ -1689,6 +1741,17 @@ var AppShell = {
         confirmNewZine: function () {
           store.newZineOpen = false;
           store.newZineInModel(store.pendingModelId);
+          // If a template other than "standard" was chosen, load it. Loading
+          // saves the just-created blank zine to the library first and then
+          // fills it from the template file (see zfLoadTemplate).
+          var chosen = null;
+          var list = store.newZineTemplates || [];
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].id === store.pendingTemplateId) { chosen = list[i]; break; }
+          }
+          if (chosen && chosen.file && window.zfLoadTemplate) {
+            window.zfLoadTemplate(chosen.file);
+          }
         },
         cancelNewZine: function () {
           store.newZineOpen = false;
@@ -1851,11 +1914,17 @@ var AppShell = {
           h: 0.34,
           rot: -4,
           wrap: 'free',
+          // Place new tape on top of everything already on the page so it
+          // is immediately visible and grabbable, matching bringToFront's
+          // convention of max z + 1 across images and text boxes combined.
           z: (function () {
             var maxZ = 0;
-            var all = this.pageElements ? this.pageElements(page) : page.images;
-            return 0;
-          }).call(this),
+            var all = (page.images || []).concat(page.textBoxes || []);
+            for (var zi = 0; zi < all.length; zi++) {
+              if (typeof all[zi].z === 'number' && all[zi].z > maxZ) maxZ = all[zi].z;
+            }
+            return maxZ + 1;
+          })(),
           color: 'beige'
         };
         page.images.push(tape);
@@ -1896,7 +1965,18 @@ var AppShell = {
           w: 1.6,
           rot: -8,
           fontSize: 1.0,
-          z: (typeof page.textBoxes.length === 'number') ? page.textBoxes.length * 10 : 0,
+          // Same convention as addTape: new stamp sits on top of the page's
+          // existing elements so it is visible and selectable immediately.
+          // (The old value keyed off textBoxes.length, which made a stamp's
+          // stacking depend only on how many boxes happened to exist.)
+          z: (function () {
+            var maxZ = 0;
+            var all = (page.images || []).concat(page.textBoxes || []);
+            for (var zi = 0; zi < all.length; zi++) {
+              if (typeof all[zi].z === 'number' && all[zi].z > maxZ) maxZ = all[zi].z;
+            }
+            return maxZ + 1;
+          })(),
           color: '#c8102e'
         };
         page.textBoxes.push(stamp);
@@ -2231,6 +2311,69 @@ var AppShell = {
         var hasTextBoxes = Array.isArray(page.textBoxes) && page.textBoxes.length > 0;
         return !(hasHeading || hasBody || hasImages || hasTextBoxes);
       },
+      // Add a photo sized to cover the whole page (full bleed). The image is
+      // enlarged until it fills both page dimensions, then centered with a
+      // slight overhang so the printer trims the excess. Reuses the same file
+      // pipeline and compression as onImageChange.
+      onImageChangeFullBleed: function (evt) {
+        var file = evt.target.files && evt.target.files[0];
+        if (!file) return;
+        if (!/^image\//.test(file.type)) { store.status = "Please pick an image file."; return; }
+        if (file.size > 8 * 1024 * 1024) { store.status = "Image is over 8 MB."; return; }
+        var fr = new FileReader();
+        var self = this;
+        fr.onload = function () {
+          // Re-fetch the active page at push time (below), not here, so a
+          // page switch during image decode does not drop the photo onto the
+          // page that was active when the file was chosen.
+          var page = store.activePage();
+          if (page && !Array.isArray(page.images)) page.images = [];
+          var m = self.activeModel;
+          var pw = (m && m.page && m.page.width) ? m.page.width : 2.75;
+          var ph = (m && m.page && m.page.height) ? m.page.height : 4.25;
+          var bleed = 0.25;
+          var coverW = pw + bleed * 2;
+          var coverH = ph + bleed * 2;
+          var img = {
+            id: zfNewImageId(),
+            src: fr.result,
+            kind: 'photo',
+            x: -bleed,
+            y: -bleed,
+            w: coverW,
+            rot: 0,
+            wrap: 'free',
+            z: 0
+          };
+          // Enlarge so the image covers BOTH page dimensions regardless of
+          // aspect (like background-size: cover). The wider/taller overflow is
+          // centered and trimmed by the printer. Works for wide photos too:
+          // pick the larger of the width-to-cover and height-to-cover scales.
+          zfGetImageSize(fr.result, function (size) {
+            if (size && size.w > 0 && size.h > 0) {
+              var aspect = size.w / size.h;
+              var wForWidth = coverW;               // width if fit to width
+              var wForHeight = coverH * aspect;     // width if fit to height
+              var w = Math.max(wForWidth, wForHeight);
+              var h = w / aspect;
+              img.w = w;
+              img.x = -bleed - (w - coverW) / 2;    // center horizontally
+              img.y = -bleed - (h - coverH) / 2;    // center vertically
+            }
+            zfCompressAndPlace(fr.result, 1600, 0.82, function (out) {
+              img.src = out;
+            });
+            // Push to whatever page is active NOW, not the one captured when
+            // the file dialog opened.
+            var livePage = store.activePage();
+            if (!Array.isArray(livePage.images)) livePage.images = [];
+            livePage.images.push(img);
+            livePage.activeImageId = img.id;
+            self.fileInputKey++;
+          });
+        };
+        fr.readAsDataURL(file);
+      },
       onImageChange: function (evt) {
         var file = evt.target.files && evt.target.files[0];
         if (!file) return;
@@ -2254,8 +2397,12 @@ var AppShell = {
           zfCompressAndPlace(fr.result, 800, 0.8, function (out) {
             img.src = out;
           });
-          page.images.push(img);
-          page.activeImageId = img.id;
+          // Push to the currently active page, not the one captured at file
+          // selection, so a page switch mid-decode does not misplace the image.
+          var livePage2 = store.activePage();
+          if (!Array.isArray(livePage2.images)) livePage2.images = [];
+          livePage2.images.push(img);
+          livePage2.activeImageId = img.id;
           self.fileInputKey++;
         };
         fr.readAsDataURL(file);
@@ -2280,6 +2427,15 @@ var AppShell = {
         onImageMouseDownItem: function (evt, img) {
           if (!img) return;
           evt.preventDefault();
+          // Placeholder slots (from templates): clicking one asks for a
+          // replacement photo instead of starting a drag. The new image
+          // inherits the slot's geometry; only src changes.
+          if (img.placeholder) {
+            this._replaceTargetId = img.id;
+            var ri = this.$refs.replaceInput;
+            if (ri) ri.click();
+            return;
+          }
           if (this.active) this.active.activeImageId = img.id;
           // Focus the wrapper so Delete/Backspace reach the element handler
           // instead of being swallowed by a contenteditable elsewhere.
@@ -2578,6 +2734,60 @@ var AppShell = {
         if (!page || !img) return;
         page.activeImageId = img.id;
         page.activeTextBoxId = null;
+      },
+      // Replace the image inside a placeholder slot in place: keep the
+      // element's position/size/rotation/etc., swap only src, and drop the
+      // placeholder flag so the "Replace image" affordance disappears.
+      onReplaceImageChange: function (evt) {
+        var file = evt.target.files && evt.target.files[0];
+        var self = this;
+        var targetId = this._replaceTargetId;
+        this._replaceTargetId = null;
+        if (evt.target) evt.target.value = '';
+        if (!file || !targetId) return;
+        if (!/^image\//.test(file.type)) { store.status = 'Please pick an image file.'; return; }
+        if (file.size > 8 * 1024 * 1024) { store.status = 'Image is over 8 MB.'; return; }
+        var page = this.active;
+        if (!page || !Array.isArray(page.images)) return;
+        var target = null;
+        for (var i = 0; i < page.images.length; i++) {
+          if (page.images[i].id === targetId) { target = page.images[i]; break; }
+        }
+        if (!target) return;
+        var fr = new FileReader();
+        fr.onload = function () {
+          var dataUrl = fr.result;
+          // If this slot is a full-bleed slot (it overflows the page), re-fit
+          // the new photo to cover the page so a different aspect ratio still
+          // fills edge to edge. Ordinary slots keep their geometry untouched,
+          // so a small multi-photo slot stays a small slot.
+          var m = self.activeModel;
+          var pw = (m && m.page && m.page.width) ? m.page.width : 2.75;
+          var ph = (m && m.page && m.page.height) ? m.page.height : 4.25;
+          var isBleed = (typeof target.x === 'number' && target.x < 0) ||
+                        (typeof target.w === 'number' && target.w > pw);
+          zfGetImageSize(dataUrl, function (size) {
+            if (isBleed && size && size.w > 0 && size.h > 0) {
+              var bleed = 0.25;
+              var coverW = pw + bleed * 2;
+              var coverH = ph + bleed * 2;
+              var aspect = size.w / size.h;
+              var w = Math.max(coverW, coverH * aspect);
+              var h = w / aspect;
+              target.w = w;
+              target.x = -bleed - (w - coverW) / 2;
+              target.y = -bleed - (h - coverH) / 2;
+              target.rot = 0;
+            }
+            zfCompressAndPlace(dataUrl, 1600, 0.82, function (out) {
+              target.src = out;
+              target.placeholder = false;
+              page.activeImageId = target.id;
+              self.fileInputKey++;
+            });
+          });
+        };
+        fr.readAsDataURL(file);
       },
       // -------- Icon picker --------
       openIconPicker: function () {
@@ -3832,7 +4042,20 @@ var AppShell = {
           }
           var stale = el.querySelectorAll("[data-zf-spacer=\"1\"], [data-zf-flow-img=\"1\"]");
           for (var i = 0; i < stale.length; i++) stale[i].remove();
-          if (page.imageWrap !== "flow" || !page.image) return;
+          // Support both the current multi-image model (page.images[] entries
+          // with wrap === 'flow') and the legacy single-image fields
+          // (page.image + page.imageWrap). The editor writes flow state to
+          // page.images[].wrap, so keying only off the legacy fields meant
+          // flow-wrap never fired in the reader for new-style pages.
+          var flowImgs = [];
+          if (Array.isArray(page.images) && page.images.length) {
+            for (var fi = 0; fi < page.images.length; fi++) {
+              if (page.images[fi].wrap === 'flow') flowImgs.push(page.images[fi]);
+            }
+          } else if (page.image && page.imageWrap === 'flow') {
+            flowImgs.push({ src: page.image, x: page.imageX || 0, y: page.imageY || 0, w: page.imageW || 1.5, rot: page.imageRot || 0 });
+          }
+          if (!flowImgs.length) return;
           var m = store.model();
           if (!m) return;
           var longSide = Math.max(m.page.width, m.page.height);
@@ -3840,7 +4063,7 @@ var AppShell = {
           var bodyWIn = rect.width / pxPerIn;
           var bodyHIn = rect.height / pxPerIn;
           zfLog("reader inject: firing for page " + (self.currentIndex + 1) + " w=" + Math.round(rect.width) + " h=" + Math.round(rect.height));
-          zfInjectFlow(el, page, pxPerIn, bodyWIn, bodyHIn, { draggable: false });
+          zfInjectMergedFlow(el, flowImgs, pxPerIn, bodyWIn, bodyHIn, { draggable: false });
         },
         _schedReaderRetry: function (attempt) {
           var self = this;
@@ -4240,7 +4463,7 @@ var AppShell = {
               '<div class="zf-mini-page zf-slot-rot" :style="slotMiniPageStyle(s)">' +
                 '<span v-if="showPageNumbers && s.pageNum > 1" class="zf-slot-page-num">{{ s.pageNum - 1 }}</span>' +
                 '<template v-if="!s.isEmpty">' +
-                  '<h3 class="zf-mini-heading" v-if="s.page.heading">{{ s.page.heading }}</h3>' +
+
                   '<template v-for="img in (s.page.images || [])" :key="\'sl-blk-\' + img.id">' +
                     '<img v-if="img.wrap === \'block\' && img.kind !== \'icon\'" ' +
                       'class="zf-mini-image zf-block-image" :src="img.src" alt="" ' +
@@ -4305,12 +4528,22 @@ var AppShell = {
       try {
         var parsed = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
         if (!parsed || !Array.isArray(parsed.p)) return;
+        // Save the current work before a shared link replaces it. Without
+        // this, clicking a #z= link mid-edit could discard up to one autosave
+        // interval (1.5s) of changes. saveDraft is cheap and idempotent.
+        try { store.saveDraft(); } catch (eSave) {}
         store.title = parsed.t || 'Untitled Zine';
         store.author = parsed.a || '';
-        store.pages = parsed.p.map(function (p, i) {
-          return { id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7), heading: p.h || '', body: p.b || '', image: p.i || '' };
+        // Translate the compact share payload ({h,b,i}) into the rich page
+        // format and route it through zfBuildPagesFromData, the same choke
+        // point used by import/template/example loading. That applies HTML
+        // sanitization (closing a stored-XSS hole in shared links) and runs
+        // page migration, so a shared heading becomes a title text box and
+        // the images/textBoxes arrays exist.
+        var sharedPages = parsed.p.map(function (p) {
+          return { heading: p.h || '', body: p.b || '', image: p.i || '' };
         });
-        if (!store.pages.length) store.pages = [zfEmptyPage()];
+        store.pages = zfBuildPagesFromData(sharedPages);
         store.activePageId = store.pages[0].id;
         store.view = 'reader';
       } catch (e) { zfLog('bad share link: ' + e.message); }
@@ -4362,8 +4595,16 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         zfLog('MOUNT ERROR: ' + (e && e.message ? e.message : String(e)));
         zfLog('STACK: ' + (e && e.stack ? e.stack : '(no stack)'));
         try {
-          document.getElementById('app').innerHTML =
-            '<div class="zf-empty" style="margin:2rem;">Boot failed: ' + (e && e.message ? e.message : String(e)) + '</div>';
+          // Build the message with textContent so an error string can never
+          // inject markup. (The innerHTML path would have executed any tags
+          // carried in e.message.)
+          var appEl = document.getElementById('app');
+          appEl.innerHTML = '';
+          var box = document.createElement('div');
+          box.className = 'zf-empty';
+          box.style.margin = '2rem';
+          box.textContent = 'Boot failed: ' + (e && e.message ? e.message : String(e));
+          appEl.appendChild(box);
         } catch (e2) {}
       }
       loadSharedZineFromHash();
@@ -4466,6 +4707,14 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         modelId: store.modelId,
         themeId: store.themeId,
         marginIn: store.marginIn,
+        // Include the remaining page-setup fields so undo covers the whole
+        // "settings" surface, not just margin. Previously margin was undoable
+        // while printer-safety and the fold/cut toggles were not, which was
+        // surprising given they live in the same panel.
+        printerSafetyIn: store.printerSafetyIn,
+        safeEdgeIn: store.safeEdgeIn,
+        showFoldLines: store.showFoldLines,
+        showCutLines: store.showCutLines,
         pages: JSON.parse(JSON.stringify(store.pages))
       };
     }
@@ -4477,6 +4726,10 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
       store.modelId = snap.modelId;
       store.themeId = snap.themeId;
       store.marginIn = snap.marginIn;
+      if (typeof snap.printerSafetyIn === 'number') store.printerSafetyIn = snap.printerSafetyIn;
+      if (typeof snap.safeEdgeIn === 'number') store.safeEdgeIn = snap.safeEdgeIn;
+      if (typeof snap.showFoldLines === 'boolean') store.showFoldLines = snap.showFoldLines;
+      if (typeof snap.showCutLines === 'boolean') store.showCutLines = snap.showCutLines;
       store.pages = snap.pages.map(function (p) {
         // Ensure optional arrays exist.
         if (!Array.isArray(p.images)) p.images = [];

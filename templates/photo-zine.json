@@ -1,0 +1,95 @@
+{
+  "specVersion": "1.0",
+  "app": "Zine Forge",
+  "kind": "template",
+  "templateId": "photo-zine",
+  "exported": "2026-10-04T00:00:00.000Z",
+  "title": "Photo zine",
+  "author": "",
+  "modelId": "mini-8",
+  "themeId": "classic",
+  "marginIn": 0.1,
+  "pages": [
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-01-img", "src": "https://picsum.photos/seed/photozine1/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-01-title", "kind": "", "role": "title", "html": "<b>PHOTO ZINE</b>", "x": 0.3, "y": 3.1, "w": 2.15, "rot": 0, "fontSize": 1.5, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false },
+        { "id": "t-pz-01-sub", "kind": "", "role": "caption", "html": "by Your Name", "x": 0.3, "y": 3.55, "w": 2.15, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-02-img", "src": "https://picsum.photos/seed/photozine2/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-02-cap", "kind": "", "role": "caption", "html": "A caption for this photo goes here.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-03-img", "src": "https://picsum.photos/seed/photozine3/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-03-cap", "kind": "", "role": "caption", "html": "Another moment, another caption.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-04-img", "src": "https://picsum.photos/seed/photozine4/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-04-cap", "kind": "", "role": "caption", "html": "Photos tell the story; the words fill the gaps.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-05-img", "src": "https://picsum.photos/seed/photozine5/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-05-cap", "kind": "", "role": "caption", "html": "Replace the sample photos with your own.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-06-img", "src": "https://picsum.photos/seed/photozine6/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-06-cap", "kind": "", "role": "caption", "html": "Drag to reposition, resize from the corner.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-07-img", "src": "https://picsum.photos/seed/photozine7/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-07-cap", "kind": "", "role": "caption", "html": "Keep it simple: one image, a few words.", "x": 0.25, "y": 3.3, "w": 2.25, "rot": 0, "fontSize": 0.7, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    },
+    {
+      "heading": "",
+      "body": "",
+      "images": [
+        { "id": "i-pz-08-img", "src": "https://picsum.photos/seed/photozine8/600/900", "kind": "photo", "x": -0.23, "y": -0.23, "w": 3.33, "rot": 0, "wrap": "free", "z": 5, "placeholder": true, "hidden": false }
+      ],
+      "textBoxes": [
+        { "id": "t-pz-08-cta", "kind": "", "role": "body", "html": "The end.<br>Find more at: your-handle", "x": 0.3, "y": 3.2, "w": 2.15, "rot": 0, "fontSize": 0.75, "align": "center", "color": "#ffffff", "overlay": true, "z": 20, "hidden": false }
+      ]
+    }
+  ]
+}

@@ -58,6 +58,25 @@ function zfMigratePage(page) {
   for (var ii = 0; ii < page.images.length; ii++) {
     if (!page.images[ii].kind) page.images[ii].kind = 'photo';
   }
+  // Migrate a legacy fixed page heading into a placed, movable title text box.
+  // Runs once per page (guarded by _headingMigrated). The title becomes a
+  // free element the user can drag, resize, or remove like any other box.
+  if (page.heading && !page._headingMigrated) {
+    page.textBoxes.push({
+      id: zfNewTextBoxId(),
+      kind: '',
+      role: 'title',
+      html: page.heading,
+      x: 0.1,
+      y: 0.1,
+      w: 2.55,
+      rot: 0,
+      fontSize: 1.6,
+      z: 10,
+      hidden: false
+    });
+    page._headingMigrated = true;
+  }
   return page;
 }
 function zfMigrateAllPages(pages) {

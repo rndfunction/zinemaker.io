@@ -13,7 +13,10 @@ window.ZineIconPicker = {
       results: [],
       loading: false,
       error: '',
-      debounceTimer: null
+      debounceTimer: null,
+      // Monotonic token guarding against out-of-order search responses.
+      // Must start at a real number so the first ++ yields a usable token.
+      _searchToken: 0
     };
   },
   computed: {
@@ -59,8 +62,13 @@ window.ZineIconPicker = {
       var self = this;
       this.loading = true;
       this.error = '';
+      // Request token: if the user types again before this response lands,
+      // _searchToken advances and this (stale) response is ignored. Prevents
+      // a slow earlier query from overwriting a newer query's results.
+      var token = ++this._searchToken;
       var url = 'https://api.iconify.design/search?query=' + encodeURIComponent(q) + '&limit=64';
       fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+        if (token !== self._searchToken) return;
         self.loading = false;
         if (data && Array.isArray(data.icons)) {
           self.results = data.icons;
@@ -68,6 +76,7 @@ window.ZineIconPicker = {
           self.results = [];
         }
       }).catch(function (err) {
+        if (token !== self._searchToken) return;
         self.loading = false;
         self.error = 'Could not reach the icon search service.';
         console.warn('Iconify search failed', err);

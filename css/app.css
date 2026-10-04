@@ -808,6 +808,23 @@
       height: auto;
       cursor: grab;
     }
+    /* Placeholder image slots: shown washed-out with a dashed frame and a
+       "Replace image" hint, so it is obvious the sample photo is meant to be
+       swapped for the user's own. The class is dropped once the user replaces
+       the image (or clears the placeholder flag). */
+    .zf-img-wrap.zf-img-placeholder { position: relative; }
+    .zf-img-wrap.zf-img-placeholder > img { opacity: 0.55; }
+    .zf-img-wrap.zf-img-placeholder::before {
+      content: "Replace image";
+      position: absolute; inset: 0; z-index: 4;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--zf-sans, sans-serif);
+      font-size: calc(0.65rem * var(--zf-page-scale, 1));
+      font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #005ea2; text-align: center; padding: 0.25rem;
+      border: 1px dashed #005ea2; box-sizing: border-box;
+      pointer-events: none;
+    }
     .zf-img-wrap.zf-img-selected {
       outline: 2px dashed var(--zf-blue);
       outline-offset: 2px;
@@ -988,6 +1005,15 @@
     .zf-textbox.zf-panel .zf-textbox-content {
       text-align: left;
       line-height: 1.35;
+    }
+    /* Overlay text sits on top of an image, where contrast is unpredictable.
+       A soft dark halo keeps it legible over any photo without a hard stroke.
+       (A future feature may sample the image and choose light/dark instead.) */
+    .zf-textbox.zf-textbox-overlay .zf-textbox-content {
+      text-shadow:
+        0 1px 2px rgba(0,0,0,0.65),
+        0 0 1px rgba(0,0,0,0.65),
+        0 0 6px rgba(0,0,0,0.35);
     }
 
     /* ---- Stamps ---- */
