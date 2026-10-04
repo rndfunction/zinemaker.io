@@ -115,6 +115,18 @@
     }
 
     /* ---- Layers (left sidebar, below the page list) ---- */
+    .zf-sidebar-danger {
+      margin-top: 1rem; padding-top: 0.75rem;
+      border-top: 1px solid var(--zf-border);
+    }
+    .zf-sidebar-clear {
+      width: 100%; padding: 0.5rem 0.75rem; cursor: pointer;
+      background: #ffffff; color: var(--zf-red, #b50909);
+      border: 1px solid var(--zf-border); border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600;
+    }
+    .zf-sidebar-clear:hover { background: #fdecec; border-color: var(--zf-red, #b50909); }
+    .zf-sidebar-clear:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
     .zf-sidebar-layers { margin-top: 0.75rem; }
     .zf-sidebar-section-head {
       display: flex; align-items: center; justify-content: space-between;
@@ -1252,6 +1264,24 @@
       padding: 0.5rem;
       overflow: hidden;
       border-bottom: 1px solid var(--zf-border);
+    }
+    /* Library card thumbnail: a scaled-down page-1 preview. */
+    .zf-lib-thumb { position: relative; overflow: hidden; padding: 0; align-items: stretch; }
+    .zf-lib-thumb-page {
+      position: absolute; inset: 0; padding: 6px; overflow: hidden;
+      display: flex; flex-direction: column; gap: 2px; text-align: left;
+      line-height: 1.2;
+    }
+    .zf-lib-thumb-heading {
+      font-family: var(--zf-page-heading-font, var(--zf-serif));
+      font-size: 1.8em; font-weight: 700; color: inherit;
+      border-bottom: 0.15em solid currentColor; padding-bottom: 0.1em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .zf-lib-thumb-body {
+      font-family: var(--zf-page-body-font, var(--zf-serif));
+      font-size: 1em; color: inherit; opacity: 0.85;
+      overflow: hidden;
     }
     .zf-lib-preview span {
       display: -webkit-box;

@@ -111,6 +111,11 @@
     } catch (e) { return 0; }
   }
 
+  // Remove every saved zine at once. Returns true on success.
+  function clearAll() {
+    return writeAll([]);
+  }
+
   function newId() {
     return 'z-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
   }
@@ -121,6 +126,7 @@
     upsert: upsert,
     remove: remove,
     duplicate: duplicate,
+    clearAll: clearAll,
     approximateSize: approximateSize,
     newId: newId
   };

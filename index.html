@@ -44,19 +44,20 @@
             Library
           </button>
           <span class="zf2-masthead-sep" aria-hidden="true"></span>
-          <button class="zf2-ghost" @click="onUndo" :disabled="!canUndo" title="Undo (Ctrl+Z)">Undo</button>
-          <button class="zf2-ghost" @click="onRedo" :disabled="!canRedo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-          <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
+          <button class="zf2-ghost" @click="onNew">New</button>
           <label class="zf2-ghost" style="cursor:pointer;" title="Load a previously exported .zine.json file">
             Import
             <input type="file" accept=".json,application/json" style="display:none;" @change="onImport" />
           </label>
+          <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
+          <button class="zf2-ghost" @click="onSaveToLibrary" title="Save this zine to your library">
+            <iconify-icon icon="ph:floppy-disk" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Save
+          </button>
           <button class="zf2-ghost" @click="store.settingsOpen = !store.settingsOpen" :aria-expanded="store.settingsOpen" title="Toggle zine settings" aria-haspopup="dialog">
             <iconify-icon icon="ph:gear-six" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
             Settings
           </button>
-          <button class="zf2-ghost" @click="onClearAll" title="Remove all content from every page">Clear all</button>
-          <button class="zf2-ghost" @click="onNew">New</button>
         </div>
       </header>
       <nav class="zf2-viewtabs" aria-label="Sections">
@@ -261,6 +262,11 @@
               </li>
             </ul>
           </div>
+        </div>
+        <div class="zf-sidebar-danger">
+          <button type="button" class="zf-sidebar-clear" @click="onClearAllEditor" title="Remove all content from every page">
+            Clear all content
+          </button>
         </div>
       </aside>
 
@@ -1459,6 +1465,22 @@
         this.safeEdgeIn = Math.round(n * 100) / 100;
       },
 
+      // True when the current draft has meaningful content worth saving to
+      // the library: a real title, or any page with heading/body/images/boxes.
+      zfHasContent: function () {
+        var t = (this.title || '').trim();
+        if (t && t !== 'Untitled Zine') return true;
+        var pages = this.pages || [];
+        for (var i = 0; i < pages.length; i++) {
+          var p = pages[i];
+          if (!p) continue;
+          if (p.heading && String(p.heading).trim()) return true;
+          if (p.body && String(p.body).trim()) return true;
+          if (Array.isArray(p.images) && p.images.length) return true;
+          if (Array.isArray(p.textBoxes) && p.textBoxes.length) return true;
+        }
+        return false;
+      },
       saveToLibrary: function () {
         if (!window.ZFLibrary) return false;
         if (!this.currentZineId) this.currentZineId = window.ZFLibrary.newId();
@@ -1643,6 +1665,13 @@ var AppShell = {
       },
       methods: {
         onExport: function () { if (window.ZFExportJson) window.ZFExportJson(); },
+        onSaveToLibrary: function () {
+          var ok = store.saveToLibrary();
+          if (ok) {
+            store.status = 'Saved to your library.';
+            setTimeout(function () { if (store.status === 'Saved to your library.') store.status = ''; }, 2000);
+          }
+        },
         onClearAll: function () { if (window.ZFClearAll) window.ZFClearAll(); },
         onImport: function (evt) {
           var f = evt.target.files && evt.target.files[0];
@@ -1678,6 +1707,7 @@ var AppShell = {
 
     var ZF_EDITOR_METHODS = {
       selectPage: function (id) { store.activePageId = id; },
+      onClearAllEditor: function () { if (window.ZFClearAll) window.ZFClearAll(); },
       pageLabel: function (page, i) {
         var h = (page.heading || "").trim();
         return h ? h : "Page " + (i + 1);
@@ -2181,7 +2211,16 @@ var AppShell = {
           t = String(page.body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
         }
         if (!t && page.heading) t = page.heading;
-        if (!t) return '(blank page)';
+        if (!t) {
+          // No heading or body text. A page can still have content as
+          // images and/or placed text boxes, so don't call it blank.
+          var hasImages = Array.isArray(page.images) && page.images.length > 0;
+          var hasBoxes = Array.isArray(page.textBoxes) && page.textBoxes.length > 0;
+          if (hasImages && hasBoxes) return '(images and elements)';
+          if (hasImages) return '(images)';
+          if (hasBoxes) return '(elements)';
+          return '(blank page)';
+        }
         return t.length > 80 ? t.slice(0, 80) + '...' : t;
       },
       isEmptyPage: function (page) {
@@ -3561,6 +3600,15 @@ var AppShell = {
       },
       methods: {
         loadExample: function (file) { zfLoadExample(file); },
+        clearLibrary: function () {
+          if (!window.ZFLibrary) return;
+          var count = (store.library || []).length;
+          if (!count) return;
+          if (!confirm('Delete all ' + count + ' saved zines from your library? This cannot be undone.')) return;
+          window.ZFLibrary.clearAll();
+          store.library = window.ZFLibrary.list();
+          if (store.currentZineId && !window.ZFLibrary.get(store.currentZineId)) store.currentZineId = null;
+        },
         newZineClick: function () { if (window.ZFNewZine) window.ZFNewZine(); },
         openZine: function (id) { store.loadFromLibrary(id); },
         duplicate: function (id) { store.duplicateInLibrary(id); },
@@ -3588,6 +3636,17 @@ var AppShell = {
           a.click();
           document.body.removeChild(a);
           setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        },
+        previewPage: function (rec) {
+          // First page of a saved record, for the card thumbnail.
+          if (!rec || !Array.isArray(rec.pages) || !rec.pages.length) return null;
+          return rec.pages[0];
+        },
+        previewPageStyle: function (rec) {
+          // A tiny themed mini-page. Font-size drives all the em units.
+          var base = this.previewStyle(rec);
+          base.fontSize = '4px';
+          return base;
         },
         previewStyle: function (rec) {
           if (!window.ZFThemes) return {};
@@ -3639,9 +3698,10 @@ var AppShell = {
                 'Storage is getting full. Export and delete old zines to free space.' +
               '</div>' +
             '</div>' +
-            '<div class="zf-header-actions" style="gap:0.5rem;">' +
-              '<button class="zf-btn zf-btn-primary" @click="newZineClick()">New zine</button>' +
-            '</div>' +
+'<div class="zf-header-actions" style="gap:0.5rem;">' +
+          '<button class="zf-btn zf-btn-primary" @click="newZineClick()">New zine</button>' +
+          '<button v-if="entries.length" class="zf-btn" style="border-color:var(--zf-border);color:var(--zf-red);" @click="clearLibrary()">Delete all</button>' +
+        '</div>' +
           '</div>' +
 
           '<div v-if="examples.length" class="zf-examples">' +
@@ -3668,8 +3728,12 @@ var AppShell = {
 
           '<div v-else class="zf-library-grid">' +
             '<div v-for="rec in entries" :key="rec.id" class="zf-lib-card">' +
-              '<div class="zf-lib-preview" :style="previewStyle(rec)">' +
-                '<span>{{ rec.title || \'Untitled Zine\' }}</span>' +
+              '<div class="zf-lib-preview zf-lib-thumb" :style="previewStyle(rec)">' +
+                '<div class="zf-lib-thumb-page" :style="previewPageStyle(rec)" v-if="previewPage(rec)">' +
+                  '<div class="zf-lib-thumb-heading">{{ previewPage(rec).heading }}</div>' +
+                  '<div class="zf-lib-thumb-body" v-html="previewPage(rec).body"></div>' +
+                '</div>' +
+                '<span v-if="!previewPage(rec)">{{ rec.title || \'Untitled Zine\' }}</span>' +
               '</div>' +
               '<div class="zf-lib-body">' +
                 '<div class="zf-lib-title">{{ rec.title || \'Untitled Zine\' }}</div>' +
@@ -4288,6 +4352,12 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         };
         app.mount('#app');
         zfLog('mounted OK; view=' + store.view + '; pages=' + store.pages.length);
+        // First visit only: no saved draft means the user has never worked
+        // here, so preload the welcome example so they can jump right in.
+        // If a draft exists we never touch it (their work always wins).
+        if (!zfSaved && window.zfLoadExample) {
+          zfLoadExample('welcome-to-zine-forge.json');
+        }
       } catch (e) {
         zfLog('MOUNT ERROR: ' + (e && e.message ? e.message : String(e)));
         zfLog('STACK: ' + (e && e.stack ? e.stack : '(no stack)'));
@@ -4473,7 +4543,12 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         zfCommitHistory();
         store._zfLastAutoSave = snap;
         store.saveDraft();
-        if (store.currentZineId) store.saveToLibrary();
+        // Mirror into the library only when the draft has real content. This
+        // holds whether or not an id exists, so a freshly created blank zine
+        // (which gets an id immediately) does not save an empty entry.
+        if (typeof store.zfHasContent === 'function' && store.zfHasContent()) {
+          store.saveToLibrary();
+        }
       }
     }, 1500);
 
