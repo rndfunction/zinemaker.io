@@ -433,6 +433,17 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
 // after scaling so they still bleed past all four edges on the new page.
 function zfRefitPagesToSize(pages, fromW, fromH, toW, toH) {
   if (!Array.isArray(pages) || !fromW || !fromH || !toW || !toH) return pages;
+  // Scale factor is "target units per source unit". The template stores
+  // positions as plain numbers in the SOURCE unit (e.g. inches); the
+  // renderer reads them as numbers in the TARGET unit (e.g. mm). So the
+  // ratio toW/fromW DOES the unit conversion as well as the physical scale:
+  //   output = input x (toW / fromW)
+  // e.g. a 2.15in-wide box on an A4 (mm) page: 2.15 x (74.25 / 2.75) = 58mm,
+  // which is 2.15in expressed in mm -- correct.
+  //
+  // NOTE: do NOT "normalize" the inputs to a common unit first -- that
+  // cancels the conversion and collapses everything (text stacked one
+  // letter per line, images tiny). The raw ratio is the correct formula.
   var sx = toW / fromW;
   var sy = toH / fromH;
   // Use a single scale for fonts and image widths (widths are horizontal),

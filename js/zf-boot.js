@@ -58,20 +58,18 @@
             typeof window.zfRepeatPagesToCount === 'function') {
           var tmplModel = parsed.modelId ? window.ZFModels.getModel(parsed.modelId) : null;
           var targetModel = window.ZFModels.getModel(chosenModelId);
-          // Native page size the template content was authored at.
+          // Native page size the template content was authored at, and the
+          // target model's page size. The refit is UNIT-AWARE: it converts
+          // both sizes to inches before computing the scale, so an
+          // inch-authored template refits correctly onto a metric (A4) model
+          // instead of dumping its content in the corner.
           var fromW = (tmplModel && tmplModel.page) ? tmplModel.page.width : 2.75;
           var fromH = (tmplModel && tmplModel.page) ? tmplModel.page.height : 4.25;
           var toW = (targetModel && targetModel.page) ? targetModel.page.width : fromW;
           var toH = (targetModel && targetModel.page) ? targetModel.page.height : fromH;
-          // Same units only (don't scale in->mm). Templates are authored in
-          // inches; if the target is metric, skip the refit (positions are
-          // close enough) rather than mixing units.
-          var sameUnit = !tmplModel || !targetModel ||
-                         !tmplModel.page || !targetModel.page ||
-                         (tmplModel.page.unit || 'in') === (targetModel.page.unit || 'in');
-          if (sameUnit) {
-            store.pages = window.zfRefitPagesToSize(store.pages, fromW, fromH, toW, toH);
-          }
+          // The raw ratio toW/fromW handles both physical scale AND unit
+          // conversion (target-units-per-source-unit), so no unit params.
+          store.pages = window.zfRefitPagesToSize(store.pages, fromW, fromH, toW, toH);
           // Fill the model's full sheet capacity by repeating the pages.
           var need = 0;
           if (window.ZFModels.pagesPerSheet) {
