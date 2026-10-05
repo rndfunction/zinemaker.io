@@ -107,6 +107,125 @@
       ]
     },
     {
+      id: 'mini-16',
+      label: '16-page mini zine (1 sheet, 2 sides, US Letter)',
+      // One-sheet 16-page booklet, matching the method at
+      // https://colarusso.github.io/mini-zine/ :
+      //   - PRINT PORTRAIT, double-sided, flip on the LONG edge.
+      //   - The sheet is a 4x4 grid of cells per side; 8 of the 16 cells
+      //     carry a page (a checkerboard), so each side prints 8 pages and
+      //     two sides give the full 16.
+      //   - Fold into quarters both ways, cut ONE central slit, open the
+      //     slit into a plus shape, collapse, fold into a booklet, staple.
+      //
+      // IMPOSITION STATUS: The grid/geometry below (4x4, portrait, two
+      // sides, single center cut) is correct for this method. The exact
+      // PAGE NUMBERS per slot are a best-effort placement and may need a
+      // one-time correction after a test print. If the folded booklet's
+      // order is wrong, only the `page` values in slots/slotsBack change;
+      // the geometry is fixed.
+      paper: { width: 8.5, height: 11, unit: 'in', orientation: 'portrait' },
+      // Each of the 16 mini-pages is a quarter-sheet cell, roughly
+      // 2.125 x 2.75 in portrait.
+      page: { width: 2.125, height: 2.75, unit: 'in' },
+      pagesPerSheet: 8,
+      sides: 2,
+      // Front side: 8 page cells in a 4x4 checkerboard (col+row even).
+      slots: [
+        { page: 16, col: 0, row: 0, rotation: 0 },
+        { page: 1,  col: 2, row: 0, rotation: 0 },
+        { page: 14, col: 1, row: 1, rotation: 0 },
+        { page: 3,  col: 3, row: 1, rotation: 0 },
+        { page: 12, col: 0, row: 2, rotation: 0 },
+        { page: 5,  col: 2, row: 2, rotation: 0 },
+        { page: 10, col: 1, row: 3, rotation: 0 },
+        { page: 7,  col: 3, row: 3, rotation: 0 }
+      ],
+      // Back side: the other 8 page cells.
+      slotsBack: [
+        { page: 2,  col: 1, row: 0, rotation: 0 },
+        { page: 15, col: 3, row: 0, rotation: 0 },
+        { page: 4,  col: 0, row: 1, rotation: 0 },
+        { page: 13, col: 2, row: 1, rotation: 0 },
+        { page: 6,  col: 1, row: 2, rotation: 0 },
+        { page: 11, col: 3, row: 2, rotation: 0 },
+        { page: 8,  col: 0, row: 3, rotation: 0 },
+        { page: 9,  col: 2, row: 3, rotation: 0 }
+      ],
+      // Quarter-sheet cells are smaller than the 8-page mini-pages, so the
+      // content budget is roughly halved.
+      budget: { chars: 450, lines: 12, words: 75 },
+      guides: [
+        // Fold lines: quarters both ways (the sheet folds into a 4x4 grid).
+        { type: 'fold', axis: 'v', pos: 25 },
+        { type: 'fold', axis: 'v', pos: 50 },
+        { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'fold', axis: 'h', pos: 25 },
+        { type: 'fold', axis: 'h', pos: 50 },
+        { type: 'fold', axis: 'h', pos: 75 },
+        // ONE central slit cut (horizontal, spanning the middle column band).
+        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+      ],
+      instructions: [
+        'Print PORTRAIT, double-sided, flipping on the LONG edge, at 100%.',
+        'Fold the sheet in half both ways (horizontal and vertical), then unfold.',
+        'Fold each half in half again both ways, so the sheet creases into a 4x4 grid.',
+        'Cut a single slit along the center horizontal line, between the two middle vertical creases (the center cell).',
+        'Open the slit: the sheet forms a plus/cross shape with a hole in the middle.',
+        'Collapse the plus into a booklet, folding the pages over one another.',
+        'Staple twice along the spine (the folded edge) to bind the 16-page booklet.',
+        'Trim the outer edges if needed. Done.'
+      ]
+    },
+    {
+      id: 'mini-16-a4',
+      label: '16-page mini zine (1 sheet, 2 sides, A4)',
+      paper: { width: 210, height: 297, unit: 'mm', orientation: 'portrait' },
+      page: { width: 52.5, height: 74.25, unit: 'mm' },
+      pagesPerSheet: 8,
+      sides: 2,
+      slots: [
+        { page: 16, col: 0, row: 0, rotation: 0 },
+        { page: 1,  col: 2, row: 0, rotation: 0 },
+        { page: 14, col: 1, row: 1, rotation: 0 },
+        { page: 3,  col: 3, row: 1, rotation: 0 },
+        { page: 12, col: 0, row: 2, rotation: 0 },
+        { page: 5,  col: 2, row: 2, rotation: 0 },
+        { page: 10, col: 1, row: 3, rotation: 0 },
+        { page: 7,  col: 3, row: 3, rotation: 0 }
+      ],
+      slotsBack: [
+        { page: 2,  col: 1, row: 0, rotation: 0 },
+        { page: 15, col: 3, row: 0, rotation: 0 },
+        { page: 4,  col: 0, row: 1, rotation: 0 },
+        { page: 13, col: 2, row: 1, rotation: 0 },
+        { page: 6,  col: 1, row: 2, rotation: 0 },
+        { page: 11, col: 3, row: 2, rotation: 0 },
+        { page: 8,  col: 0, row: 3, rotation: 0 },
+        { page: 9,  col: 2, row: 3, rotation: 0 }
+      ],
+      budget: { chars: 450, lines: 12, words: 75 },
+      guides: [
+        { type: 'fold', axis: 'v', pos: 25 },
+        { type: 'fold', axis: 'v', pos: 50 },
+        { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'fold', axis: 'h', pos: 25 },
+        { type: 'fold', axis: 'h', pos: 50 },
+        { type: 'fold', axis: 'h', pos: 75 },
+        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+      ],
+      instructions: [
+        'Print PORTRAIT, double-sided, flipping on the LONG edge, at 100%.',
+        'Fold the sheet in half both ways (horizontal and vertical), then unfold.',
+        'Fold each half in half again both ways, so the sheet creases into a 4x4 grid.',
+        'Cut a single slit along the center horizontal line, between the two middle vertical creases (the center cell).',
+        'Open the slit: the sheet forms a plus/cross shape with a hole in the middle.',
+        'Collapse the plus into a booklet, folding the pages over one another.',
+        'Staple twice along the spine (the folded edge) to bind the 16-page booklet.',
+        'Trim the outer edges if needed. Done.'
+      ]
+    },
+    {
       id: 'half-fold-4',
       label: '4-page half-fold (1 sheet, 2 sides)',
       // Landscape letter, folded once across the middle into a half-letter
