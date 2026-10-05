@@ -39,6 +39,49 @@ function zfNewTextBoxId() {
   return 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
+// -------- Page deep-copy --------
+// Single deep-copy helper for page objects. Pages are plain JSON data
+// (heading/body/images/textBoxes and any future fields), so JSON round-trip
+// is sufficient today. It is centralized here so every copy path (store
+// duplicatePage, library duplicate) uses the SAME strategy -- previously one
+// path used JSON.parse(JSON.stringify()) and another used Object.assign,
+// which meant a future field could survive one path and vanish in the other.
+// `reid` (default true) assigns fresh ids to the page and every nested
+// image/textBox so the copy can never collide with the original.
+function zfDeepCopyPage(page, reid) {
+  var copy = JSON.parse(JSON.stringify(page || {}));
+  if (reid === false) return copy;
+  copy.id = 'p' + Math.random().toString(36).slice(2, 9);
+  if (Array.isArray(copy.images)) {
+    copy.images = copy.images.map(function (im) {
+      im.id = zfNewImageId();
+      return im;
+    });
+  }
+  if (Array.isArray(copy.textBoxes)) {
+    copy.textBoxes = copy.textBoxes.map(function (tb) {
+      tb.id = zfNewTextBoxId();
+      return tb;
+    });
+  }
+  copy.activeImageId = null;
+  copy.activeTextBoxId = null;
+  return copy;
+}
+
+// -------- Numeric clamp helper --------
+// Shared by setMargin/setPrinterSafety/setSafeEdge AND by the loaders
+// (import, library load, shared link). Loaders previously assigned raw
+// numbers, so a hand-edited file with marginIn: 500 produced a broken
+// layout. This keeps every write in range.
+function zfClampNumber(value, min, max, fallback) {
+  var n = Number(value);
+  if (isNaN(n)) return fallback;
+  if (n < min) n = min;
+  if (n > max) n = max;
+  return Math.round(n * 100) / 100;
+}
+
 // -------- Page migration --------
 function zfMigratePage(page) {
   if (!page) return page;
@@ -86,7 +129,14 @@ function zfMigrateAllPages(pages) {
 }
 
 // -------- HTML sanitization --------
-var ZF_ALLOWED_TAGS = { STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, STRIKE: 1, BR: 1, DIV: 1, P: 1, SPAN: 1, FONT: 1 };
+// Inline formatting we keep as-is, and structural list tags we also keep.
+// Lists are allowed because flattening them (the old behavior for any
+// disallowed tag) collapsed <li> items into one unbroken string with no
+// line breaks -- pasting a bulleted list lost all its structure.
+var ZF_ALLOWED_TAGS = { STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, STRIKE: 1, BR: 1, DIV: 1, P: 1, SPAN: 1, FONT: 1, UL: 1, OL: 1, LI: 1 };
+// Tags we keep as structure but whose own attributes we drop (e.g. <ul>).
+// The allowlist above already restricts which tags survive; this set just
+// documents which ones are structural rather than inline formatting.
 // Only these color forms are allowed through, so a pasted/typed style can
 // never smuggle a url(), expression(), or other CSS.
 var ZF_COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%]+\)|[a-zA-Z]{3,20})$/;
@@ -111,8 +161,15 @@ function zfSanitizeHtml(html) {
       }
       var tag = child.tagName;
       if (!ZF_ALLOWED_TAGS[tag]) {
-        var text = document.createTextNode(child.textContent || '');
-        node.replaceChild(text, child);
+        // Disallowed tag: replace it with its text, but recurse into its
+        // children first so nested allowed tags (e.g. <a><b>x</b></a>)
+        // keep their formatting instead of being flattened to plain text.
+        // For the common case of <a href="...">label</a>, this drops the
+        // link but keeps <b>/<i> emphasis inside the label.
+        var frag = document.createDocumentFragment();
+        while (child.firstChild) frag.appendChild(child.firstChild);
+        walk(frag);
+        node.replaceChild(frag, child);
         continue;
       }
       // Capture a validated color BEFORE stripping attributes, since the

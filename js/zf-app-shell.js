@@ -8,7 +8,17 @@
   var store = window.ZF_STORE;
 
   var AppShell = {
-    data: function () { return { store: store, tick: 0 }; },
+    // `nowTick` bumps every second so the savedLabel computed re-evaluates.
+    // Date.now() is not reactive on its own, so without this the "Saved Ns
+    // ago" label froze at whatever value it had when lastSavedAt changed.
+    data: function () { return { store: store, tick: 0, nowTick: 0 }; },
+    mounted: function () {
+      var self = this;
+      this._savedLabelTimer = setInterval(function () { self.nowTick++; }, 1000);
+    },
+    beforeUnmount: function () {
+      if (this._savedLabelTimer) clearInterval(this._savedLabelTimer);
+    },
     computed: {
       canUndo: function () {
         // Tie to the reactive tick so this recomputes when history changes.
@@ -20,6 +30,8 @@
         return window.ZFCanRedo ? window.ZFCanRedo() : false;
       },
       savedLabel: function () {
+        // Read nowTick so this recomputes once per second (see data/mounted).
+        var _ = this.nowTick;
         var t = store.lastSavedAt;
         if (!t) return '';
         var secs = Math.floor((Date.now() - t) / 1000);
@@ -29,8 +41,15 @@
         if (mins < 60) return 'Saved ' + mins + 'm ago';
         return 'Saved';
       },
-      // Model + theme lists for the global settings panel.
-      models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
+      // Model list for the pickers. Experimental models are excluded so a
+      // user cannot select an unverified imposition by accident; any zine
+      // already using one still resolves via getModel().
+      models: function () {
+        if (!window.ZFModels) return [];
+        return window.ZFModels.listSelectableModels
+          ? window.ZFModels.listSelectableModels()
+          : window.ZFModels.listModels();
+      },
       themes: function () { return (window.ZFThemes) ? window.ZFThemes.listThemes() : []; }
     },
     methods: {

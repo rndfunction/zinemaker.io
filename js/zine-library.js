@@ -67,8 +67,12 @@
       }),
       updatedAt: record.updatedAt || Date.now()
     };
-    if (idx >= 0) all[idx] = entry;
-    else all.unshift(entry);
+    // Always move the record to the front on save so the library list is
+    // ordered by most-recently-updated. The old code left an existing
+    // record in place, so "Save" did not bump it and the list order was
+    // effectively arbitrary.
+    if (idx >= 0) all.splice(idx, 1);
+    all.unshift(entry);
     return writeAll(all);
   }
 
@@ -88,12 +92,12 @@
       themeId: src.themeId,
       modelId: src.modelId,
       pages: (src.pages || []).map(function (p) {
-        // Deep-copy the full page so the duplicate carries its decorations
-        // (images, textBoxes, icons) rather than only heading/body/image.
-        var copy = Object.assign({}, p);
-        if (Array.isArray(p.images)) copy.images = p.images.map(function (el) { return Object.assign({}, el); });
-        if (Array.isArray(p.textBoxes)) copy.textBoxes = p.textBoxes.map(function (tb) { return Object.assign({}, tb); });
-        return copy;
+        // Shared deep-copy + re-id helper (util.js). Previously this
+        // shallow-copied each nested element and KEPT its id, so a
+        // duplicated zine loaded alongside the original in one session
+        // produced colliding element ids. zfDeepCopyPage fixes that and
+        // uses the same strategy as the store's duplicatePage.
+        return zfDeepCopyPage(p, true);
       }),
       updatedAt: Date.now()
     };

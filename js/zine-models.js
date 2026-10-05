@@ -109,6 +109,9 @@
     {
       id: 'mini-16',
       label: '16-page mini zine (1 sheet, 2 sides, US Letter)',
+      // Imposition page-number placement is unverified (see note below);
+      // hidden from pickers until confirmed by a test print.
+      experimental: true,
       // One-sheet 16-page booklet, matching the method at
       // https://colarusso.github.io/mini-zine/ :
       //   - PRINT PORTRAIT, double-sided, flip on the LONG edge.
@@ -180,6 +183,7 @@
     {
       id: 'mini-16-a4',
       label: '16-page mini zine (1 sheet, 2 sides, A4)',
+      experimental: true,
       paper: { width: 210, height: 297, unit: 'mm', orientation: 'portrait' },
       page: { width: 52.5, height: 74.25, unit: 'mm' },
       pagesPerSheet: 8,
@@ -263,6 +267,21 @@
     return MODELS[0];
   }
 
+  // Models flagged `experimental: true` have an UNVERIFIED imposition --
+  // the slot page-numbers may need a one-time correction after a test
+  // print (see the mini-16 comments above). They are hidden from the user
+  // facing New Zine / Settings dropdowns until verified, but remain
+  // resolvable by getModel() so an existing project that already uses one
+  // keeps working and does not silently fall back to mini-8.
+  function isExperimental(model) {
+    return !!(model && model.experimental);
+  }
+
+  // Models safe to show in a picker: everything except experimental ones.
+  function listSelectableModels() {
+    return MODELS.filter(function (m) { return !isExperimental(m); });
+  }
+
   function listModels() {
     return MODELS.slice();
   }
@@ -313,6 +332,8 @@
 
   window.ZFModels = {
     getModel: getModel,
+    isExperimental: isExperimental,
+    listSelectableModels: listSelectableModels,
     listModels: listModels,
     minimumPages: minimumPages,
     requiredPageCount: requiredPageCount,

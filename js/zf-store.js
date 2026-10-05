@@ -115,7 +115,11 @@
     store.author = parsed.author || '';
     if (parsed.modelId && window.ZFModels) store.modelId = parsed.modelId;
     if (parsed.themeId && window.ZFThemes) store.themeId = parsed.themeId;
-    if (typeof parsed.marginIn === 'number') store.marginIn = parsed.marginIn;
+    // Clamp on load: an imported/hand-edited file could carry an
+    // out-of-range value that would break the printed layout.
+    if (typeof parsed.marginIn === 'number') store.setMargin(parsed.marginIn);
+    if (typeof parsed.printerSafetyIn === 'number') store.setPrinterSafety(parsed.printerSafetyIn);
+    if (typeof parsed.safeEdgeIn === 'number') store.setSafeEdge(parsed.safeEdgeIn);
     store.pages = zfBuildPagesFromData(parsed.pages);
     store.activePageId = store.pages[0].id;
     return true;
@@ -225,31 +229,10 @@
     duplicatePage: function (id) {
       var idx = this.pages.findIndex(function (p) { return p.id === id; });
       if (idx < 0) return;
-      var s = this.pages[idx];
-      // Deep-copy the whole page so the duplicate carries its decorations
-      // (images, icons, tape, stickers, text boxes) instead of only the
-      // legacy heading/body/image fields. Cherry-picking fields previously
-      // dropped `kind` and every placed element, which made duplicated
-      // decorated pages come out blank except for body text. Mirrors the
-      // deep-copy approach used by duplicateSelectedElement.
-      var c = JSON.parse(JSON.stringify(s));
-      c.id = 'p' + Math.random().toString(36).slice(2, 9);
-      // Give nested element ids fresh values so the copy cannot collide
-      // with (or be selected as) the original's elements.
-      if (Array.isArray(c.images)) {
-        c.images = c.images.map(function (im) {
-          im.id = zfNewImageId();
-          return im;
-        });
-      }
-      if (Array.isArray(c.textBoxes)) {
-        c.textBoxes = c.textBoxes.map(function (tb) {
-          tb.id = zfNewTextBoxId();
-          return tb;
-        });
-      }
-      c.activeImageId = null;
-      c.activeTextBoxId = null;
+      // Shared deep-copy + re-id helper (util.js). Guarantees the copy
+      // carries every decorated element (images, icons, tape, stickers,
+      // text boxes) and that nested ids never collide with the original.
+      var c = zfDeepCopyPage(this.pages[idx], true);
       this.pages.splice(idx + 1, 0, c);
       this.activePageId = c.id;
     },
@@ -303,28 +286,21 @@
       }
     },
 
+    // Range clamps + rounding live in zfClampNumber (util.js) so the
+    // setters and the loaders (import, library load, shared link) enforce
+    // identical bounds. min/max mirror the sliders in the settings panel.
     setMargin: function (v) {
-      var n = Number(v);
-      if (isNaN(n)) return;
-      if (n < 0.04) n = 0.04;
-      if (n > 0.35) n = 0.35;
-      this.marginIn = Math.round(n * 100) / 100;
+      var n = zfClampNumber(v, 0.04, 0.35, this.marginIn);
+      if (n === this.marginIn && String(v) !== String(this.marginIn)) return;
+      this.marginIn = n;
     },
 
     setPrinterSafety: function (v) {
-      var n = Number(v);
-      if (isNaN(n)) return;
-      if (n < 0) n = 0;
-      if (n > 0.5) n = 0.5;
-      this.printerSafetyIn = Math.round(n * 100) / 100;
+      this.printerSafetyIn = zfClampNumber(v, 0, 0.5, this.printerSafetyIn);
     },
 
     setSafeEdge: function (v) {
-      var n = Number(v);
-      if (isNaN(n)) return;
-      if (n < 0) n = 0;
-      if (n > 0.75) n = 0.75;
-      this.safeEdgeIn = Math.round(n * 100) / 100;
+      this.safeEdgeIn = zfClampNumber(v, 0, 0.75, this.safeEdgeIn);
     },
 
     // True when the current draft has meaningful content worth saving to
@@ -383,7 +359,9 @@
       this.author = rec.author;
       this.themeId = rec.themeId || 'classic';
       this.modelId = rec.modelId || 'mini-8';
-      this.marginIn = (typeof rec.marginIn === 'number') ? rec.marginIn : 0.1;
+      // Route the stored margin through setMargin so it is clamped/rounded
+      // the same way a live slider edit would be.
+      this.setMargin(typeof rec.marginIn === 'number' ? rec.marginIn : 0.1);
       this.pages = (rec.pages || []).map(function (p, i) {
         // Preserve the full stored page (images, textBoxes, icons, ...) so
         // decorated content survives a save/load round trip. Only the page
