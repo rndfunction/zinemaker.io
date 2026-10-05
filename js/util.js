@@ -422,6 +422,70 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
   return style;
 }
 
+// -------- Template refit --------
+// Refit a template's pages from the page size they were authored at to a
+// target model's page size, so one template works for every model. The
+// template stores element positions/sizes in INCHES tuned to its native
+// page box (e.g. mini-8's 2.75 x 4.25). We scale every coordinate and
+// dimension by the ratio of the target page to the native page.
+//
+// Full-bleed images (wider than the page, negative x/y) are kept centered
+// after scaling so they still bleed past all four edges on the new page.
+function zfRefitPagesToSize(pages, fromW, fromH, toW, toH) {
+  if (!Array.isArray(pages) || !fromW || !fromH || !toW || !toH) return pages;
+  var sx = toW / fromW;
+  var sy = toH / fromH;
+  // Use a single scale for fonts and image widths (widths are horizontal),
+  // but allow vertical positions to scale independently.
+  function scaleImg(im) {
+    var out = Object.assign({}, im);
+    if (typeof im.w === 'number') {
+      var newW = im.w * sx;
+      out.w = newW;
+      // Re-center horizontally: a full-bleed image on the native page has
+      // x such that x + w/2 == fromW/2 (centered). Preserve that.
+      if (typeof im.x === 'number') {
+        out.x = (toW - newW) / 2;
+      }
+    }
+    if (typeof im.h === 'number') out.h = im.h * sy;
+    if (typeof im.y === 'number') out.y = im.y * sy;
+    return out;
+  }
+  function scaleBox(tb) {
+    var out = Object.assign({}, tb);
+    if (typeof tb.x === 'number') out.x = tb.x * sx;
+    if (typeof tb.y === 'number') out.y = tb.y * sy;
+    if (typeof tb.w === 'number') out.w = tb.w * sx;
+    if (typeof tb.h === 'number') out.h = tb.h * sy;
+    // Font size is authored in em relative to the page base; scale by the
+    // smaller axis ratio so text fits both dimensions.
+    if (typeof tb.fontSize === 'number') out.fontSize = tb.fontSize * Math.min(sx, sy);
+    return out;
+  }
+  return pages.map(function (p) {
+    var np = Object.assign({}, p);
+    if (Array.isArray(p.images)) np.images = p.images.map(scaleImg);
+    if (Array.isArray(p.textBoxes)) np.textBoxes = p.textBoxes.map(scaleBox);
+    return np;
+  });
+}
+
+// Repeat a set of pages cyclically until there are `count` pages, giving
+// each repetition fresh page ids. Used so a template's photo pages fill a
+// larger model (e.g. 8 photo pages repeated to fill a 16-page booklet).
+function zfRepeatPagesToCount(pages, count) {
+  if (!Array.isArray(pages) || !pages.length || count <= 0) return pages || [];
+  var out = [];
+  for (var i = 0; i < count; i++) {
+    var src = pages[i % pages.length];
+    var copy = JSON.parse(JSON.stringify(src));
+    copy.id = 'p' + i + '-' + Math.random().toString(36).slice(2, 7);
+    out.push(copy);
+  }
+  return out;
+}
+
 // -------- Lorem ipsum --------
 var ZF_LOREM_WORDS = ('lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ' +
   'enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit ' +

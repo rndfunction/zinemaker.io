@@ -404,7 +404,7 @@
                   '</div>' +
                 '</template>' +
                 '<template v-for="box in (s.page.textBoxes || [])" :key="\'sl-tb-\' + box.id">' +
-                  '<div class="zf-textbox zf-textbox-readonly" :class="{ \'zf-stamp\': box.kind === \'stamp\', \'zf-panel\': box.kind === \'panel\' }" :style="slotTextBoxStyleFor(box, s)">' +
+                  '<div class="zf-textbox zf-textbox-readonly" :class="{ \'zf-stamp\': box.kind === \'stamp\', \'zf-panel\': box.kind === \'panel\', \'zf-textbox-overlay\': box.overlay }" :style="slotTextBoxStyleFor(box, s)">' +
                     '<div class="zf-textbox-content" v-html="box.html"></div>' +
                   '</div>' +
                 '</template>' +

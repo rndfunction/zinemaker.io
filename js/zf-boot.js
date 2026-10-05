@@ -44,18 +44,45 @@
         }
         if (!window.zfApplyZineData(parsed)) throw new Error('bad template file');
         // Restore the user's chosen model over the template's own modelId.
-        // If the chosen model needs more pages than the template provides,
-        // pad with blank pages so the imposition has a full sheet to work
-        // with (otherwise the extra slots render empty in the sheet view).
+        // A template fills CONTENT; the user's format choice wins.
         store.modelId = chosenModelId;
-        if (window.ZFModels && typeof window.zfBlankPagesForModel === 'function') {
-          var need = window.zfBlankPagesForModel(chosenModelId).length;
-          var have = store.pages.length;
-          if (have < need) {
-            for (var pi = have; pi < need; pi++) {
-              store.pages.push(window.zfEmptyPage());
-            }
+        // Refit the template's content from the page size it was authored at
+        // to the chosen model's page size, then repeat the pages cyclically
+        // to fill a full sheet for that model. This makes ONE template work
+        // for every model: 8 photo pages refit and repeated to 16 for the
+        // 16-page booklet, scaled to full page for single-page, etc.
+        // Without the refit, positions tuned for mini-8 land wrong on other
+        // page sizes; without the repeat, larger models got blank padding.
+        if (window.ZFModels && window.ZFModels.getModel &&
+            typeof window.zfRefitPagesToSize === 'function' &&
+            typeof window.zfRepeatPagesToCount === 'function') {
+          var tmplModel = parsed.modelId ? window.ZFModels.getModel(parsed.modelId) : null;
+          var targetModel = window.ZFModels.getModel(chosenModelId);
+          // Native page size the template content was authored at.
+          var fromW = (tmplModel && tmplModel.page) ? tmplModel.page.width : 2.75;
+          var fromH = (tmplModel && tmplModel.page) ? tmplModel.page.height : 4.25;
+          var toW = (targetModel && targetModel.page) ? targetModel.page.width : fromW;
+          var toH = (targetModel && targetModel.page) ? targetModel.page.height : fromH;
+          // Same units only (don't scale in->mm). Templates are authored in
+          // inches; if the target is metric, skip the refit (positions are
+          // close enough) rather than mixing units.
+          var sameUnit = !tmplModel || !targetModel ||
+                         !tmplModel.page || !targetModel.page ||
+                         (tmplModel.page.unit || 'in') === (targetModel.page.unit || 'in');
+          if (sameUnit) {
+            store.pages = window.zfRefitPagesToSize(store.pages, fromW, fromH, toW, toH);
           }
+          // Fill the model's full sheet capacity by repeating the pages.
+          var need = 0;
+          if (window.ZFModels.pagesPerSheet) {
+            need = window.ZFModels.pagesPerSheet(targetModel);
+          } else if (targetModel && targetModel.pagesPerSheet) {
+            need = targetModel.pagesPerSheet;
+          }
+          if (need && store.pages.length < need) {
+            store.pages = window.zfRepeatPagesToCount(store.pages, need);
+          }
+          if (store.pages.length) store.activePageId = store.pages[0].id;
         }
         if (window.ZFLibrary) store.currentZineId = window.ZFLibrary.newId();
         store.view = 'editor';
