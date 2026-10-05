@@ -36,6 +36,25 @@ Serve the folder with any static file server and open `index.html`:
 Opening `index.html` directly from disk works in most browsers, but a
 local server is recommended so relative script paths resolve cleanly.
 
+## Printing
+
+Printing relies on a runtime-injected `@page` rule and print-specific CSS.
+**Serve the app over `http://` (e.g. the local server above) when you intend
+to print.** Opening the file directly from disk (`file://`) or viewing it
+inside a sandboxed preview iframe can cause the browser to ignore the
+injected print rules, which makes the sheet print at the wrong size or not
+at all.
+
+In the print dialog, set **Scale to 100%** and **Margins to None** so the
+imposition lands at its exact physical size. The sheet is sized to the
+model's real paper dimensions (e.g. 11in x 8.5in for a landscape mini zine),
+so any other scale shrinks or clips it.
+
+Two-sided models (16-page mini, half-fold) print on both sides of one sheet.
+The print dialog's "flip on long edge / short edge" setting matters: each
+model's instructions state which edge to flip on. For the 16-page mini zine,
+flip on the **short** edge.
+
 ## Zine models
 
 A **model** describes the imposition -- how N zine pages map onto one

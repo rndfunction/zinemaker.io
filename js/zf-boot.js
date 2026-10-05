@@ -98,6 +98,76 @@
   window.zfLoadTemplate = zfLoadTemplate;
   window.zfLoadExample = zfLoadExample;
 
+  // -------- Imposition test sheet --------
+  // Fills every page with a huge page number (and nothing else) so a single
+  // print reveals where each page physically lands after folding. Used to
+  // verify two-sided models whose back-side page mapping is a guess. The
+  // user prints, folds, staples, reads the order off the paper, and reports
+  // which numbers ended up where; only the model's slotsBack `page` values
+  // change. Leaves the current draft untouched by saving it first.
+  function zfImpositionTest() {
+    var m = store.model && store.model();
+    if (!m) return false;
+    // Save the user's real work so the test fill never destroys it.
+    try { store.saveToLibrary(); } catch (e) {}
+    try { store.saveDraft(); } catch (e) {}
+    var total = 0;
+    if (window.ZFModels && window.ZFModels.pagesPerSheet) {
+      total = window.ZFModels.pagesPerSheet(m);
+    } else if (m.pagesPerSheet) {
+      total = m.pagesPerSheet;
+    }
+    if (!total) total = (m.slots ? m.slots.length : 1) * (m.sides || 1);
+    var pages = [];
+    for (var i = 1; i <= total; i++) {
+      // Big number as a centered text box so it survives the mini-page
+      // renderer (which reads textBoxes, not just heading/body). A plain
+      // heading would also work, but a text box is guaranteed to render on
+      // every view (editor, reader, sheet) identically.
+      var p = window.zfEmptyPage();
+      p.heading = 'Page ' + i;
+      // Put the number in the BODY, vertically centered and as far from the
+      // paper edges as possible, so it can't fall in a printer's unprintable
+      // margin. A big centered number is unmissable in every view and proves
+      // whether the issue is edge-clipping or something else. The text box is
+      // ALSO placed dead-center for the same reason (it used to sit at the
+      // top-left corner, x:0.1 y:0.1, which is near the paper edge on corner
+      // slots).
+      //
+      // Body: a flex container filling the page, centering the digit.
+      p.body = '<div style="display:flex;align-items:center;justify-content:center;' +
+               'width:100%;height:100%;font-size:2.6em;font-weight:bold;">' +
+               i + '</div>';
+      // Text box: centered in the page, big.
+      var tbW = Math.max(1.2, (m.page.width || 2.75) * 0.7);
+      var tbH = Math.max(0.8, (m.page.height || 4.25) * 0.3);
+      p.textBoxes = [{
+        id: 'tb-test-' + i,
+        kind: '',
+        role: 'title',
+        html: '<b>' + i + '</b>',
+        x: ((m.page.width || 2.75) - tbW) / 2,
+        y: ((m.page.height || 4.25) - tbH) / 2,
+        w: tbW,
+        h: tbH,
+        rot: 0,
+        fontSize: 3.0,
+        align: 'center',
+        z: 10,
+        hidden: false
+      }];
+      pages.push(p);
+    }
+    store.pages = pages;
+    store.activePageId = pages[0].id;
+    store.modelId = m.id;
+    if (typeof store.zfEnsureModelCapacity === 'function') store.zfEnsureModelCapacity();
+    store.view = 'sheet';
+    store.status = 'IMPOSITION TEST: ' + total + ' pages. Print double-sided, fold, staple, then read off the page order. Your real draft was saved to the library.';
+    return true;
+  }
+  window.ZFImpositionTest = zfImpositionTest;
+
   // -------- Shared-link loader --------
   function loadSharedZineFromHash() {
     var hash = location.hash || '';
@@ -304,6 +374,9 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
     // is what they'd expect for text).
     window.addEventListener('keydown', function (evt) {
       var cmd = evt.ctrlKey || evt.metaKey;
+      // Dev keyboard shortcuts were removed for shipping. The test-sheet
+      // and model-cycle helpers are still available as console-only
+      // functions: ZFImpositionTest() and (via setModel) the model pickers.
       var key = (evt.key || '').toLowerCase();
       // Skip our shortcuts when the user is typing inside an editable.
       // Let the browser handle native text editing (Backspace, Ctrl+Z, etc.)

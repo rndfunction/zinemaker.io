@@ -3,8 +3,7 @@
 // in index.html. Classic script; reads the shared store from window.ZF_STORE
 // (set by zf-store.js, which must load first). Uses zfElementStyle /
 // zfTextBoxStyle (util.js) and window.ZFModels / window.ZFThemes. Also
-// depends on zfBuildSlot, which is defined in zf-editor.js (it was a
-// top-level function in the original file).
+// depends on zfBuildSlot, which is defined here.
 (function () {
   'use strict';
 
@@ -12,8 +11,7 @@
 
   // Build one sheet slot's render data: rect, page scale, safe edges, and
   // the page content. Shared by the front (slots) and back (slotsBack) of a
-  // sheet so two-sided models use identical logic. Copied here from the
-  // original inline <script>, where it was a top-level function.
+  // sheet so two-sided models use identical logic.
   function zfBuildSlot(m, slot, pages) {
     var rect = window.ZFModels.slotRect(m, slot);
     var page = pages[slot.page - 1];
@@ -63,8 +61,6 @@
     };
   }
 
-  // Expose it on window so other modules and the original inline code can
-  // still reach it during the transition.
   window.zfBuildSlot = zfBuildSlot;
 
   var ZineSheet = {
@@ -93,7 +89,6 @@
       sheetStyle: function () {
         var m = this.model;
         if (!m) return {};
-        // Screen display: fit within a 560px-tall preview.
         var aspect = m.paper.width / m.paper.height;
         var h = 560;
         var w = Math.round(h * aspect);
@@ -102,54 +97,55 @@
       paperCss: function () {
         var m = this.model;
         if (!m) return '';
-        // Emit dynamic @page rules and the print size for this model's paper.
-        // NOTE: do NOT include an orientation keyword alongside explicit
-        // dimensions -- that confuses some browsers. Use explicit dims only.
+        // NATIVE ORIENTATION -- NO ROTATION.
+        //
+        // The sheet prints at the model's OWN paper size and orientation:
+        // a landscape model (mini-8, mini-16) gets a landscape @page and a
+        // landscape .zf-sheet, and the imposition slots sit where they
+        // naturally are. A portrait model (single-page) gets a portrait
+        // @page. No transform, no portrait swap.
+        //
+        // Why: the previous approach rotated a landscape imposition 90deg
+        // into a portrait page. That depended on the transform surviving the
+        // browser's print snapshot, which it did NOT on real printers --
+        // content printed unrotated in the top-left corner. With no rotation
+        // there is nothing to drop. Modern printers print landscape natively.
+        //
+        // w and h already carry their unit ("11in", "8.5in"), so they are
+        // used directly. The @page size, the .zf-sheet size, and the inner
+        // all use the model's natural w x h.
         var unit = m.paper.unit === 'in' ? 'in' : 'mm';
         var w = m.paper.width + unit;
         var h = m.paper.height + unit;
-        var aspect = m.paper.width / m.paper.height;
-        // No scale: the sheet prints edge-to-edge at exactly the paper size,
-        // so the fold lines land at the correct physical positions. Printers
-        // may clip the outer unprintable border (typically ~0.15-0.25in);
-        // design accordingly (put important content away from the extreme
-        // edges, or use the page margin for a bleed buffer).
-        // Print: paper is always portrait (matching the printer's physical
-        // feed direction). The model's landscape imposition sits inside a
-        // .zf-sheet-inner that gets rotated 90 degrees clockwise so the
-        // landscape zine fits on portrait paper. Folding happens after the
-        // user rotates the printed page 90 degrees counterclockwise.
-        //
-        // For Letter: model landscape 11x8.5 -> paper portrait 8.5x11.
-        // For A4:    model landscape 297x210 -> paper portrait 210x297.
-        //
-        // KEY: we keep the sheet-inner at its SCREEN dimensions (whatever
-        // the preview computed) and apply a single uniform scale to stretch
-        // it to fill the print paper. This ensures that every px-based
-        // value inside (fonts, paddings, absolute offsets, icon sizes,
-        // mini-page scale, etc.) scales by the exact same factor, so print
-        // becomes a faithful enlargement of the on-screen sheet.
-        var portW = h;  // portrait width = model paper height
-        var portH = w;  // portrait height = model paper width
-        return '@page { size: ' + portW + ' ' + portH + '; margin: 0; }\n' +
+        return '@page { size: ' + w + ' ' + h + '; margin: 0; }\n' +
                '@media print {\n' +
                '  html, body { margin: 0; padding: 0; background: #ffffff; }\n' +
+               // Each .zf-sheet is one printed side. Sized to the model's
+               // natural paper dimensions. The page break between sides is
+               // applied via .zf-sheet-side in app.css.
+               '  .zf-sheet-side {\n' +
+               '    display: block !important;\n' +
+               '    margin: 0 !important;\n' +
+               '    padding: 0 !important;\n' +
+               '    position: relative !important;\n' +
+               '  }\n' +
                '  .zf-sheet {\n' +
-               '    width: ' + portW + ' !important;\n' +
-               '    height: ' + portH + ' !important;\n' +
+               '    width: ' + w + ' !important;\n' +
+               '    height: ' + h + ' !important;\n' +
                '    margin: 0 !important;\n' +
                '    padding: 0 !important;\n' +
                '    overflow: hidden !important;\n' +
                '    position: relative !important;\n' +
                '  }\n' +
+               // No rotation: the inner fills the sheet 1:1. transform is
+               // explicitly reset so no leftover transform applies.
                '  .zf-sheet-inner {\n' +
-               '    width: ' + w + ' !important;\n' +
-               '    height: ' + h + ' !important;\n' +
+               '    width: 100% !important;\n' +
+               '    height: 100% !important;\n' +
                '    position: absolute !important;\n' +
                '    top: 0 !important;\n' +
                '    left: 0 !important;\n' +
-               '    transform-origin: 0 0 !important;\n' +
-               '    transform: translate(' + portW + ', 0) rotate(90deg) !important;\n' +
+               '    transform: none !important;\n' +
                '  }\n' +
                '}\n';
       },
@@ -168,9 +164,6 @@
       hasBack: function () {
         return this.slotsBack.length > 0;
       },
-      // One entry per printable side. Front always; back when the model
-      // defines slotsBack. Lets the sheet template loop over sides without
-      // duplicating the slot markup.
       sheetSides: function () {
         var sides = [{ label: 'Front', slots: this.slots }];
         if (this.hasBack) sides.push({ label: 'Back', slots: this.slotsBack });
@@ -188,15 +181,10 @@
       slotFreeImageStyleFor: function (img, s) {
         var m = this.model;
         if (!m || !img) return {};
-        // Decorative elements (tape, scraps, sticky notes, stickers) have no
-        // src but still need position/size/rotation.
         var decorKinds = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
         if (!img.src && !decorKinds[img.kind]) return {};
         return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
       },
-      // Merge a decorative element's position style with its custom color
-      // (hex from the color picker) so sticky notes and stickers recolor in
-      // the sheet view. Mirrors the editor component's helpers.
       stickyStyle: function (img, base) {
         var out = Object.assign({}, base || {});
         if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
@@ -216,7 +204,6 @@
         if (!m || !box) return {};
         return zfTextBoxStyle(box, m.page.width, m.page.height, store.marginIn);
       },
-
       sheetInjectFlows: function () {
         var self = this;
         this.$nextTick(function () {
@@ -226,20 +213,16 @@
       _attemptSheetInject: function (attempt) {
         var self = this;
         if (attempt > 20) return;
-        // Only retry while the sheet view is actually active.
         if (store.view !== "sheet") return;
         var root = self.$el;
         if (!root) { self._schedSheetRetry(attempt); return; }
         var bodies = root.querySelectorAll('.zf-mini-body[data-slot-page]');
         if (!bodies.length) { self._schedSheetRetry(attempt); return; }
-        // Check if the sheet is visible yet (first body should have size)
         var firstRect = bodies[0].getBoundingClientRect();
         if (firstRect.width < 20 || firstRect.height < 20) {
           self._schedSheetRetry(attempt);
           return;
         }
-        // TEMPORARY: legacy single-image path. Will be replaced by the
-        // multi-image loop in a subsequent step.
         for (var i = 0; i < bodies.length; i++) {
           var el = bodies[i];
           var pageNum = Number(el.getAttribute('data-slot-page'));
@@ -247,7 +230,6 @@
           if (!page) continue;
           var stale = el.querySelectorAll('[data-zf-spacer="1"], [data-zf-flow-img="1"]');
           for (var k = 0; k < stale.length; k++) stale[k].remove();
-          // Support both old (page.image) and new (page.images) shape.
           var flowImgs = [];
           if (Array.isArray(page.images) && page.images.length) {
             for (var fi = 0; fi < page.images.length; fi++) {
@@ -280,10 +262,6 @@
         setTimeout(function () { self._attemptSheetInject(attempt + 1); }, 80);
       },
       slotMiniPageStyle: function (s) {
-        // Build the mini-page's inline style. Base padding is margin * scale
-        // (mirrors .zf-mini-page's CSS padding). Additional padding is
-        // added on sides that touch the paper edge, using the safe-edge
-        // value. Everything scales via --zf-page-scale.
         var scale = (s && s.pageScale) ? s.pageScale : 1;
         var margin = store.marginIn;
         var safe = store.safeEdgeIn;
@@ -305,21 +283,6 @@
         };
       },
       printSheet: function () { window.print(); },
-      _zfJumpProbe: function () {
-        var self = this;
-        document.addEventListener('click', function () {
-          setTimeout(function () {
-            var page = document.querySelector('.zf-canvas-col .zf-mini-page');
-            var body = document.querySelector('.zf-mini-body.zf-editable');
-            function geo(el, name) {
-              if (!el) return name + '=none';
-              var r = el.getBoundingClientRect();
-              return name + '{t=' + Math.round(r.top) + ',h=' + Math.round(r.height) + ',st=' + el.scrollTop + ',sh=' + el.scrollHeight + '}';
-            }
-            try { console.log('[ZF JUMP] page' + geo(page, '') + ' body' + geo(body, '') + ' winScroll=' + window.scrollY); } catch (e) {}
-          }, 60);
-        }, true);
-      },
       installPaperCss: function () {
         try {
           var id = 'zf-paper-css';
@@ -329,9 +292,6 @@
             el.id = id;
             document.head.appendChild(el);
           }
-          // Never overwrite a good @page rule with an empty value. A re-render
-          // can momentarily evaluate paperCss to '' (e.g. model not ready yet);
-          // writing that would strip the print page size and blank the print.
           var css = this.paperCss;
           if (css) el.textContent = css;
         } catch (e) {}
@@ -340,9 +300,6 @@
     mounted: function () {
       this.installPaperCss();
       this.sheetInjectFlows();
-      // Re-assert the print page size and flow injections at the moment of
-      // every print. Without this, a second print can be blank because the
-      // DOM/style state left over from the first print is not re-applied.
       var self = this;
       this._onBeforePrint = function () {
         try {
@@ -364,11 +321,18 @@
     },
     template:
       '<div class="zf-sheet-view">' +
-        '<component :is="\'style\'" v-html="paperCss"></component>' +
         '<div class="zf-no-print" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">' +
           '<div>' +
             '<h2 style="margin:0;font-family:var(--zf-serif);">{{ model ? model.label : \'No model\' }}</h2>' +
             '<div class="zf-muted">Printable sheet preview. Toggle fold and cut guides below.</div>' +
+            '<div v-if="model && model.flip" class="zf-flip-note" style="margin-top:0.35rem;font-size:0.85rem;">' +
+              '<span class="zf-flip-badge">2-sided</span> ' +
+              'Print double-sided, flip on the <b>{{ model.flip === \'short\' ? \'short\' : \'long\' }} edge</b>.' +
+            '</div>' +
+            '<div v-if="model && model.binding === \'staple\'" class="zf-flip-note" style="margin-top:0.2rem;font-size:0.85rem;">' +
+              '<span class="zf-flip-badge">staple</span> ' +
+              'Two staple marks are printed on the spine. Staple there after folding.' +
+            '</div>' +
           '</div>' +
           '<div class="zf-header-actions" style="gap:0.5rem;">' +
             '<label class="zf-muted" style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;">' +
@@ -396,12 +360,15 @@
                   ':class="g.axis === \'v\' ? \'zf-cut-v\' : \'zf-cut-h\'" ' +
                   ':style="(g.axis === \'v\' ? \'top:\' + (g.from||0) + \'%;bottom:\' + (100-(g.to||100)) + \'%;left:\' : \'left:\' + (g.from||0) + \'%;right:\' + (100-(g.to||100)) + \'%;top:\') + g.pos + \'%\'"></div>' +
               '</template>' +
+              '<template v-if="model && model.binding === \'staple\'">' +
+                '<div class="zf-staple-mark zf-staple-mark-1" aria-hidden="true"></div>' +
+                '<div class="zf-staple-mark zf-staple-mark-2" aria-hidden="true"></div>' +
+              '</template>' +
             '</div>' +
             '<div v-for="s in side.slots" :key="s.key" class="zf-slot" :style="Object.assign({}, s.rect, themeStyle)">' +
             '<div class="zf-mini-page zf-slot-rot" :style="slotMiniPageStyle(s)">' +
               '<span v-if="showPageNumbers && s.pageNum > 1" class="zf-slot-page-num">{{ s.pageNum - 1 }}</span>' +
               '<template v-if="!s.isEmpty">' +
-
                 '<template v-for="img in (s.page.images || [])" :key="\'sl-blk-\' + img.id">' +
                   '<img v-if="img.wrap === \'block\' && img.kind !== \'icon\'" ' +
                     'class="zf-mini-image zf-block-image" :src="img.src" alt="" ' +
@@ -442,14 +409,11 @@
                   '</div>' +
                 '</template>' +
               '</template>' +
-
             '</div>' +
             '</div>' +
-
           '</div>' +
         '</div>' +
         '</div>' +
-
         '<div class="zf-instructions zf-no-print" v-if="model && model.instructions">' +
           '<h3>Text instructions</h3>' +
           '<ol>' +
@@ -460,4 +424,31 @@
   };
 
   window.ZineSheet = ZineSheet;
+
+  // Diagnostic: ZFDiag() from the app's own console dumps live sheet geometry.
+  window.ZFDiag = function () {
+    function g(el) {
+      if (!el) return null;
+      var cs = getComputedStyle(el);
+      return {
+        w: cs.width, h: cs.height, pos: cs.position,
+        transform: cs.transform, overflow: cs.overflow, display: cs.display
+      };
+    }
+    var st = document.getElementById('zf-paper-css');
+    var sheet = document.querySelector('.zf-sheet');
+    var inner = document.querySelector('.zf-sheet-inner');
+    var sides = document.querySelectorAll('.zf-sheet-side');
+    return {
+      model: window.ZF_STORE ? window.ZF_STORE.modelId : '(none)',
+      hasPaperStyle: !!st,
+      paperLen: st ? st.textContent.length : 0,
+      paperCss: st ? st.textContent : '(none)',
+      sideCount: sides.length,
+      sheet: g(sheet),
+      inner: g(inner),
+      sheetRect: sheet ? sheet.getBoundingClientRect().toJSON() : null,
+      innerRect: inner ? inner.getBoundingClientRect().toJSON() : null
+    };
+  };
 })();

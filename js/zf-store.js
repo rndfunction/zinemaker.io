@@ -140,18 +140,20 @@
   // A fresh zine starts with a full sheet's worth of blank pages for the
   // current model, so users don't have to click "Add page" repeatedly.
   function zfBlankPagesForModel(modelId) {
-    var per = 8;
-    var sides = 1;
+    var total = 8;
     try {
       if (window.ZFModels) {
         var m = window.ZFModels.getModel(modelId || 'mini-8');
-        if (m && m.pagesPerSheet) per = m.pagesPerSheet;
-        if (m && typeof m.sides === 'number' && m.sides > 0) sides = m.sides;
+        // pagesPerSheet is now DERIVED (cells * sides) by the model
+        // registry, so a 2-sided W-fold reports 16 while a 1-sided one
+        // reports 8. Do NOT multiply by sides again here.
+        if (window.ZFModels.pagesPerSheet) {
+          total = window.ZFModels.pagesPerSheet(m);
+        } else if (m && m.pagesPerSheet) {
+          total = m.pagesPerSheet;
+        }
       }
     } catch (e) {}
-    // A two-sided model needs pagesPerSheet * sides pages to fill both
-    // printed sides (e.g. the 4-page half-fold = 2 per side * 2 sides).
-    var total = per * sides;
     var arr = [];
     for (var i = 0; i < total; i++) arr.push(zfEmptyPage());
     return arr;
@@ -203,7 +205,14 @@
     // beyond the current sheet's capacity without starting a new sheet.
     sheetCapacity: function () {
       var m = this.model();
-      var per = (m && m.pagesPerSheet) ? m.pagesPerSheet : 1;
+      // Use the derived pages-per-sheet so 2-sided models (which produce
+      // cells*sides pages per physical sheet) get the right capacity.
+      var per = 1;
+      if (m && window.ZFModels && window.ZFModels.pagesPerSheet) {
+        per = window.ZFModels.pagesPerSheet(m);
+      } else if (m && m.pagesPerSheet) {
+        per = m.pagesPerSheet;
+      }
       var have = this.pages.length;
       var sheets = Math.max(1, Math.ceil(have / per));
       return sheets * per;
@@ -215,7 +224,12 @@
     // sheet by adding a full sheet's worth of blank pages. Never destroys.
     addPageOrSheet: function () {
       var m = this.model();
-      var per = (m && m.pagesPerSheet) ? m.pagesPerSheet : 1;
+      var per = 1;
+      if (m && window.ZFModels && window.ZFModels.pagesPerSheet) {
+        per = window.ZFModels.pagesPerSheet(m);
+      } else if (m && m.pagesPerSheet) {
+        per = m.pagesPerSheet;
+      }
       if (this.pages.length < this.sheetCapacity()) {
         this.addPage();
       } else {
@@ -262,6 +276,10 @@
     newZineInModel: function (modelId) {
       if (modelId && modelId !== this.modelId) this.modelId = modelId;
       this.newZine();
+      // newZine seeds a full sheet for the model, but if the model id
+      // changed in the line above AFTER the seed used the old model, make
+      // sure we still have a full sheet's worth of pages.
+      this.zfEnsureModelCapacity();
     },
     setView: function (v) { this.view = v; },
 
@@ -431,6 +449,19 @@
       }, 2500);
     },
 
+    // Grow the page array to the current model's capacity, adding blank
+    // pages at the end. Never shrinks: extra pages are kept (they simply
+    // won't print), matching the "never destroys content" rule. Needed
+    // because a 2-sided W-fold model produces 16 pages per sheet, so
+    // switching from mini-8 (8 pages) to mini-16 (16 pages) must add the
+    // 8 back-side pages or the imposition renders half empty.
+    zfEnsureModelCapacity: function () {
+      var cap = this.sheetCapacity();
+      while (this.pages.length < cap) {
+        this.pages.push(zfEmptyPage());
+      }
+    },
+
     setModel: function (id) {
       if (!window.ZFModels) return;
       if (id === this.modelId) return;
@@ -452,6 +483,10 @@
         if (!ok) return;
       }
       this.modelId = id;
+      // A model change can raise the pages-per-sheet (e.g. 8 -> 16 for a
+      // 2-sided W-fold). Pad the page array so the imposition has a full
+      // sheet to render instead of half-empty back cells.
+      this.zfEnsureModelCapacity();
       this.status = 'Zine model set to: ' + window.ZFModels.getModel(id).label;
       var self = this;
       setTimeout(function () {
@@ -461,14 +496,19 @@
 
     minimumPages: function () {
       var m = this.model();
-      return m ? m.pagesPerSheet : 1;
+      if (!m) return 1;
+      return (window.ZFModels && window.ZFModels.pagesPerSheet)
+        ? window.ZFModels.pagesPerSheet(m)
+        : (m.pagesPerSheet || 1);
     },
 
     pagesNeeded: function () {
       var m = this.model();
       if (!m) return 0;
       var have = this.pages.length;
-      var need = m.pagesPerSheet;
+      var need = (window.ZFModels && window.ZFModels.pagesPerSheet)
+        ? window.ZFModels.pagesPerSheet(m)
+        : (m.pagesPerSheet || 1);
       var sheets = Math.max(1, Math.ceil(have / need));
       return sheets * need;
     }

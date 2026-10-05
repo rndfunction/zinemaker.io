@@ -230,7 +230,37 @@
     .zf-btn-primary:hover { background: #e5a000; }
     .zf-main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
     .zf-muted { color: var(--zf-gray-mid); font-size: 0.9rem; }
-    .zf-error-boundary {
+    /* Sheet view: flip note badge + staple marks for two-sided / stapled models. */
+.zf-flip-badge {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--zf-border);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--zf-gray-light);
+  color: var(--zf-gray-mid);
+  vertical-align: 1px;
+}
+
+/* Two short ticks along the spine (horizontal center fold at 50%). Each
+   staple mark is a small perpendicular dash drawn just above and below
+   the fold line at 25% and 75% across the sheet, so the user can line up
+   a stapler after folding. */
+.zf-staple-mark {
+  position: absolute;
+  top: 50%;
+  width: calc(0.12in * var(--zf-page-scale, 1));
+  height: calc(0.02in * var(--zf-page-scale, 1));
+  background: #1b1b1b;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.zf-staple-mark-1 { left: 25%; }
+.zf-staple-mark-2 { left: 75%; }
+
+.zf-error-boundary {
       max-width: 480px; margin: 3rem auto; padding: 1.5rem;
       text-align: center; border: 1px solid var(--zf-border);
       border-radius: 8px; background: var(--zf-gray-light);
@@ -621,8 +651,13 @@
     }
     .zf-slot-page-num {
       position: absolute;
-      bottom: 4px;
-      right: 6px;
+      /* Physical clearance from the paper edges, scaled to the current view.
+         Was bottom:4px; right:6px, which sat inside most printers'
+         unprintable margin (~0.15-0.25in) and got clipped -- the number
+         showed in the preview but not on paper. 0.16in / 0.12in clears a
+         typical margin while staying close to the corner. */
+      bottom: calc(0.16in * var(--zf-page-scale, 1));
+      right: calc(0.12in * var(--zf-page-scale, 1));
       font-family: var(--zf-font);
       font-size: 0.6rem;
       color: var(--zf-gray-mid);
@@ -1171,6 +1206,14 @@
       position: absolute;
       border-top: 2px solid #1b1b1b;
     }
+    /* Vertical cut line. This rule was missing -- .zf-cut-v only had the
+       shared transparent/absolute rule above, so vertical cuts rendered
+       invisible. Mini-8 never used a vertical cut, so it went unnoticed
+       until the 16-page fold needed one. Mirrors .zf-cut-h. */
+    .zf-sheet-guides .zf-cut-v {
+      position: absolute;
+      border-left: 2px solid #1b1b1b;
+    }
     .zf-slot {
       position: absolute;
       padding: 0;
@@ -1428,20 +1471,50 @@
       #app .zf-main > section[data-zf-view="sheet"] > * { display: block !important; }
       /* Hide the editor/reader chrome that lives outside the sheet section. */
       #app > div > header { display: none !important; }
-      /* Show only the active sheet view */
-      .zf-sheet-side + .zf-sheet-side { margin-top: 1.5rem; }
+      /* Two-sided models render one .zf-sheet-side per printable side
+         (front, then back). Each side must land on its OWN physical page:
+         the front prints on the top of the paper and the back on the
+         reverse. Previously only a 1.5rem top margin separated them, and
+         .zf-sheet had `page-break-after: avoid`, so the browser crammed
+         both sides onto a single page -- the front ended up top-left
+         cornered and the back rendered into whatever space was left,
+         producing nonsense geometry. Force a page break after every side
+         except the last. */
+      /* Force a page break BEFORE each side after the first. Chromium
+         honors `break-before` on a block child more reliably than
+         `break-after` on the previous sibling. Combined with the
+         un-clipping rules below, this makes two-sided models print as
+         two physical pages (front, then back). */
+      .zf-sheet-side + .zf-sheet-side { page-break-before: always; break-before: page; }
+      /* Allow the sheet view and its ancestors to fragment across pages.
+         A parent with overflow:hidden (or a fixed height) becomes a
+         fragmentation container that swallows child page breaks. In print
+         we need every ancestor to be overflow:visible and auto-height so
+         the browser can paginate between the two .zf-sheet-side blocks. */
+      html, body, #app, #app > div, .zf-main, .zf-sheet-view {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+      }
     .zf-sheet-side-label {
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
       font-weight: 700; color: var(--zf-gray-mid); margin-bottom: 0.35rem; text-align: center;
     }
     .zf-sheet-view { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
       .zf-sheet-view > .zf-no-print { display: none !important; }
+      /* Each .zf-sheet is one printed side. It must not be split across
+         pages, but it MUST be allowed to start a new page after the
+         previous side (the page break is applied to .zf-sheet-side, not
+         here). `page-break-after: avoid` was the bug: it told the browser
+         to keep both sides on one page. */
       .zf-sheet {
         box-shadow: none !important;
         border: none !important;
         margin: 0 !important;
         page-break-inside: avoid;
-        page-break-after: avoid;
+        break-inside: avoid;
+        page-break-after: auto;
+        break-after: auto;
       }
       .zf-slot { border: none !important; }
       .zf-slot-label { display: none !important; }

@@ -146,6 +146,38 @@ function zfSafeColor(val) {
   return ZF_COLOR_RE.test(v) ? v : '';
 }
 
+// Inline style properties we preserve through sanitization, with a strict
+// value pattern for each. Anything not listed here (or whose value does not
+// match) is dropped. Kept deliberately narrow so a pasted/imported style can
+// never smuggle url(), expression(), javascript:, or other active CSS.
+var ZF_SAFE_STYLE_PROPS = {
+  'font-size':   /^[0-9.]+(em|rem|pt|px|%)$/,
+  'font-weight': /^(normal|bold|bolder|lighter|[1-9]00)$/,
+  'font-style':  /^(normal|italic|oblique)$/,
+  'text-align':  /^(left|right|center|justify)$/,
+  'line-height': /^[0-9.]+(em|rem|pt|px|%)?$/,
+  'font-family': /^[a-zA-Z0-9 ,'"-]+$/,
+  'color':       /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%]+\)|[a-zA-Z]{3,20})$/
+};
+
+// Parse an inline style string and return only the safe, validated
+// declarations as a rebuilt "prop: value; ..." string. Returns '' if none.
+function zfSafeInlineStyle(styleText) {
+  if (!styleText) return '';
+  var out = [];
+  var parts = String(styleText).split(';');
+  for (var i = 0; i < parts.length; i++) {
+    var decl = parts[i];
+    var colon = decl.indexOf(':');
+    if (colon < 0) continue;
+    var prop = decl.slice(0, colon).trim().toLowerCase();
+    var val = decl.slice(colon + 1).trim();
+    var re = ZF_SAFE_STYLE_PROPS[prop];
+    if (re && re.test(val)) out.push(prop + ': ' + val);
+  }
+  return out.join('; ');
+}
+
 function zfSanitizeHtml(html) {
   if (!html) return '';
   var tmp = document.createElement('div');
@@ -172,24 +204,29 @@ function zfSanitizeHtml(html) {
         node.replaceChild(frag, child);
         continue;
       }
-      // Capture a validated color BEFORE stripping attributes, since the
-      // removal below would otherwise delete it.
+      // Capture a SAFE SUBSET of inline styles BEFORE stripping attributes,
+      // since the removal below would otherwise delete them. This preserves
+      // font-size, font-weight, text-align, line-height, font-family and
+      // color through a save/load round trip -- previously ALL inline styles
+      // were dropped, so enlarged/bold text in bodies and text boxes came
+      // back at the base size (a number typed big printed as a tiny speck).
+      // Each value is validated against a strict pattern (zfSafeInlineStyle),
+      // so no active CSS can survive.
+      var keepStyle = zfSafeInlineStyle(child.getAttribute('style'));
       var keepColor = '';
-      if (tag === 'SPAN') {
-        var st = (child.getAttribute('style') || '');
-        var m = st.match(/color\s*:\s*([^;]+)/i);
-        if (m) keepColor = zfSafeColor(m[1]);
-      } else if (tag === 'FONT') {
+      if (tag === 'FONT') {
         keepColor = zfSafeColor(child.getAttribute('color'));
       }
       var attrs = Array.prototype.slice.call(child.attributes || []);
       for (var j = 0; j < attrs.length; j++) {
         child.removeAttribute(attrs[j].name);
       }
-      // Re-apply the single validated color so inline text color survives.
-      if (keepColor) {
-        if (tag === 'SPAN') child.setAttribute('style', 'color: ' + keepColor);
-        else if (tag === 'FONT') child.setAttribute('color', keepColor);
+      // Re-apply the validated styles. FONT keeps its legacy color attr.
+      if (keepStyle) {
+        child.setAttribute('style', keepStyle);
+      }
+      if (keepColor && tag === 'FONT') {
+        child.setAttribute('color', keepColor);
       }
       walk(child);
     }

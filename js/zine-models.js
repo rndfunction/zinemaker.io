@@ -109,124 +109,138 @@
     {
       id: 'mini-16',
       label: '16-page mini zine (1 sheet, 2 sides, US Letter)',
-      // Imposition page-number placement is unverified (see note below);
-      // hidden from pickers until confirmed by a test print.
-      experimental: true,
-      // One-sheet 16-page booklet, matching the method at
-      // https://colarusso.github.io/mini-zine/ :
-      //   - PRINT PORTRAIT, double-sided, flip on the LONG edge.
-      //   - The sheet is a 4x4 grid of cells per side; 8 of the 16 cells
-      //     carry a page (a checkerboard), so each side prints 8 pages and
-      //     two sides give the full 16.
-      //   - Fold into quarters both ways, cut ONE central slit, open the
-      //     slit into a plus shape, collapse, fold into a booklet, staple.
+      // SAME W-fold geometry as mini-8, printed DOUBLE-SIDED and stapled.
+      // The 4x4 / central-slit method used previously was a different sheet
+      // topography entirely and has been retired; this model now branches
+      // directly off the verified mini-8 fold.
       //
-      // IMPOSITION STATUS: The grid/geometry below (4x4, portrait, two
-      // sides, single center cut) is correct for this method. The exact
-      // PAGE NUMBERS per slot are a best-effort placement and may need a
-      // one-time correction after a test print. If the folded booklet's
-      // order is wrong, only the `page` values in slots/slotsBack change;
-      // the geometry is fixed.
-      paper: { width: 8.5, height: 11, unit: 'in', orientation: 'portrait' },
-      // Each of the 16 mini-pages is a quarter-sheet cell, roughly
-      // 2.125 x 2.75 in portrait.
-      page: { width: 2.125, height: 2.75, unit: 'in' },
-      pagesPerSheet: 8,
+      //   - PRINT LANDSCAPE, double-sided, flip on the LONG edge, at 100%.
+      //   - Front cells carry pages 1-8 (mini-8's pattern).
+      //   - Back cells carry pages 9-16, arranged so each back page is the
+      //     leaf-mate of the front page it shares paper with.
+      //   - Fold and cut exactly as mini-8, then staple the spine.
+      //
+      // IMPOSITION STATUS: The slot->page mapping below is a FIRST GUESS.
+      // Pages 1-8 (front) are verified mini-8. Pages 9-16 (back) are a
+      // mirrored guess pending a single test print. If the folded order is
+      // wrong, only the `page` values in slotsBack change; the geometry is
+      // fixed. Use the keyboard test-sheet helper to verify.
+      paper: { width: 11, height: 8.5, unit: 'in', orientation: 'landscape' },
+      // Same mini-page size as mini-8 after folding: ~2.75 x 4.25 portrait.
+      page: { width: 2.75, height: 4.25, unit: 'in' },
+      // Cells per side is 8 (see slots); pagesPerSheet is DERIVED as
+      // cells * sides = 16. Kept here for readability.
+      pagesPerSheet: 16,
       sides: 2,
-      // Front side: 8 page cells in a 4x4 checkerboard (col+row even).
+      // SHORT-edge flip: verified on a real print. In landscape, flipping
+      // on the short edge makes the back register correctly.
+      flip: 'short',
+      binding: 'staple',
+      // Imposition DERIVED from a physical test print. The fold permutation
+      // (which flat cell lands at which flip position) was read off the
+      // printed sheet, then pages were assigned so the booklet reads
+      // 1,2,3,...,16 as you flip through it. This differs from mini-8's
+      // front, because a 16-page booklet distributes pages across BOTH
+      // sides rather than putting all 8 front pages on one side.
+      // Front (rot 180 = top row, printed upside-down):
       slots: [
-        { page: 16, col: 0, row: 0, rotation: 0 },
-        { page: 1,  col: 2, row: 0, rotation: 0 },
-        { page: 14, col: 1, row: 1, rotation: 0 },
-        { page: 3,  col: 3, row: 1, rotation: 0 },
-        { page: 12, col: 0, row: 2, rotation: 0 },
-        { page: 5,  col: 2, row: 2, rotation: 0 },
-        { page: 10, col: 1, row: 3, rotation: 0 },
-        { page: 7,  col: 3, row: 3, rotation: 0 }
+        { page: 4, col: 3, row: 0, rotation: 180 },
+        { page: 5, col: 2, row: 0, rotation: 180 },
+        { page: 8, col: 1, row: 0, rotation: 180 },
+        { page: 9, col: 0, row: 0, rotation: 180 },
+        { page: 12, col: 0, row: 1, rotation: 0 },
+        { page: 13, col: 1, row: 1, rotation: 0 },
+        { page: 16, col: 2, row: 1, rotation: 0 },
+        { page: 1, col: 3, row: 1, rotation: 0 }
       ],
-      // Back side: the other 8 page cells.
+      // Back:
       slotsBack: [
-        { page: 2,  col: 1, row: 0, rotation: 0 },
-        { page: 15, col: 3, row: 0, rotation: 0 },
-        { page: 4,  col: 0, row: 1, rotation: 0 },
-        { page: 13, col: 2, row: 1, rotation: 0 },
-        { page: 6,  col: 1, row: 2, rotation: 0 },
-        { page: 11, col: 3, row: 2, rotation: 0 },
-        { page: 8,  col: 0, row: 3, rotation: 0 },
-        { page: 9,  col: 2, row: 3, rotation: 0 }
+        { page: 3, col: 0, row: 0, rotation: 180 },
+        { page: 6, col: 1, row: 0, rotation: 180 },
+        { page: 7, col: 2, row: 0, rotation: 180 },
+        { page: 10, col: 3, row: 0, rotation: 180 },
+        { page: 2, col: 0, row: 1, rotation: 0 },
+        { page: 15, col: 1, row: 1, rotation: 0 },
+        { page: 14, col: 2, row: 1, rotation: 0 },
+        { page: 11, col: 3, row: 1, rotation: 0 }
       ],
-      // Quarter-sheet cells are smaller than the 8-page mini-pages, so the
-      // content budget is roughly halved.
-      budget: { chars: 450, lines: 12, words: 75 },
+      // Same mini-page size as mini-8, so SAME budget.
+      budget: { chars: 900, lines: 23, words: 150 },
+      // Guides for the 16-page fold. The center lines are CUTS (not folds):
+      // you cut the sheet into quarters along the center vertical and
+      // center horizontal, then fold along the two outer vertical creases
+      // (v25, v75). Showing a fold and a cut on the same line was confusing,
+      // so the center is a cut only. The horizontal cut is FULL width (no
+      // from/to = full span); the vertical cut is FULL height.
       guides: [
-        // Fold lines: quarters both ways (the sheet folds into a 4x4 grid).
         { type: 'fold', axis: 'v', pos: 25 },
-        { type: 'fold', axis: 'v', pos: 50 },
         { type: 'fold', axis: 'v', pos: 75 },
-        { type: 'fold', axis: 'h', pos: 25 },
-        { type: 'fold', axis: 'h', pos: 50 },
-        { type: 'fold', axis: 'h', pos: 75 },
-        // ONE central slit cut (horizontal, spanning the middle column band).
-        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+        { type: 'cut', axis: 'h', pos: 50 },
+        { type: 'cut', axis: 'v', pos: 50 }
       ],
       instructions: [
-        'Print PORTRAIT, double-sided, flipping on the LONG edge, at 100%.',
-        'Fold the sheet in half both ways (horizontal and vertical), then unfold.',
-        'Fold each half in half again both ways, so the sheet creases into a 4x4 grid.',
-        'Cut a single slit along the center horizontal line, between the two middle vertical creases (the center cell).',
-        'Open the slit: the sheet forms a plus/cross shape with a hole in the middle.',
-        'Collapse the plus into a booklet, folding the pages over one another.',
-        'Staple twice along the spine (the folded edge) to bind the 16-page booklet.',
-        'Trim the outer edges if needed. Done.'
+        'Print LANDSCAPE, double-sided, flipping on the SHORT edge, at 100%.',
+        'Fold in half (mountain fold), then unfold.',
+        'Fold both edges to the center line, then unfold. The sheet now has 4 columns.',
+        'Fold in half lengthwise, then unfold. The sheet now has 2 rows.',
+        'Cut between 3 & 8 and between 4 & 7 (between the two center columns).',
+        'Push pages 4 & 3 and 7 & 8 away from one another, then pull the ends together.',
+        'Fold page 1 to the front. Staple twice along the spine to bind the 16-page booklet.',
+        'Flip the booklet over to read pages 9-16. Done.'
       ]
     },
     {
       id: 'mini-16-a4',
       label: '16-page mini zine (1 sheet, 2 sides, A4)',
-      experimental: true,
-      paper: { width: 210, height: 297, unit: 'mm', orientation: 'portrait' },
-      page: { width: 52.5, height: 74.25, unit: 'mm' },
-      pagesPerSheet: 8,
+      // A4 equivalent of mini-16. SAME fold geometry, imposition, flip and
+      // binding as the US-Letter mini-16 -- only the paper and page sizes
+      // differ (metric). Kept in sync with mini-16 by hand; if you change
+      // the imposition on one, change it on the other.
+      paper: { width: 297, height: 210, unit: 'mm', orientation: 'landscape' },
+      page: { width: 74.25, height: 105, unit: 'mm' },
+      pagesPerSheet: 16,
       sides: 2,
+      flip: 'short',
+      binding: 'staple',
+      // Front (rot 180 = top row, printed upside-down):
       slots: [
-        { page: 16, col: 0, row: 0, rotation: 0 },
-        { page: 1,  col: 2, row: 0, rotation: 0 },
-        { page: 14, col: 1, row: 1, rotation: 0 },
-        { page: 3,  col: 3, row: 1, rotation: 0 },
-        { page: 12, col: 0, row: 2, rotation: 0 },
-        { page: 5,  col: 2, row: 2, rotation: 0 },
-        { page: 10, col: 1, row: 3, rotation: 0 },
-        { page: 7,  col: 3, row: 3, rotation: 0 }
+        { page: 4, col: 3, row: 0, rotation: 180 },
+        { page: 5, col: 2, row: 0, rotation: 180 },
+        { page: 8, col: 1, row: 0, rotation: 180 },
+        { page: 9, col: 0, row: 0, rotation: 180 },
+        { page: 12, col: 0, row: 1, rotation: 0 },
+        { page: 13, col: 1, row: 1, rotation: 0 },
+        { page: 16, col: 2, row: 1, rotation: 0 },
+        { page: 1, col: 3, row: 1, rotation: 0 }
       ],
+      // Back:
       slotsBack: [
-        { page: 2,  col: 1, row: 0, rotation: 0 },
-        { page: 15, col: 3, row: 0, rotation: 0 },
-        { page: 4,  col: 0, row: 1, rotation: 0 },
-        { page: 13, col: 2, row: 1, rotation: 0 },
-        { page: 6,  col: 1, row: 2, rotation: 0 },
-        { page: 11, col: 3, row: 2, rotation: 0 },
-        { page: 8,  col: 0, row: 3, rotation: 0 },
-        { page: 9,  col: 2, row: 3, rotation: 0 }
+        { page: 3, col: 0, row: 0, rotation: 180 },
+        { page: 6, col: 1, row: 0, rotation: 180 },
+        { page: 7, col: 2, row: 0, rotation: 180 },
+        { page: 10, col: 3, row: 0, rotation: 180 },
+        { page: 2, col: 0, row: 1, rotation: 0 },
+        { page: 15, col: 1, row: 1, rotation: 0 },
+        { page: 14, col: 2, row: 1, rotation: 0 },
+        { page: 11, col: 3, row: 1, rotation: 0 }
       ],
-      budget: { chars: 450, lines: 12, words: 75 },
+      budget: { chars: 900, lines: 23, words: 150 },
+      // Center lines are CUTS; outer verticals are folds. Same as mini-16.
       guides: [
         { type: 'fold', axis: 'v', pos: 25 },
-        { type: 'fold', axis: 'v', pos: 50 },
         { type: 'fold', axis: 'v', pos: 75 },
-        { type: 'fold', axis: 'h', pos: 25 },
-        { type: 'fold', axis: 'h', pos: 50 },
-        { type: 'fold', axis: 'h', pos: 75 },
-        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 75 }
+        { type: 'cut', axis: 'h', pos: 50 },
+        { type: 'cut', axis: 'v', pos: 50 }
       ],
       instructions: [
-        'Print PORTRAIT, double-sided, flipping on the LONG edge, at 100%.',
-        'Fold the sheet in half both ways (horizontal and vertical), then unfold.',
-        'Fold each half in half again both ways, so the sheet creases into a 4x4 grid.',
-        'Cut a single slit along the center horizontal line, between the two middle vertical creases (the center cell).',
-        'Open the slit: the sheet forms a plus/cross shape with a hole in the middle.',
-        'Collapse the plus into a booklet, folding the pages over one another.',
-        'Staple twice along the spine (the folded edge) to bind the 16-page booklet.',
-        'Trim the outer edges if needed. Done.'
+        'Print LANDSCAPE, double-sided, flipping on the SHORT edge, at 100%.',
+        'Fold in half (mountain fold), then unfold.',
+        'Fold both edges to the center line, then unfold. The sheet now has 4 columns.',
+        'Fold in half lengthwise, then unfold. The sheet now has 2 rows.',
+        'Cut along the center vertical and center horizontal lines (the + cut).',
+        'Fold along the two outer vertical creases.',
+        'Fold page 1 to the front. Staple twice along the spine to bind the 16-page booklet.',
+        'Flip the booklet over to read the rest. Done.'
       ]
     },
     {
@@ -267,6 +281,29 @@
     return MODELS[0];
   }
 
+  // ---- Geometry primitives ----
+  // pagesPerSheet is DERIVED, not hardcoded: it is the number of zine pages
+  // one physical sheet produces, i.e. (cells per side) x (number of sides).
+  // A model may still declare pagesPerSheet explicitly for legacy reasons,
+  // but derivePagesPerSheet() is the source of truth and matches it.
+  // This is what lets a 1-sided W-fold (8 cells, 8 pages) and a 2-sided
+  // W-fold (8 cells x 2 sides, 16 pages) share the SAME grid geometry.
+  function cellsPerSide(model) {
+    if (!model || !model.slots) return 0;
+    return model.slots.length;
+  }
+
+  function modelSides(model) {
+    if (!model) return 1;
+    return (typeof model.sides === 'number' && model.sides > 0) ? model.sides : 1;
+  }
+
+  function derivePagesPerSheet(model) {
+    var cells = cellsPerSide(model);
+    if (!cells) return (model && model.pagesPerSheet) ? model.pagesPerSheet : 1;
+    return cells * modelSides(model);
+  }
+
   // Models flagged `experimental: true` have an UNVERIFIED imposition --
   // the slot page-numbers may need a one-time correction after a test
   // print (see the mini-16 comments above). They are hidden from the user
@@ -287,11 +324,11 @@
   }
 
   function minimumPages(model) {
-    return model.pagesPerSheet;
+    return derivePagesPerSheet(model);
   }
 
   function requiredPageCount(model, sheets) {
-    return model.pagesPerSheet * Math.max(1, sheets);
+    return derivePagesPerSheet(model) * Math.max(1, sheets);
   }
 
   // How many slots wide/tall is the grid for this model?
@@ -337,6 +374,9 @@
     listModels: listModels,
     minimumPages: minimumPages,
     requiredPageCount: requiredPageCount,
+    pagesPerSheet: derivePagesPerSheet,
+    cellsPerSide: cellsPerSide,
+    sides: modelSides,
     gridSize: gridSize,
     slotRect: slotRect,
     contentBudget: contentBudget,
