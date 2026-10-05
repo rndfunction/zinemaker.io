@@ -1154,7 +1154,9 @@
     }
     .zf-sheet-guides .zf-fold-h,
     .zf-sheet-guides .zf-fold-v,
-    .zf-sheet-guides .zf-cut-v {
+    .zf-sheet-guides .zf-cut-v,
+    .zf-sheet-guides .zf-staple-v,
+    .zf-sheet-guides .zf-staple-h {
       position: absolute;
       background: transparent;
       pointer-events: none;
@@ -1170,6 +1172,16 @@
     .zf-sheet-guides .zf-cut-h {
       position: absolute;
       border-top: 2px solid #1b1b1b;
+    }
+    /* Staple line: dotted blue, visually distinct from the red dashed fold
+       lines and the solid-black cut lines. Marks where to staple the spine
+       of a multi-page booklet (e.g. the 16-page mini). Optional; toggled in
+       the sheet view. */
+    .zf-sheet-guides .zf-staple-h {
+      border-top: 2px dotted #2563eb;
+    }
+    .zf-sheet-guides .zf-staple-v {
+      border-left: 2px dotted #2563eb;
     }
     .zf-slot {
       position: absolute;
@@ -1429,7 +1441,19 @@
       /* Hide the editor/reader chrome that lives outside the sheet section. */
       #app > div > header { display: none !important; }
       /* Show only the active sheet view */
-      .zf-sheet-side + .zf-sheet-side { margin-top: 1.5rem; }
+      /* Two-sided models render a sheet per side; each side prints on its
+         own page. Keep the wrapper simple: block flow, no extra positioning
+         (position: relative here interfered with the rotated inner sheet and
+         pushed the imposition into a corner), and a hard page break. */
+      .zf-sheet-side {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      .zf-sheet-side:last-child { page-break-after: auto; break-after: auto; }
+      .zf-sheet-side + .zf-sheet-side { margin-top: 0 !important; }
     .zf-sheet-side-label {
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
       font-weight: 700; color: var(--zf-gray-mid); margin-bottom: 0.35rem; text-align: center;
