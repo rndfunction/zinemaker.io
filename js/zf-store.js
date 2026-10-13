@@ -494,6 +494,24 @@
       }, 2500);
     },
 
+    // The margin to use for the CURRENT model. A model may declare its own
+    // marginIn (e.g. the accordion sets 0 so every panel is congruent and
+    // folds flush); otherwise the user's global margin applies. All views
+    // should read this instead of store.marginIn directly so a per-model
+    // override is honored everywhere.
+    modelMarginIn: function () {
+      var m = this.model();
+      if (m && typeof m.marginIn === 'number') return m.marginIn;
+      return this.marginIn;
+    },
+    // Whether the current model opts out of the printer safe-edge padding.
+    // The accordion needs this: safe-edge would add asymmetric padding to
+    // edge panels and break the uniform panel size the fold requires.
+    modelNoSafeEdge: function () {
+      var m = this.model();
+      return !!(m && m.noSafeEdge);
+    },
+
     minimumPages: function () {
       var m = this.model();
       if (!m) return 1;

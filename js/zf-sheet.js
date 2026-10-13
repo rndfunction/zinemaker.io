@@ -55,7 +55,7 @@
         !(page.textBoxes && page.textBoxes.length)
       ),
       pageScale: slotScale,
-      pageMargin: store.marginIn + 'in',
+      pageMargin: store.modelMarginIn() + 'in',
       safeEdges: safeEdges,
       bodyHtml: page ? (page.body || '') : ''
     };
@@ -174,7 +174,7 @@
       slotBlockImageStyleFor: function (img, s) {
         var m = this.model;
         if (!m || !img || !img.src) return {};
-        var base = zfElementStyle(img, m.page.width, m.page.height, store.marginIn, { block: true });
+        var base = zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), { block: true });
         base.borderRadius = "calc(0.02in * var(--zf-page-scale, 1))";
         return base;
       },
@@ -183,7 +183,7 @@
         if (!m || !img) return {};
         var decorKinds = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
         if (!img.src && !decorKinds[img.kind]) return {};
-        return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
+        return zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), {});
       },
       stickyStyle: function (img, base) {
         var out = Object.assign({}, base || {});
@@ -202,7 +202,7 @@
       slotTextBoxStyleFor: function (box, s) {
         var m = this.model;
         if (!m || !box) return {};
-        return zfTextBoxStyle(box, m.page.width, m.page.height, store.marginIn);
+        return zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
       },
       sheetInjectFlows: function () {
         var self = this;
@@ -263,8 +263,10 @@
       },
       slotMiniPageStyle: function (s) {
         var scale = (s && s.pageScale) ? s.pageScale : 1;
-        var margin = store.marginIn;
-        var safe = store.safeEdgeIn;
+        var margin = store.modelMarginIn();
+        // Models that opt out of safe-edge (e.g. the accordion) get no
+        // extra edge padding, so every panel is the same effective size.
+        var safe = store.modelNoSafeEdge() ? 0 : store.safeEdgeIn;
         var se = (s && s.safeEdges) ? s.safeEdges : {};
         var top = margin + (se.top ? safe : 0);
         var right = margin + (se.right ? safe : 0);

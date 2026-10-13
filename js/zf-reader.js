@@ -31,7 +31,7 @@
         if (!img || !img.src) return {};
         var m = store.model();
         if (!m) return {};
-        var base = zfElementStyle(img, m.page.width, m.page.height, store.marginIn, { block: true });
+        var base = zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), { block: true });
         base.borderRadius = "calc(0.02in * var(--zf-page-scale, 1))";
         return base;
       },
@@ -42,7 +42,7 @@
         if (!img.src && !decorKinds[img.kind]) return {};
         var m = store.model();
         if (!m) return {};
-        return zfElementStyle(img, m.page.width, m.page.height, store.marginIn, {});
+        return zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), {});
       },
       // Merge a decorative element's position style with its custom color
       // (hex from the color picker) so sticky notes and stickers recolor in
@@ -65,7 +65,7 @@
         if (!box) return {};
         var m = store.model();
         if (!m) return {};
-        return zfTextBoxStyle(box, m.page.width, m.page.height, store.marginIn);
+        return zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
       },
       injectReaderFlow: function () {
         var self = this;
@@ -150,7 +150,7 @@
           width: Math.round(renderedW) + "px",
           height: Math.round(renderedH) + "px",
           "--zf-page-scale": pageScale,
-          "--zf-page-margin": store.marginIn + "in"
+          "--zf-page-margin": store.modelMarginIn() + "in"
         };
       }
     },

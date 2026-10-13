@@ -930,6 +930,133 @@
     .zf-textbox .zf-img-handle {
       display: none;
     }
+    /* -------- Drawing overlay -------- */
+    /* The layer fills the mini-page and sits above its content. The canvas
+       captures pointer events so a drag draws instead of dragging an element
+       or editing text. */
+    .zf-draw-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 500;
+      pointer-events: none;
+    }
+    .zf-draw-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: auto;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .zf-draw-toolbar {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      max-width: calc(100% - 12px);
+      padding: 0.35rem 0.5rem;
+      background: rgba(27,27,27,0.92);
+      color: #ffffff;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      pointer-events: auto;
+      z-index: 501;
+    }
+    .zf-draw-tool {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: transparent;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 4px;
+      padding: 0.15rem 0.4rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .zf-draw-tool input[type="color"] {
+      width: 24px; height: 20px; padding: 0; border: none; background: transparent; cursor: pointer;
+    }
+    .zf-draw-tool input[type="range"] { width: 72px; }
+    /* Drawing tools panel, docked in the right rail (below the rail groups)
+       while drawing. Vertical stack of rows so it fits the narrow rail
+       column and keeps the canvas clear. */
+    /* The draw panel floats in the empty space to the RIGHT of the centered
+       1100px editor container, WITHOUT reflowing the grid (so the canvas
+       keeps its full width and is never squished). It is fixed to the right
+       edge on wide screens; on narrow screens where there is no free space
+       it is hidden (see the media query below) so it cannot cover the page. */
+    .zf-draw-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.6rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      background: var(--zf-gray-light, #f2f2f2);
+      position: fixed;
+      top: 5rem;
+      right: 1rem;
+      width: 168px;
+      max-height: calc(100vh - 6rem);
+      overflow-y: auto;
+      z-index: 40;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    /* Hide the floating panel when the viewport is too narrow to have free
+       space beside the 1100px editor + rail (it would overlap content). */
+    @media (max-width: 1400px) {
+      .zf-draw-panel { display: none; }
+    }
+    .zf-draw-panel-head {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      color: var(--zf-gray-mid);
+    }
+    .zf-draw-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+    }
+    .zf-draw-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      color: var(--zf-ink);
+    }
+    .zf-draw-opt input[type="range"] { width: 100%; max-width: 120px; }
+    .zf-draw-opt input[type="color"] {
+      width: 28px; height: 22px; padding: 0; border: 1px solid var(--zf-border); border-radius: 4px; background: #ffffff; cursor: pointer;
+    }
+    .zf-draw-opt select {
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      padding: 0.1rem 0.2rem;
+      background: #ffffff;
+    }
+    .zf-draw-btn {
+      flex: 1 1 auto;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      background: #ffffff;
+      color: var(--zf-blue-dark, #005ea2);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+    }
+    .zf-draw-btn:hover { border-color: var(--zf-blue, #005ea2); }
+    .zf-draw-done { background: var(--zf-blue, #005ea2); color: #ffffff; border-color: var(--zf-blue, #005ea2); }
     .zf-textbox-selected .zf-img-handle {
       display: block;
     }

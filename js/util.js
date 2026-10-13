@@ -422,6 +422,134 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
   return style;
 }
 
+// -------- Vector drawings --------
+// A drawing is stored as a list of strokes (vector), not as a baked image.
+// Each stroke records the tool and settings plus its points, all in PAGE
+// INCH coordinates, so the same data renders identically at any scale:
+//   { tool: 'pen'|'calligraphy'|'eraser', color, size, opacity, nib,
+//     pts: [{x, y}, ...] }   // x,y in inches within the page box
+//
+// zfRenderStrokes draws that list onto a 2D context. `scale` converts inches
+// to the target canvas's pixels (px = inch * scale), so the live editor
+// passes its on-screen scale and a high-DPI commit passes a large scale.
+// Drawing in inches means the render is resolution-independent.
+
+// Convert #rrggbb (+ alpha) to an rgba() string. Mirrors the editor helper so
+// the renderer is self-contained.
+function zfColorWithAlpha(hex, alpha) {
+  var h = String(hex || '#000000').replace('#', '');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (h.length !== 6) return 'rgba(0,0,0,' + alpha + ')';
+  var r = parseInt(h.slice(0,2), 16);
+  var g = parseInt(h.slice(2,4), 16);
+  var b = parseInt(h.slice(4,6), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+// Fill one calligraphy segment (a->b, inches) as a nib-shaped quad. Width
+// comes from the angle between travel and the nib edge.
+function zfRenderCalliSegment(ctx, a, b, stroke, scale, prevEdge) {
+  var ax = a.x * scale, ay = a.y * scale;
+  var bx = b.x * scale, by = b.y * scale;
+  var phi = Math.atan2(by - ay, bx - ax);
+  var theta = (stroke.nib || 0) * Math.PI / 180;
+  var base = stroke.size * scale;
+  var hw = Math.max((base / 2) * Math.abs(Math.sin(phi - theta)), base * 0.06);
+  var nx = -Math.sin(phi), ny = Math.cos(phi);
+  var aL = { x: ax + nx * hw, y: ay + ny * hw };
+  var aR = { x: ax - nx * hw, y: ay - ny * hw };
+  var bL = { x: bx + nx * hw, y: by + ny * hw };
+  var bR = { x: bx - nx * hw, y: by - ny * hw };
+  var startL = prevEdge ? prevEdge.L : aL;
+  var startR = prevEdge ? prevEdge.R : aR;
+  ctx.beginPath();
+  ctx.moveTo(startL.x, startL.y);
+  ctx.lineTo(aL.x, aL.y);
+  ctx.lineTo(bL.x, bL.y);
+  ctx.lineTo(bR.x, bR.y);
+  ctx.lineTo(aR.x, aR.y);
+  ctx.lineTo(startR.x, startR.y);
+  ctx.closePath();
+  ctx.fill();
+  return { L: bL, R: bR };
+}
+
+// Draw a full stroke list. `opts.reserve` (0..1) shrinks the rendered drawing
+// within its box (used when the box is slightly larger than the ink).
+function zfRenderStrokes(ctx, strokes, scale, opts) {
+  if (!ctx || !Array.isArray(strokes)) return;
+  opts = opts || {};
+  var alpha = (typeof opts.alpha === 'number') ? opts.alpha : 1;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (var s = 0; s < strokes.length; s++) {
+    var st = strokes[s];
+    var pts = st.pts || [];
+    if (pts.length === 0) continue;
+    var op = (typeof st.opacity === 'number' ? st.opacity : 1) * alpha;
+    var erasing = (st.tool === 'eraser');
+    if (erasing) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0,0,0,1)';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      var col = (op >= 1) ? st.color : zfColorWithAlpha(st.color, op);
+      ctx.fillStyle = col;
+      ctx.strokeStyle = col;
+    }
+
+    if (st.tool === 'calligraphy') {
+      var prevEdge = null;
+      for (var c = 1; c < pts.length; c++) {
+        prevEdge = zfRenderCalliSegment(ctx, pts[c-1], pts[c], st, scale, prevEdge);
+      }
+      if (pts.length === 1) {
+        // A tap: draw a small quad.
+        zfRenderCalliSegment(ctx, pts[0], { x: pts[0].x + 0.004, y: pts[0].y + 0.004 }, st, scale, null);
+      }
+    } else {
+      // Pen / eraser: a rounded polyline. If the stroke has a smoothing
+      // level, draw quadratic curves through the midpoints (matching the
+      // live editor) so the committed render looks like what was drawn.
+      ctx.lineWidth = st.size * scale;
+      var sm = (typeof st.smoothing === 'number') ? st.smoothing : 0;
+      if (pts.length === 1) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
+        ctx.lineTo(pts[0].x * scale + 0.01, pts[0].y * scale + 0.01);
+        ctx.stroke();
+      } else if (sm > 0) {
+        // Retain 3..5 points like the live editor; curve through midpoints.
+        var keep = 2 + sm;
+        var buf = [];
+        ctx.beginPath();
+        for (var q = 0; q < pts.length; q++) {
+          buf.push(pts[q]);
+          if (buf.length > keep) buf.shift();
+          if (buf.length >= 3) {
+            var p0 = buf[buf.length - 3], p1 = buf[buf.length - 2], p2 = buf[buf.length - 1];
+            var m1x = (p0.x + p1.x) / 2 * scale, m1y = (p0.y + p1.y) / 2 * scale;
+            var m2x = (p1.x + p2.x) / 2 * scale, m2y = (p1.y + p2.y) / 2 * scale;
+            if (q === 2) ctx.moveTo(m1x, m1y);
+            ctx.quadraticCurveTo(p1.x * scale, p1.y * scale, m2x, m2y);
+          }
+        }
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
+        for (var p = 1; p < pts.length; p++) {
+          ctx.lineTo(pts[p].x * scale, pts[p].y * scale);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 // -------- Template refit --------
 // Refit a template's pages from the page size they were authored at to a
 // target model's page size, so one template works for every model. The

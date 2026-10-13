@@ -271,6 +271,94 @@
         'Fold the sheet in half across the middle so page 1 is the front cover.',
         'Page 2 is inside-left, page 3 is inside-right, page 4 is the back cover.'
       ]
+    },
+    {
+      id: 'mini-16-accordion',
+      label: '16-page accordion (1 sheet, 1 side, no staples)',
+      // Single-sided 4x4 accordion fold. Cut the sheet into 4 horizontal
+      // strips (they stay connected), then accordion-fold. No staples and
+      // no double-sided printing -- the whole booklet is one face.
+      //
+      // Layout (landscape 11x8.5, 4 cols x 4 rows). Covers are counted as
+      // pages 1 and 16 so every cell maps to a real page.
+      //
+      //   row A (top):    16  15  14  13
+      //   row B:           9  10  11  12
+      //   row C:           8   7   6   5
+      //   row D (bottom):  1   2   3   4
+      //
+      // Reading order serpentines up the sheet: D left->right, C right->left,
+      // B left->right, A right->left. Rows alternate orientation (1st and
+      // 3rd right-side-up, 2nd and 4th upside-down) per the source diagram.
+      //
+      // IMPOSITION STATUS: mapping and rotations are a best-effort read of a
+      // reference diagram, NOT yet verified on paper. Print, fold, and read;
+      // if the order is wrong, only the `page`/`rotation` values change.
+      paper: { width: 11, height: 8.5, unit: 'in', orientation: 'landscape' },
+      // 4x4 grid on an 11x8.5 sheet => each panel is 2.75 x 2.125 (landscape).
+      page: { width: 2.75, height: 2.125, unit: 'in' },
+      pagesPerSheet: 16,
+      sides: 1,
+      binding: 'none',
+      // Zero page margin: the mini-page IS the folded panel, so any inset
+      // would make edge panels a different effective size than interior
+      // ones and the accordion would not fold flush. noSafeEdge disables the
+      // printer safe-edge padding for the same reason (it would add
+      // asymmetric inset to edge panels).
+      marginIn: 0,
+      noSafeEdge: true,
+      slots: [
+        // row A (top), left->right: 16,15,14,13 -- printed upside-down
+        { page: 16, col: 0, row: 0, rotation: 180 },
+        { page: 15, col: 1, row: 0, rotation: 180 },
+        { page: 14, col: 2, row: 0, rotation: 180 },
+        { page: 13, col: 3, row: 0, rotation: 180 },
+        // row B: 9,10,11,12 -- right-side-up
+        { page: 9, col: 0, row: 1, rotation: 0 },
+        { page: 10, col: 1, row: 1, rotation: 0 },
+        { page: 11, col: 2, row: 1, rotation: 0 },
+        { page: 12, col: 3, row: 1, rotation: 0 },
+        // row C: 8,7,6,5 -- printed upside-down
+        { page: 8, col: 0, row: 2, rotation: 180 },
+        { page: 7, col: 1, row: 2, rotation: 180 },
+        { page: 6, col: 2, row: 2, rotation: 180 },
+        { page: 5, col: 3, row: 2, rotation: 180 },
+        // row D (bottom): 1,2,3,4 -- right-side-up
+        { page: 1, col: 0, row: 3, rotation: 0 },
+        { page: 2, col: 1, row: 3, rotation: 0 },
+        { page: 3, col: 2, row: 3, rotation: 0 },
+        { page: 4, col: 3, row: 3, rotation: 0 }
+      ],
+      // Three horizontal cuts between the four strips. They stay connected
+      // after cutting (the cuts separate strips, they do not detach them).
+      // Fold lines at every interior grid line (the 4x4 cell boundaries),
+      // and cut lines at the three horizontal strip boundaries. The cuts are
+      // PARTIAL -- each spans a different range of columns so the strips
+      // stay connected (alternating), which is what makes the accordion
+      // hold together without staples:
+      //   top cut    (pos 25): columns 1-3  -> from 0% to 75%
+      //   middle cut (pos 50): columns 2-4  -> from 25% to 100%
+      //   bottom cut (pos 75): columns 1-3  -> from 0% to 75%
+      guides: [
+        { type: 'fold', axis: 'v', pos: 25 },
+        { type: 'fold', axis: 'v', pos: 50 },
+        { type: 'fold', axis: 'v', pos: 75 },
+        { type: 'fold', axis: 'h', pos: 25 },
+        { type: 'fold', axis: 'h', pos: 50 },
+        { type: 'fold', axis: 'h', pos: 75 },
+        { type: 'cut', axis: 'h', pos: 25, from: 0,  to: 75 },
+        { type: 'cut', axis: 'h', pos: 50, from: 25, to: 100 },
+        { type: 'cut', axis: 'h', pos: 75, from: 0,  to: 75 }
+      ],
+      budget: { chars: 700, lines: 14, words: 100 },
+      instructions: [
+        'Print this sheet ONE SIDE ONLY, landscape, at 100%.',
+        'Cut along the three horizontal lines to make four connected strips.',
+        'Fold the strips accordion-style (mountain/valley alternating) so the panels stack.',
+        'Fold the inside front cover (page 1) face to face with page 2.',
+        'Continue folding back-to-back / face-to-face in page order.',
+        'Tuck the blank ends into the cover pocket to finish. No staples needed.'
+      ]
     }
   ];
 
