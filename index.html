@@ -329,7 +329,7 @@
               </div>
             </div>
           </div>
-          <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)">
+          <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)" @mousedown="onBodyMouseDown">
             <template v-for="g in safeGuides" :key="g.key">
               <div class="zf-mini-safe-guide" :style="g.style"></div>
             </template>
@@ -365,13 +365,12 @@
                   contenteditable="true"
                   @input="onBodyInput"
                   @paste="onBodyPaste"
-                  @focus="clearElementSelection"
-                  @mousedown="onBodyMouseDown"></div>
+                  @focus="clearElementSelection"></div>
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                     :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
+                      :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-handle-owner': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                      @mousedown="onTextBoxMouseDown($event, box)"
@@ -397,7 +396,7 @@
                    class="zf-img-wrap"
                    :data-zf-img-id="img.id"
                    tabindex="0"
-                     :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
+                      :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-handle-owner': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
                      @mousedown="onImageMouseDownItem($event, img)"
                      @click.stop="onElementClick('image', img, $event)"

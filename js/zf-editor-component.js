@@ -28,6 +28,15 @@
       // mini-page so this works identically in every view.
       var base = zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), {});
       base.cursor = "grab";
+      // Layered z boost so a SELECTED element (and its handles) paints above
+      // unselected neighbors, and the PRIMARY (handle-owner) paints above the
+      // other selected -- otherwise a higher-z neighbor covers the handles
+      // and they cannot be grabbed. Derived from selection, so it reverts
+      // automatically on deselect (the stored z is never changed).
+      var page = this.active;
+      if (page && this.isSelected('image', img.id)) {
+        base.zIndex = base.zIndex + (page.activeImageId === img.id ? 20000 : 10000);
+      }
       return base;
     },
     imageBlockStyle: function (img) {
@@ -56,8 +65,14 @@
     // Mousedown on the page body (empty space). Starts a potential marquee;
     // whether it becomes a marquee or a plain text-click is decided by
     // movement (see onImageMouseMove / onImageMouseUp).
+    // Mousedown on the page (anywhere in the visible page, including its
+    // margins/padding) starts a potential marquee. Ignore mousedowns that
+    // land on an element or a handle -- those have their own handlers and
+    // should select/move/transform rather than start a band.
     onBodyMouseDown: function (evt) {
       if (evt.button !== 0) return;
+      var t = evt.target;
+      if (t && t.closest && t.closest('.zf-img-wrap, .zf-textbox, .zf-img-handle, .zf-mini-safe-guide')) return;
       this.marquee = {
         active: true,
         startX: evt.clientX, startY: evt.clientY,
@@ -1128,7 +1143,89 @@
         if (page.activeImageId === el.id) page.activeImageId = null;
       }
     },
+    // -------- Block z-order (multi-selection / group) --------
+    // Move every selected element as a BLOCK, preserving their relative
+    // stacking, so a group keeps its internal order when raised/lowered.
+    _selectedEls: function () {
+      var page = this.active;
+      if (!page) return [];
+      var out = [];
+      (this.selSet || []).forEach(function (s) {
+        var el = null;
+        if (s.kind === 'textBox') {
+          (page.textBoxes || []).forEach(function (tb) { if (tb.id === s.id) el = tb; });
+        } else {
+          (page.images || []).forEach(function (im) { if (im.id === s.id) el = im; });
+        }
+        if (el) out.push(el);
+      });
+      return out;
+    },
+    _blockZOrder: function (dir) {
+      var page = this.active;
+      if (!page) return;
+      var block = this._selectedEls();
+      if (!block.length) return;
+      var all = (page.images || []).concat(page.textBoxes || []);
+      var inBlock = {};
+      block.forEach(function (e) { inBlock[e.id] = true; });
+      var zOf = function (e) { return (typeof e.z === 'number') ? e.z : 0; };
+      // Order the block members by their current relative z, so we can
+      // reassign them CONTIGUOUS slots preserving their internal order.
+      var ordered = block.slice().sort(function (a, b) { return zOf(a) - zOf(b); });
+      var n = ordered.length;
+      // The z-values of everything NOT in the block, sorted.
+      var others = all.filter(function (e) { return !inBlock[e.id]; }).map(zOf).sort(function (a, b) { return a - b; });
+
+      // Compact the block into a contiguous band (no strangers between
+      // members), then place that band at the target end / step.
+      function assignBand(base) {
+        // base = lowest z for the band; members ascend by 1 from there.
+        ordered.forEach(function (e, i) { e.z = Math.round((base + i) * 100) / 100; });
+      }
+
+      if (dir === 'front') {
+        // Place the band above everything: lowest member = maxOther + 1.
+        var maxOther = others.length ? others[others.length - 1] : 0;
+        assignBand(maxOther + 1);
+      } else if (dir === 'back') {
+        var minOther = others.length ? others[0] : 1;
+        assignBand(minOther - n); // band ends just below the lowest other
+      } else if (dir === 'forward') {
+        // Move the band so it sits just ABOVE the next element above it.
+        var curMax = Math.max.apply(null, block.map(zOf));
+        var nextAbove = null;
+        for (var a = 0; a < others.length; a++) { if (others[a] > curMax) { nextAbove = others[a]; break; } }
+        if (nextAbove === null) return; // already on top
+        // Re-stack everything: elements above nextAbove stay above the band.
+        assignBand(nextAbove + 1);
+        // Push any other that collided above nextAbove by n.
+        // (Simplest stable approach: bump others that are >= the new band.)
+        var newBandMin = nextAbove + 1;
+        var newBandMax = nextAbove + n;
+        all.forEach(function (e) {
+          if (inBlock[e.id]) return;
+          var z = zOf(e);
+          if (z >= newBandMin && z <= newBandMax) e.z = Math.round((z + n) * 100) / 100;
+        });
+      } else if (dir === 'backward') {
+        var curMin = Math.min.apply(null, block.map(zOf));
+        var nextBelow = null;
+        for (var b = others.length - 1; b >= 0; b--) { if (others[b] < curMin) { nextBelow = others[b]; break; } }
+        if (nextBelow === null) return; // already on bottom
+        assignBand(nextBelow - n);
+        var newBackMax = nextBelow - 1;
+        var newBackMin = nextBelow - n;
+        all.forEach(function (e) {
+          if (inBlock[e.id]) return;
+          var z = zOf(e);
+          if (z >= newBackMin && z <= newBackMax) e.z = Math.round((z - n) * 100) / 100;
+        });
+      }
+    },
+
     bringToFront: function () {
+      if (this.selSet && this.selSet.length > 1) { this._blockZOrder('front'); return; }
       var el = this.activeImage || this.activeTextBox;
       if (!el) return;
       var page = this.active;
@@ -1141,6 +1238,7 @@
       el.z = maxZ + 1;
     },
     sendToBack: function () {
+      if (this.selSet && this.selSet.length > 1) { this._blockZOrder('back'); return; }
       var el = this.activeImage || this.activeTextBox;
       if (!el) return;
       var page = this.active;
@@ -1153,6 +1251,7 @@
       el.z = minZ - 1;
     },
     bringForward: function () {
+      if (this.selSet && this.selSet.length > 1) { this._blockZOrder('forward'); return; }
       var el = this.activeImage || this.activeTextBox;
       if (!el) return;
       var page = this.active;
@@ -1175,6 +1274,7 @@
       el.z = nextZ;
     },
     sendBackward: function () {
+      if (this.selSet && this.selSet.length > 1) { this._blockZOrder('backward'); return; }
       var el = this.activeImage || this.activeTextBox;
       if (!el) return;
       var page = this.active;
@@ -1214,7 +1314,11 @@
     ctxAction: function (action) {
       var m = this.ctxMenu;
       if (!m.open) return;
-      this._selectElementById(m.kind, m.id);
+      // If a multi-selection is active, keep it (so block ops apply to ALL);
+      // otherwise select just the clicked element.
+      if (!(this.selSet && this.selSet.length > 1 && this.isSelected(m.kind, m.id))) {
+        this._selectElementById(m.kind, m.id);
+      }
       switch (action) {
         case 'front': this.bringToFront(); break;
         case 'forward': this.bringForward(); break;
@@ -1279,6 +1383,23 @@
     copySelected: function () {
       var page = this.active;
       if (!page) return;
+      // Multi-copy: buffer every selected element so a paste recreates them.
+      if (this.selSet && this.selSet.length > 1) {
+        var items = [];
+        this.selSet.forEach(function (s) {
+          var arr = (s.kind === 'textBox') ? page.textBoxes : page.images;
+          if (!Array.isArray(arr)) return;
+          for (var i = 0; i < arr.length; i++) {
+            if (arr[i].id === s.id) { items.push({ kind: s.kind, data: JSON.parse(JSON.stringify(arr[i])) }); break; }
+          }
+        });
+        if (items.length) {
+          window.zfClipboard = { type: 'multi', items: items };
+          store.status = 'Copied ' + items.length + ' elements.';
+          setTimeout(function () { if (store.status.indexOf('Copied ') === 0) store.status = ''; }, 1500);
+        }
+        return;
+      }
       if (page.activeTextBoxId && Array.isArray(page.textBoxes)) {
         for (var i = 0; i < page.textBoxes.length; i++) {
           if (page.textBoxes[i].id === page.activeTextBoxId) {
@@ -1296,6 +1417,7 @@
             store.status = 'Copied element.';
             setTimeout(function () { if (store.status === 'Copied element.') store.status = ''; }, 1500);
             return;
+            // (multi handled above)
           }
         }
       }
@@ -1304,9 +1426,37 @@
     // selected so it can be moved or restyled immediately.
     pasteElement: function () {
       var clip = window.zfClipboard;
-      if (!clip || !clip.data) return;
+      if (!clip) return;
       var page = this.active;
       if (!page) return;
+      // Multi-paste: recreate every buffered element (offset), select the
+      // pasted set.
+      if (clip.type === 'multi' && Array.isArray(clip.items)) {
+        var selfP = this;
+        var newSet = [];
+        var zTop = 0;
+        (page.images || []).concat(page.textBoxes || []).forEach(function (e) { zTop = Math.max(zTop, (typeof e.z === 'number' ? e.z : 0)); });
+        clip.items.forEach(function (it) {
+          var copy = JSON.parse(JSON.stringify(it.data));
+          var isText = (it.kind === 'textBox');
+          copy.id = isText ? zfNewTextBoxId() : zfNewImageId();
+          copy.x = (typeof copy.x === 'number' ? copy.x : 0) + 0.15;
+          copy.y = (typeof copy.y === 'number' ? copy.y : 0) + 0.15;
+          copy.z = ++zTop;
+          if (isText) { if (!Array.isArray(page.textBoxes)) page.textBoxes = []; page.textBoxes.push(copy); }
+          else { if (!Array.isArray(page.images)) page.images = []; page.images.push(copy); }
+          newSet.push({ kind: isText ? 'textBox' : 'image', id: copy.id });
+        });
+        if (newSet.length) {
+          this.selSet = newSet;
+          this._syncPrimary();
+          this.$nextTick(function () { selfP.syncTextBoxDom(); selfP.injectShapeSpacer(); });
+        }
+        store.status = 'Pasted ' + newSet.length + ' elements.';
+        setTimeout(function () { if (store.status.indexOf('Pasted') === 0) store.status = ''; }, 1500);
+        return;
+      }
+      if (!clip.data) return;
       var d = clip.data;
       if (clip.type === 'textBox') {
         if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
@@ -1341,6 +1491,33 @@
     duplicateSelectedElement: function () {
       var page = this.active;
       if (!page) return;
+      // Multi-duplicate: duplicate every selected element (offset a little),
+      // and re-select the copies. Groups keep their members together.
+      if (this.selSet && this.selSet.length > 1) {
+        var newSet = [];
+        var selfD = this;
+        this.selSet.forEach(function (s) {
+          var el = null, arr = null;
+          if (s.kind === 'textBox') { arr = page.textBoxes; }
+          else { arr = page.images; }
+          if (!Array.isArray(arr)) return;
+          for (var i = 0; i < arr.length; i++) { if (arr[i].id === s.id) { el = arr[i]; break; } }
+          if (!el) return;
+          var copy = JSON.parse(JSON.stringify(el));
+          copy.id = (s.kind === 'textBox') ? zfNewTextBoxId() : zfNewImageId();
+          copy.x = (typeof el.x === 'number' ? el.x : 0) + 0.15;
+          copy.y = (typeof el.y === 'number' ? el.y : 0) + 0.15;
+          copy.z = (typeof el.z === 'number' ? el.z : 0) + 1;
+          arr.push(copy);
+          newSet.push({ kind: s.kind, id: copy.id });
+        });
+        if (newSet.length) {
+          this.selSet = newSet;
+          this._syncPrimary();
+          this.$nextTick(function () { selfD.syncTextBoxDom(); selfD.injectShapeSpacer(); });
+        }
+        return;
+      }
       // Text box duplication.
       if (page.activeTextBoxId && Array.isArray(page.textBoxes)) {
         for (var i = 0; i < page.textBoxes.length; i++) {
@@ -1644,6 +1821,19 @@
         cx: cx,
         cy: cy
       };
+      // Group resize: if several are selected, snapshot them and use the
+      // group pivot (the pointer distance is measured from the pivot).
+      var gsnap = this._groupTransformSnapshot();
+      try { zfLog('IMGRES gsnap=' + (gsnap ? gsnap.items.length : 'null') + ' selSet=' + (this.selSet || []).length); } catch (e) {}
+      if (gsnap) {
+        var gpx = pr.left + gsnap.pivot.x * px;
+        var gpy = pr.top + gsnap.pivot.y * px;
+        var gdx0 = evt.clientX - gpx, gdy0 = evt.clientY - gpy;
+        this.imageDrag.group = gsnap;
+        this.imageDrag.gcx = gpx;
+        this.imageDrag.gcy = gpy;
+        this.imageDrag.startDist = Math.sqrt(gdx0 * gdx0 + gdy0 * gdy0) || 1;
+      }
       if (this.active) this.active.activeImageId = img.id;
     },
     onTextBoxResizeStartScaled: function (evt, box) {
@@ -1680,6 +1870,8 @@
         imgId: box.id,
         mode: "resize-scaled",
         isText: true,
+        startX: evt.clientX,
+        startY: evt.clientY,
         startDist: startDist,
         baseW: w,
         // Base font in POINTS: explicit fontPt, else legacy multiplier x 10pt.
@@ -1689,7 +1881,22 @@
         cx: cx,
         cy: cy
       };
-      this.selectTextBox(box);
+      // Do NOT collapse the selection: if several are selected, this handle
+      // drag should transform the whole group (like an image handle). Make
+      // the box primary without dropping others.
+      if (this.isSelected('textBox', box.id)) this._syncPrimary('textBox', box.id);
+      else this.selectTextBox(box);
+      // Group resize: snapshot the selection and resize about its pivot.
+      var gsnapT = this._groupTransformSnapshot();
+      if (gsnapT) {
+        var gpxT = pr.left + gsnapT.pivot.x * px;
+        var gpyT = pr.top + gsnapT.pivot.y * px;
+        var gdxT = evt.clientX - gpxT, gdyT = evt.clientY - gpyT;
+        this.imageDrag.group = gsnapT;
+        this.imageDrag.gcx = gpxT;
+        this.imageDrag.gcy = gpyT;
+        this.imageDrag.startDist = Math.sqrt(gdxT * gdxT + gdyT * gdyT) || 1;
+      }
     },
     onRotateStart: function (evt, img) {
       if (!img) return;
@@ -1712,11 +1919,30 @@
       this.imageDrag = {
         imgId: img.id,
         mode: "rotate",
+        // startX/startY are REQUIRED by the general "moved" detection at the
+        // top of onImageMouseMove; without them, a rotate drag never marked
+        // moved, so the follow-up click was not suppressed and the group
+        // selection collapsed after rotating. (Resize set these already, which
+        // is why resize survived but rotate did not.)
+        startX: evt.clientX,
+        startY: evt.clientY,
         startAngle: startAngle,
         baseRot: (typeof img.rot === "number") ? img.rot : 0,
         cx: cx,
         cy: cy
       };
+      // Group rotate: snapshot the selection and rotate about its pivot.
+      var gsnapR = this._groupTransformSnapshot();
+      try { zfLog('IMGROT gsnap=' + (gsnapR ? gsnapR.items.length : 'null') + ' selSet=' + (this.selSet || []).length); } catch (e) {}
+      if (gsnapR) {
+        var gpxR = pr.left + gsnapR.pivot.x * px;
+        var gpyR = pr.top + gsnapR.pivot.y * px;
+        var gdxR = evt.clientX - gpxR, gdyR = evt.clientY - gpyR;
+        this.imageDrag.group = gsnapR;
+        this.imageDrag.gcx = gpxR;
+        this.imageDrag.gcy = gpyR;
+        this.imageDrag.startAngle = Math.atan2(gdyR, gdxR) * 180 / Math.PI;
+      }
       if (this.active) this.active.activeImageId = img.id;
     },
     onImageMouseMove: function (evt) {
@@ -1727,6 +1953,16 @@
         return;
       }
       if (!this.imageDrag) return;
+      // Mark ANY real drag (move / resize / rotate) as "moved" once the
+      // pointer travels past a few px. onImageMouseUp uses this to suppress
+      // the click that follows the drag, which would otherwise collapse a
+      // multi-selection down to one element. Previously only the move branch
+      // set this, so resize/rotate dropped the group selection.
+      if (this.imageDrag.startX !== undefined) {
+        var gmvx = evt.clientX - this.imageDrag.startX;
+        var gmvy = evt.clientY - this.imageDrag.startY;
+        if ((gmvx * gmvx + gmvy * gmvy) > 9) this.imageDrag.moved = true;
+      }
       var page = this.active;
       var m = this.activeModel;
       if (!page || !m) return;
@@ -1789,6 +2025,17 @@
         img.w = Math.round(fw * 100) / 100;
         img.h = Math.round(fh * 100) / 100;
       } else if (mode === "resize") {
+        // Group resize: scale ALL selected elements about the pivot.
+        if (this.imageDrag.group) {
+          var gdx = evt.clientX - this.imageDrag.gcx;
+          var gdy = evt.clientY - this.imageDrag.gcy;
+          var gdist = Math.sqrt(gdx * gdx + gdy * gdy) || 1;
+          var gs = gdist / this.imageDrag.startDist;
+          if (gs < 0.1) gs = 0.1;
+          if (gs > 12) gs = 12;
+          this._applyGroupTransform(this.imageDrag.group, gs, 0);
+          return;
+        }
         var dx = evt.clientX - this.imageDrag.cx;
         var dy = evt.clientY - this.imageDrag.cy;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1801,6 +2048,20 @@
         if (newW > 24) newW = 24;
         img.w = Math.round(newW * 100) / 100;
       } else if (mode === "resize-scaled") {
+        // Group resize driven from a TEXT BOX handle: scale ALL selected
+        // elements about the pivot (same as the image resize branch). Without
+        // this, a text-box resize only scaled the text box and left the rest
+        // of the selection untouched.
+        if (this.imageDrag.group) {
+          var gsdx = evt.clientX - this.imageDrag.gcx;
+          var gsdy = evt.clientY - this.imageDrag.gcy;
+          var gsdist = Math.sqrt(gsdx * gsdx + gsdy * gsdy) || 1;
+          var gss = gsdist / this.imageDrag.startDist;
+          if (gss < 0.1) gss = 0.1;
+          if (gss > 12) gss = 12;
+          this._applyGroupTransform(this.imageDrag.group, gss, 0);
+          return;
+        }
         // Text box: scale width and font size together.
         var sdx = evt.clientX - this.imageDrag.cx;
         var sdy = evt.clientY - this.imageDrag.cy;
@@ -1818,6 +2079,15 @@
         img.fontPt = Math.round(nfPt * 2) / 2; // round to 0.5pt
         delete img.fontSize; // migrate off the legacy multiplier
       } else if (mode === "rotate") {
+        // Group rotate: rotate ALL selected elements about the pivot.
+        if (this.imageDrag.group) {
+          var gax = evt.clientX - this.imageDrag.gcx;
+          var gay = evt.clientY - this.imageDrag.gcy;
+          var gang = Math.atan2(gay, gax) * 180 / Math.PI;
+          var gdelta = gang - this.imageDrag.startAngle;
+          this._applyGroupTransform(this.imageDrag.group, 1, gdelta);
+          return;
+        }
         var rdx = evt.clientX - this.imageDrag.cx;
         var rdy = evt.clientY - this.imageDrag.cy;
         var angle = Math.atan2(rdy, rdx) * 180 / Math.PI;
@@ -1852,6 +2122,7 @@
       var wasDragging = !!this.imageDrag;
       var wasText = this.imageDrag && this.imageDrag.isText;
       var moved = !!(this.imageDrag && this.imageDrag.moved);
+      try { zfLog('IMGUP mode=' + (this.imageDrag && this.imageDrag.mode) + ' moved=' + moved + ' selSet=' + (this.selSet || []).length); } catch (e) {}
       this.imageDrag = null;
       if (wasDragging && !wasText) {
         var self = this;
@@ -2177,6 +2448,95 @@
       (page.textBoxes || []).forEach(function (tb) { set.push({ kind: 'textBox', id: tb.id }); });
       this.selSet = set;
       this._syncPrimary();
+    },
+
+    // Snapshot every selected element (center, size, rotation, font) plus the
+    // group's pivot (bounding-box center, in page inches), so a resize/rotate
+    // can be applied uniformly to all of them. Returns null for <2 selected.
+    _groupTransformSnapshot: function () {
+      var page = this.active;
+      var m = this.activeModel;
+      if (!page || !m || !this.selSet || this.selSet.length < 2) return null;
+      var margin = store.modelMarginIn();
+      var items = [];
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      var self = this;
+      this.selSet.forEach(function (s) {
+        var el = null;
+        if (s.kind === 'textBox') {
+          (page.textBoxes || []).forEach(function (tb) { if (tb.id === s.id) el = tb; });
+        } else {
+          (page.images || []).forEach(function (im) { if (im.id === s.id) el = im; });
+        }
+        if (!el) return;
+        var w = (typeof el.w === 'number') ? el.w : 0.6;
+        var h = (el.kind === 'icon') ? w : ((typeof el.h === 'number') ? el.h : (s.kind === 'textBox' ? 0.5 : w));
+        var cx = (typeof el.x === 'number' ? el.x : 0) + margin + w / 2;
+        var cy = (typeof el.y === 'number' ? el.y : 0) + margin + h / 2;
+        items.push({
+          kind: s.kind, id: s.id,
+          cx: cx, cy: cy, w: w, h: h,
+          rot: (typeof el.rot === 'number') ? el.rot : 0,
+          fontPt: (typeof el.fontPt === 'number') ? el.fontPt : null
+        });
+        if (cx - w/2 < minX) minX = cx - w/2;
+        if (cy - h/2 < minY) minY = cy - h/2;
+        if (cx + w/2 > maxX) maxX = cx + w/2;
+        if (cy + h/2 > maxY) maxY = cy + h/2;
+      });
+      if (items.length < 2) return null;
+      return {
+        pivot: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+        items: items
+      };
+    },
+
+    // Apply a uniform scale (s) and/or rotation (thetaDeg) to a group snapshot
+    // about its pivot. Writes back x/y/w/h/rot/fontPt (in page inches).
+    _applyGroupTransform: function (g, s, thetaDeg) {
+      var page = this.active;
+      var m = this.activeModel;
+      if (!page || !m || !g) return;
+      var margin = store.modelMarginIn();
+      var th = (thetaDeg || 0) * Math.PI / 180;
+      var cos = Math.cos(th), sin = Math.sin(th);
+      g.items.forEach(function (it) {
+        // Rotate the center about the pivot, and scale its distance from it.
+        var dx = it.cx - g.pivot.x, dy = it.cy - g.pivot.y;
+        var rx = dx * cos - dy * sin;
+        var ry = dx * sin + dy * cos;
+        var ncx = g.pivot.x + rx * s;
+        var ncy = g.pivot.y + ry * s;
+        var nw = it.w * s;
+        var nh = it.h * s;
+        var nrot = it.rot + (thetaDeg || 0);
+        // Locate the element and write back.
+        var el = null;
+        if (it.kind === 'textBox') {
+          (page.textBoxes || []).forEach(function (tb) { if (tb.id === it.id) el = tb; });
+        } else {
+          (page.images || []).forEach(function (im) { if (im.id === it.id) el = im; });
+        }
+        if (!el) return;
+        el.x = Math.round((ncx - margin - nw / 2) * 100) / 100;
+        el.y = Math.round((ncy - margin - nh / 2) * 100) / 100;
+        el.w = Math.round(Math.max(0.1, nw) * 100) / 100;
+        if (el.kind !== 'icon') {
+          if (typeof it.h === 'number' && it.h > 0) el.h = Math.round(Math.max(0.05, nh) * 100) / 100;
+        }
+        el.rot = Math.round(nrot);
+        // Text boxes: on a GROUP SCALE, lock the width so the box scales
+        // RIGIDLY like every other element. Otherwise auto-width re-hugs the
+        // (scaled) text, so the box width drifts independently of the group
+        // and looks out of lockstep. Only lock on a real scale (s !== 1), so
+        // a pure group rotate does not unexpectedly fix a box's width.
+        if (it.kind === 'textBox') {
+          if (s !== 1) el.autoWidth = false;
+          if (it.fontPt !== null) el.fontPt = Math.round(Math.max(4, it.fontPt * s) * 2) / 2;
+        } else if (it.fontPt !== null) {
+          el.fontPt = Math.round(Math.max(4, it.fontPt * s) * 2) / 2;
+        }
+      });
     },
 
     // Capture {kind, id, x, y} for every selected element, so a drag can move
@@ -2746,6 +3106,12 @@
       var base = zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
       base.minHeight = "1em";
       base.cursor = "move";
+      // Layered z boost (see imageStyle). Selected above unselected; primary
+      // above other selected; reverts on deselect.
+      var page = this.active;
+      if (page && this.isSelected('textBox', box.id)) {
+        base.zIndex = base.zIndex + (page.activeTextBoxId === box.id ? 20000 : 10000);
+      }
       return base;
     },
     setTextBoxAlign: function (align) {
@@ -2947,7 +3313,11 @@
         return;
       }
       evt.preventDefault();
-      this.selectTextBox(box);
+      // If the box is part of a multi-selection, keep the selection (do not
+      // collapse to just this box) and move the whole group.
+      var multi = this.selSet && this.selSet.length > 1 && this.isSelected('textBox', box.id);
+      if (multi) this._syncPrimary('textBox', box.id);
+      else this.selectTextBox(box);
       var self = this;
       if (evt.currentTarget && evt.currentTarget.focus) {
         try { evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
@@ -2959,7 +3329,8 @@
         startX: evt.clientX,
         startY: evt.clientY,
         baseX: (typeof box.x === 'number') ? box.x : 0,
-        baseY: (typeof box.y === 'number') ? box.y : 0
+        baseY: (typeof box.y === 'number') ? box.y : 0,
+        bases: multi ? this._selectionBases() : null
       };
     },
     onTextBoxResizeStart: function (evt, box) {
@@ -3013,12 +3384,27 @@
         imgId: box.id,
         mode: 'rotate',
         isText: true,
+        startX: evt.clientX,
+        startY: evt.clientY,
         startAngle: startAngle,
         baseRot: (typeof box.rot === 'number') ? box.rot : 0,
         cx: cx,
         cy: cy
       };
-      this.selectTextBox(box);
+      // Do NOT collapse the selection: with several selected, rotate the
+      // whole group about its pivot (like an image rotate handle).
+      if (this.isSelected('textBox', box.id)) this._syncPrimary('textBox', box.id);
+      else this.selectTextBox(box);
+      var gsnapTR = this._groupTransformSnapshot();
+      if (gsnapTR) {
+        var gpxTR = pr.left + gsnapTR.pivot.x * px;
+        var gpyTR = pr.top + gsnapTR.pivot.y * px;
+        var gdxTR = evt.clientX - gpxTR, gdyTR = evt.clientY - gpyTR;
+        this.imageDrag.group = gsnapTR;
+        this.imageDrag.gcx = gpxTR;
+        this.imageDrag.gcy = gpyTR;
+        this.imageDrag.startAngle = Math.atan2(gdyTR, gdxTR) * 180 / Math.PI;
+      }
     },
     onTextBoxDelete: function (box) {
       var page = this.active;

@@ -1008,13 +1008,21 @@
       border: 2px solid #ffffff;
       box-shadow: 0 0 0 1px var(--zf-blue);
       cursor: pointer;
-      z-index: 3;
+      /* Handles must sit ABOVE every element, regardless of the element's own
+         z-order, or an element with higher z would cover the selected
+         element's resize/rotate handles and make them unclickable. Element
+         wraps use inline z-index: 100 + z, so use a value well above that. */
+      z-index: 100000;
       touch-action: none;
     }
     /* Handles show for EVERY selected element. With multiple selected, a
        future step will apply a handle-drag to all of them (group transform),
        so handles belong on all selected elements, not just a lone one. */
-    .zf-img-wrap.zf-img-selected .zf-img-handle { display: block; }
+    /* Handles show only on the PRIMARY (handle-owner) element, so there is
+       ONE grabbable set of handles that always floats on top. In a
+       multi-selection, click a member to make it primary and grab its
+       handles. Other selected elements show a box only. */
+    .zf-img-wrap.zf-handle-owner .zf-img-handle { display: block; }
     .zf-img-handle.zf-img-handle-resize {
       width: 12px; height: 12px;
       right: -7px; bottom: -7px;
@@ -1042,7 +1050,11 @@
       position: absolute;
       box-sizing: border-box;
       z-index: 3;
-      min-height: 1em;
+      /* Comfortable minimum grab area: a short / auto-width box still has a
+         usable transparent region around the text to click and drag, instead
+         of only the glyphs (a couple of px). */
+      min-height: 1.8em;
+      min-width: 1.6em;
       padding: 0.15em 0.2em;
       border: 1px dashed transparent;
       border-radius: 2px;
@@ -1196,7 +1208,7 @@
     }
     .zf-draw-btn:hover { border-color: var(--zf-blue, #005ea2); }
     .zf-draw-done { background: var(--zf-blue, #005ea2); color: #ffffff; border-color: var(--zf-blue, #005ea2); }
-    .zf-textbox-selected .zf-img-handle {
+    .zf-textbox.zf-handle-owner .zf-img-handle {
       display: block;
     }
     .zf-mini-image.zf-positioned { cursor: grab; }
