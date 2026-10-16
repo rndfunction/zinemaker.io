@@ -430,6 +430,16 @@
     .zf-overlap-name { overflow: hidden; text-overflow: ellipsis; }
     .zf-overlap-item:hover { background: #1b1b1b; color: #fbf6e8; border-color: #1b1b1b; }
 
+    /* Rubber-band marquee (drag on empty page space to select). Fixed so it
+       is not clipped by the page. */
+    .zf-marquee {
+      position: fixed;
+      z-index: 580;
+      border: 1px dashed var(--zf-blue, #005ea2);
+      background: rgba(0,94,162,0.08);
+      pointer-events: none;
+    }
+
     /* Right-click context menu for elements. Fixed at the cursor. */
     .zf-ctx-menu {
       position: fixed;
@@ -971,10 +981,26 @@
     }
     /* Selected: stronger than hover (heavier + solid-color dashed) so the
        active element reads clearly, in the app's established dashed style. */
+    /* Selection box uses box-shadow (NOT outline): the focus rules below set
+       `outline: none`, which was killing the selected outline on any focused
+       element -- making a selected element look deselected. box-shadow is
+       unaffected by outline rules. */
     .zf-img-wrap.zf-img-selected {
-      outline: 2px dashed var(--zf-blue);
-      outline-offset: 2px;
+      box-shadow: 0 0 0 2px var(--zf-blue);
     }
+    /* Suppress focus rings on element wrappers entirely. The selected state
+       is shown by the branded dashed outline; a focus ring on a clicked
+       element just left a lingering colored box (black, then amber). */
+    .zf-img-wrap:focus { outline: none; }
+    .zf-img-wrap:focus-visible { outline: none; }
+    .zf-textbox:focus { outline: none; }
+    .zf-textbox:focus-visible { outline: none; }
+    /* Layers-panel chain (group) toggle: dim when unlinked, lit when in a
+       group. */
+    .zf-layer-chain .iconify { opacity: 0.5; }
+    .zf-layer-chain.linked { color: var(--zf-blue, #005ea2); }
+    .zf-layer-chain.linked .iconify { opacity: 1; }
+
     .zf-img-handle {
       position: absolute;
       display: none;
@@ -985,6 +1011,9 @@
       z-index: 3;
       touch-action: none;
     }
+    /* Handles show for EVERY selected element. With multiple selected, a
+       future step will apply a handle-drag to all of them (group transform),
+       so handles belong on all selected elements, not just a lone one. */
     .zf-img-wrap.zf-img-selected .zf-img-handle { display: block; }
     .zf-img-handle.zf-img-handle-resize {
       width: 12px; height: 12px;
@@ -1030,8 +1059,7 @@
     /* Selected: stronger than hover (heavier dashed), in the app's style. */
     .zf-textbox-selected {
       border: 1px dashed var(--zf-blue) !important;
-      outline: 2px dashed var(--zf-blue);
-      outline-offset: 2px;
+      box-shadow: 0 0 0 2px var(--zf-blue);
     }
     .zf-textbox .zf-textbox-content {
       outline: none;

@@ -246,10 +246,10 @@
           <div v-show="layersOpen" class="zf-sidebar-layers-body">
             <div v-if="!layers.length" class="zf-muted" style="font-size:0.8rem;">No objects on this page yet.</div>
             <ul class="zf-layers-list" v-else>
-              <li v-for="(layer, li) in layers" :key="layer.id"
-                  draggable="true"
-                  :class="[{ active: (layer.kind === 'textBox' ? active.activeTextBoxId === layer.id : active.activeImageId === layer.id) }, layerDragClass(li)]"
-                  @click="selectLayer(layer)"
+               <li v-for="(layer, li) in layers" :key="layer.id"
+                   draggable="true"
+                   :class="[{ active: isSelected(layer.kind === 'textBox' ? 'textBox' : 'image', layer.id) }, layerDragClass(li)]"
+                   @click="selectLayer(layer, $event)"
                   @dragstart="onLayerDragStart($event, li)"
                   @dragover="onLayerDragOver($event, li)"
                   @dragleave="onLayerDragLeave($event, li)"
@@ -258,11 +258,18 @@
                 <iconify-icon class="zf-layer-ico"
                   :icon="layer.kind === 'textBox' ? 'ph:text-t' : (layer.kind === 'icon' ? 'ph:star' : 'ph:image')"
                   aria-hidden="true"></iconify-icon>
-                <span class="zf-layer-label">{{ layerLabel(layer) }}</span>
-                <span class="zf-layer-tools">
-                  <button class="zf-icon-btn" @click.stop="toggleLayerHidden(layer)" :title="layer.el.hidden ? 'Show layer' : 'Hide layer'" :aria-label="layer.el.hidden ? 'Show layer' : 'Hide layer'">
-                    <iconify-icon :icon="layer.el.hidden ? 'ph:eye-slash' : 'ph:eye'" aria-hidden="true"></iconify-icon>
-                  </button>
+                 <span class="zf-layer-label">{{ layerLabel(layer) }}</span>
+                 <span class="zf-layer-tools">
+                   <button class="zf-icon-btn zf-layer-chain" :class="{ linked: isGrouped(layer.id) }"
+                           @click.stop="toggleLayerGroup(layer)"
+                           :title="isGrouped(layer.id) ? 'Unlink from group' : 'Link with selection'"
+                           :aria-label="isGrouped(layer.id) ? 'Unlink from group' : 'Link with selection'"
+                           :aria-pressed="isGrouped(layer.id)">
+                     <iconify-icon :icon="isGrouped(layer.id) ? 'ph:link-simple' : 'ph:link-simple-break'" aria-hidden="true"></iconify-icon>
+                   </button>
+                   <button class="zf-icon-btn" @click.stop="toggleLayerHidden(layer)" :title="layer.el.hidden ? 'Show layer' : 'Hide layer'" :aria-label="layer.el.hidden ? 'Show layer' : 'Hide layer'">
+                     <iconify-icon :icon="layer.el.hidden ? 'ph:eye-slash' : 'ph:eye'" aria-hidden="true"></iconify-icon>
+                   </button>
                   <button class="zf-icon-btn" @click.stop="removeLayer(layer)" title="Delete layer" aria-label="Delete layer">&times;</button>
                 </span>
               </li>
@@ -352,24 +359,24 @@
                    :icon="img.src"
                    :style="Object.assign({}, imageBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
             </template>
-            <div class="zf-mini-body zf-editable"
-                 ref="bodyEditor"
-                 :key="active.id"
-                 contenteditable="true"
-                 @input="onBodyInput"
-                 @paste="onBodyPaste"
-                 @focus="clearElementSelection"
-                 @mousedown="clearElementSelection"></div>
+             <div class="zf-mini-body zf-editable"
+                  ref="bodyEditor"
+                  :key="active.id"
+                  contenteditable="true"
+                  @input="onBodyInput"
+                  @paste="onBodyPaste"
+                  @focus="clearElementSelection"
+                  @mousedown="onBodyMouseDown"></div>
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                    :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && active.activeTextBoxId !== box.id }]"
+                     :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
-                    @mousedown="onTextBoxMouseDown($event, box)"
-                    @click.stop="selectTextBox(box)"
-                    @contextmenu.prevent.stop="openContextMenu($event, 'textBox', box.id)"
+                     @mousedown="onTextBoxMouseDown($event, box)"
+                     @click.stop="onElementClick('textBox', box, $event)"
+                     @contextmenu.prevent.stop="openContextMenu($event, 'textBox', box.id)"
                     @keydown="onTextBoxKeydown($event, box)">
                 <div class="zf-textbox-content"
                      :data-zf-text-content-id="box.id"
@@ -390,11 +397,11 @@
                    class="zf-img-wrap"
                    :data-zf-img-id="img.id"
                    tabindex="0"
-                    :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && active.activeImageId !== img.id }"
+                     :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
-                    @mousedown="onImageMouseDownItem($event, img)"
-                    @click.stop="selectImage(img)"
-                    @dblclick.stop="editDrawing(img)"
+                     @mousedown="onImageMouseDownItem($event, img)"
+                     @click.stop="onElementClick('image', img, $event)"
+                     @dblclick.stop="editDrawing(img)"
                     @contextmenu.prevent.stop="openContextMenu($event, 'image', img.id)"
                     @keydown.delete.prevent="deleteSelectedElement"
                     @keydown.backspace.prevent="deleteSelectedElement">
@@ -456,6 +463,11 @@
             </div>
           </div>
         </div>
+        <!-- Rubber-band marquee: a fixed (un-clipped) box drawn while
+             dragging on empty page space to select elements. -->
+        <div v-if="marquee.active && marquee.moved" class="zf-marquee"
+             :style="{ left: marquee.x + 'px', top: marquee.y + 'px', width: marquee.w + 'px', height: marquee.h + 'px' }"
+             aria-hidden="true"></div>
         <!-- Overlap picker: lists the elements stacked under the cursor so a
              specific one can be chosen by name when they overlap. -->
         <div v-if="overlapPicker.open" class="zf-overlap-picker"
@@ -477,6 +489,9 @@
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('backward')">Send Backward</button>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('back')">Send to Back</button>
           <div class="zf-ctx-sep" aria-hidden="true"></div>
+          <button v-if="canGroupSelection" type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('group')">Group</button>
+          <button v-if="canUngroupSelection" type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('ungroup')">Ungroup</button>
+          <div v-if="canGroupSelection || canUngroupSelection" class="zf-ctx-sep" aria-hidden="true"></div>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('duplicate')">Duplicate</button>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('copy')">Copy</button>
           <button type="button" class="zf-ctx-item zf-ctx-danger" role="menuitem" @click="ctxAction('delete')">Delete</button>

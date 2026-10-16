@@ -412,6 +412,23 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         active.tagName === 'TEXTAREA'
       );
 
+      // Select All (Ctrl/Cmd+A) on the editor page. Skip only while editing
+      // TEXT (an input/textarea or a text-box's contenteditable) so we do not
+      // hijack "select all text" there. The page BODY is a contenteditable
+      // too, but focusing it should still allow Select All of elements.
+      var inTextBox = active && active.closest && active.closest('.zf-textbox');
+      var inTextInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || inTextBox);
+      if (cmd && !inTextInput && key === 'a' && !evt.shiftKey && !evt.altKey) {
+        // Always prevent the browser's native select-all (which highlighted
+        // the whole page when nothing specific was focused), and always run
+        // our Select All on the editor page.
+        evt.preventDefault();
+        if (window.ZFEditorActions && window.ZFEditorActions.selectAll) {
+          window.ZFEditorActions.selectAll();
+        }
+        return;
+      }
+
       // Undo/redo
       if (cmd && !inEditable) {
         if (key === 'z' && !evt.shiftKey) {

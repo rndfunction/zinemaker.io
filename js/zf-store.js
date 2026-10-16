@@ -21,7 +21,11 @@
       heading: '',
       body: '',
       images: [],
-      textBoxes: []
+      textBoxes: [],
+      // Groups: [{ id, memberIds: ['<elId>', ...] }]. A group binds elements
+      // so clicking any member selects the whole group (atomic). Stored on
+      // the page so it round-trips with the page.
+      groups: []
     };
   }
 
@@ -101,6 +105,8 @@
           hidden: !!tb.hidden
         };
       }) : [];
+      // Carry groups through import/build.
+      page.groups = Array.isArray(p.groups) ? p.groups : [];
       if (window.zfMigratePage) window.zfMigratePage(page);
       return page;
     });

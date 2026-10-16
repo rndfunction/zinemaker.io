@@ -47,6 +47,76 @@
       if (!page) return;
       page.activeImageId = null;
       page.activeTextBoxId = null;
+      // Clear the multi-selection set too, or the selected class (and its
+      // bounding box + handles) would linger after clicking empty space.
+      this.selSet = [];
+      this.hoveredEl = { kind: '', id: '' };
+    },
+
+    // Mousedown on the page body (empty space). Starts a potential marquee;
+    // whether it becomes a marquee or a plain text-click is decided by
+    // movement (see onImageMouseMove / onImageMouseUp).
+    onBodyMouseDown: function (evt) {
+      if (evt.button !== 0) return;
+      this.marquee = {
+        active: true,
+        startX: evt.clientX, startY: evt.clientY,
+        x: evt.clientX, y: evt.clientY, w: 0, h: 0, moved: false
+      };
+    },
+
+    // Is the marquee drag in progress and moved enough to count as a band?
+    _marqueeMoving: function () {
+      return this.marquee && this.marquee.active;
+    },
+
+    // Update the marquee rect from a pointer position.
+    _marqueeUpdate: function (clientX, clientY) {
+      var m = this.marquee;
+      if (!m || !m.active) return;
+      var dx = clientX - m.startX, dy = clientY - m.startY;
+      if ((dx * dx + dy * dy) > 9) m.moved = true;
+      m.x = Math.min(m.startX, clientX);
+      m.y = Math.min(m.startY, clientY);
+      m.w = Math.abs(dx);
+      m.h = Math.abs(dy);
+      this.marquee = Object.assign({}, m); // trigger reactivity
+    },
+
+    // Finish the marquee: select every element whose box intersects it.
+    // Shift-held adds to the existing selection; otherwise it replaces.
+    _marqueeFinish: function (additive) {
+      var m = this.marquee;
+      var page = this.active;
+      if (!m || !page) { this.marquee = { active: false, startX: 0, startY: 0, x: 0, y: 0, w: 0, h: 0, moved: false }; return; }
+      if (m.moved) {
+        var rect = { left: m.x, top: m.y, right: m.x + m.w, bottom: m.y + m.h };
+        var set = additive ? (this.selSet || []).slice() : [];
+        var seen = {};
+        set.forEach(function (s) { seen[s.kind + ':' + s.id] = true; });
+        var self = this;
+        function consider(kind, id, el) {
+          var key = kind + ':' + id;
+          if (seen[key]) return;
+          var r = el.getBoundingClientRect();
+          var intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
+          if (intersects) { set.push({ kind: kind, id: id }); seen[key] = true; }
+        }
+        (page.images || []).forEach(function (im) {
+          var d = self.$el ? self.$el.querySelector('[data-zf-img-id="' + im.id + '"]') : null;
+          if (d) consider('image', im.id, d);
+        });
+        (page.textBoxes || []).forEach(function (tb) {
+          var d = self.$el ? self.$el.querySelector('[data-zf-text-id="' + tb.id + '"]') : null;
+          if (d) consider('textBox', tb.id, d);
+        });
+        this.selSet = set;
+        this._syncPrimary();
+      } else {
+        // No movement: treat as a plain empty click -> clear selection.
+        this.clearElementSelection();
+      }
+      this.marquee = { active: false, startX: 0, startY: 0, x: 0, y: 0, w: 0, h: 0, moved: false };
     },
     // -------- Layers (drag to reorder) --------
     layerDragClass: function (i) {
@@ -93,15 +163,18 @@
       if (!page) return [];
       return (page.images || []).concat(page.textBoxes || []);
     },
-    selectLayer: function (layer) {
+    // Select a layer from the layers panel. Plain click replaces the
+    // selection; Shift-click adds/removes (same semantics as the canvas), so
+    // multiple elements can be selected from the list without touching the
+    // canvas (useful when the page is crowded).
+    selectLayer: function (layer, evt) {
       var page = this.active;
       if (!page || !layer) return;
-      if (layer.kind === 'textBox') {
-        page.activeTextBoxId = layer.el.id;
-        page.activeImageId = null;
+      var kind = (layer.kind === 'textBox') ? 'textBox' : 'image';
+      if (evt && evt.shiftKey) {
+        this._selSetToggle(kind, layer.el.id);
       } else {
-        page.activeImageId = layer.el.id;
-        page.activeTextBoxId = null;
+        this._selSetOnly(kind, layer.el.id);
       }
     },
     layerLabel: function (layer) {
@@ -1150,6 +1223,8 @@
         case 'duplicate': this.duplicateSelectedElement(); break;
         case 'copy': this.copySelected(); break;
         case 'delete': this.deleteSelectedElement(); break;
+        case 'group': this.groupSelection(); break;
+        case 'ungroup': this.ungroupSelection(); break;
       }
       this.closeContextMenu();
     },
@@ -1157,6 +1232,20 @@
     deleteSelectedElement: function () {
       var page = this.active;
       if (!page) return;
+      // Multi-delete: remove every element in the selection set.
+      if (this.selSet && this.selSet.length > 1) {
+        var self = this;
+        var ids = {};
+        this.selSet.forEach(function (s) { ids[s.kind + ':' + s.id] = true; });
+        if (Array.isArray(page.images)) {
+          page.images = page.images.filter(function (im) { return !ids['image:' + im.id]; });
+        }
+        if (Array.isArray(page.textBoxes)) {
+          page.textBoxes = page.textBoxes.filter(function (tb) { return !ids['textBox:' + tb.id]; });
+        }
+        this._selSetClear();
+        return;
+      }
       if (page.activeTextBoxId && Array.isArray(page.textBoxes)) {
         var tIdx = -1;
         for (var i = 0; i < page.textBoxes.length; i++) {
@@ -1485,6 +1574,15 @@
         if (ri) ri.click();
         return;
       }
+      // Shift-click: toggle this element in the selection (add/remove) and
+      // do NOT start a drag or apply selection priority.
+      if (evt.shiftKey) {
+        this._hideOverlapPicker();
+        this._selSetToggle('image', img.id);
+        var selfSh = this;
+        this.$nextTick(function () { selfSh.injectShapeSpacer(); });
+        return;
+      }
       // Selection priority: if an element is ALREADY selected and the pointer
       // is inside that element's own box (+ small grace), drag THAT element --
       // do not let z-order re-pick a different one. Respects a deliberate
@@ -1510,7 +1608,8 @@
         startX: evt.clientX,
         startY: evt.clientY,
         baseX: (typeof img.x === "number") ? img.x : 0,
-        baseY: (typeof img.y === "number") ? img.y : 0
+        baseY: (typeof img.y === "number") ? img.y : 0,
+        bases: this._selectionBases()
       };
     },
     onResizeStart: function (evt, img) {
@@ -1621,6 +1720,12 @@
       if (this.active) this.active.activeImageId = img.id;
     },
     onImageMouseMove: function (evt) {
+      // Rubber-band: if a body mousedown started a marquee, update it and
+      // return (no element drag is active).
+      if (this.marquee && this.marquee.active) {
+        this._marqueeUpdate(evt.clientX, evt.clientY);
+        return;
+      }
       if (!this.imageDrag) return;
       var page = this.active;
       var m = this.activeModel;
@@ -1639,10 +1744,35 @@
       var pxPerInch = 96 * this.imageScale;
       var mode = this.imageDrag.mode || "move";
       if (mode === "move") {
+        // Mark that a real drag happened (moved beyond a few px), so the
+        // click that follows mouseup does not collapse the selection.
+        var mvx = evt.clientX - this.imageDrag.startX;
+        var mvy = evt.clientY - this.imageDrag.startY;
+        if ((mvx * mvx + mvy * mvy) > 9) this.imageDrag.moved = true;
         var dxIn = (evt.clientX - this.imageDrag.startX) / pxPerInch;
         var dyIn = (evt.clientY - this.imageDrag.startY) / pxPerInch;
-        img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
-        img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
+        // Multi-move: if several elements are selected, move them all by the
+        // same delta (their positions captured at drag start).
+        if (this.selSet && this.selSet.length > 1 && this.imageDrag.bases) {
+          for (var bi = 0; bi < this.imageDrag.bases.length; bi++) {
+            var b = this.imageDrag.bases[bi];
+            var target = null;
+            if (b.kind === 'textBox') {
+              var tboxes = page.textBoxes || [];
+              for (var ti = 0; ti < tboxes.length; ti++) { if (tboxes[ti].id === b.id) { target = tboxes[ti]; break; } }
+            } else {
+              var timgs = page.images || [];
+              for (var ii = 0; ii < timgs.length; ii++) { if (timgs[ii].id === b.id) { target = timgs[ii]; break; } }
+            }
+            if (target) {
+              target.x = Math.round((b.x + dxIn) * 100) / 100;
+              target.y = Math.round((b.y + dyIn) * 100) / 100;
+            }
+          }
+        } else {
+          img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
+          img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
+        }
       } else if (mode === "resize-free") {
         // Independent width and height: horizontal drag changes w, vertical
         // drag changes h. Uses a projection so the element grows with the
@@ -1712,13 +1842,31 @@
         }
       }
     },
-    onImageMouseUp: function () {
+    onImageMouseUp: function (evt) {
+      // Rubber-band: finish if a marquee was in progress. Shift = add to the
+      // existing selection; otherwise replace.
+      if (this.marquee && this.marquee.active) {
+        this._marqueeFinish(!!(evt && evt.shiftKey));
+        return;
+      }
       var wasDragging = !!this.imageDrag;
       var wasText = this.imageDrag && this.imageDrag.isText;
+      var moved = !!(this.imageDrag && this.imageDrag.moved);
       this.imageDrag = null;
       if (wasDragging && !wasText) {
         var self = this;
         this.$nextTick(function () { self.injectShapeSpacer(); });
+      }
+      // A real drag should NOT be followed by a click that re-selects (which
+      // would collapse a multi-selection). Suppress the next click.
+      // IMPORTANT: clear on a MACROTASK (setTimeout), not $nextTick -- the
+      // browser's click event fires after mouseup but LATER than a microtask,
+      // so a $nextTick clear ran too early and the click still collapsed the
+      // selection.
+      if (moved) {
+        this._suppressClick = true;
+        var self2 = this;
+        setTimeout(function () { self2._suppressClick = false; }, 0);
       }
     },
     setImageW: function (v) {
@@ -1807,11 +1955,267 @@
       var self = this;
       this.$nextTick(function () { self.injectShapeSpacer(); });
     },
+    // -------- Multi-selection helpers --------
+    // The selection set is the source of truth for "what is selected"; the
+    // single active ids mirror the primary (last-selected) member.
+    _selKey: function (kind, id) { return kind + ':' + id; },
+
+    // Is this element in the selection set?
+    isSelected: function (kind, id) {
+      var s = this.selSet || [];
+      for (var i = 0; i < s.length; i++) {
+        if (s[i].kind === kind && s[i].id === id) return true;
+      }
+      return false;
+    },
+
+    // True when this element is the ONLY selection -- the case that shows
+    // resize/rotate handles (handles are single-element only; multi-select
+    // shows bounding boxes but no handles).
+    isSingleSelected: function (kind, id) {
+      var s = this.selSet || [];
+      return s.length === 1 && s[0].kind === kind && s[0].id === id;
+    },
+
+    // Replace the selection with a single element (and set it primary).
+    // -------- Groups (atomic selection) --------
+    // Resolve an element id to its group (or null).
+    _groupOf: function (id) {
+      var page = this.active;
+      if (!page || !Array.isArray(page.groups)) return null;
+      for (var i = 0; i < page.groups.length; i++) {
+        if ((page.groups[i].memberIds || []).indexOf(id) !== -1) return page.groups[i];
+      }
+      return null;
+    },
+
+    // Is this element id in any group?
+    _isGrouped: function (id) { return !!this._groupOf(id); },
+
+    // { kind, id } for every member of a group (kind resolved by lookup).
+    _groupMemberRefs: function (group) {
+      var page = this.active;
+      var out = [];
+      if (!page || !group) return out;
+      (group.memberIds || []).forEach(function (mid) {
+        var inImgs = (page.images || []).some(function (im) { return im.id === mid; });
+        var inTbs = (page.textBoxes || []).some(function (tb) { return tb.id === mid; });
+        if (inImgs) out.push({ kind: 'image', id: mid });
+        else if (inTbs) out.push({ kind: 'textBox', id: mid });
+      });
+      return out;
+    },
+
+    // Expand a list of {kind,id} so any grouped member pulls in its whole
+    // group (dedup). This is what makes groups "atomic" for selection.
+    _expandToGroups: function(refs) {
+      var page = this.active;
+      var out = [];
+      var seen = {};
+      function push(r) {
+        var k = r.kind + ':' + r.id;
+        if (seen[k]) return;
+        seen[k] = true;
+        out.push(r);
+      }
+      (refs || []).forEach(function (r) {
+        push(r);
+        var g = null;
+        if (page && Array.isArray(page.groups)) {
+          for (var i = 0; i < page.groups.length; i++) {
+            if ((page.groups[i].memberIds || []).indexOf(r.id) !== -1) { g = page.groups[i]; break; }
+          }
+        }
+        if (g) {
+          (g.memberIds || []).forEach(function (mid) {
+            var inImgs = (page.images || []).some(function (im) { return im.id === mid; });
+            push({ kind: inImgs ? 'image' : 'textBox', id: mid });
+          });
+        }
+      });
+      return out;
+    },
+
+    _selSetOnly: function (kind, id) {
+      var page = this.active;
+      if (!page) return;
+      this.selSet = this._expandToGroups([{ kind: kind, id: id }]);
+      this._syncPrimary();
+    },
+
+    // Add to the selection (primary becomes this). No-op if present.
+    _selSetAdd: function (kind, id) {
+      if (this.isSelected(kind, id)) { this._syncPrimary(kind, id); return; }
+      this.selSet = (this.selSet || []).concat([{ kind: kind, id: id }]);
+      this._syncPrimary(kind, id);
+    },
+
+    // Toggle membership (Shift-click). Returns true if now selected.
+    _selSetToggle: function (kind, id) {
+      if (this.isSelected(kind, id)) {
+        // Remove the whole group the element belongs to (atomic).
+        var grp = this._groupOf(id);
+        var remove = grp ? (grp.memberIds || []) : [id];
+        this.selSet = (this.selSet || []).filter(function (s) { return remove.indexOf(s.id) === -1; });
+        this._syncPrimary();
+        return false;
+      }
+      var add = this._expandToGroups([{ kind: kind, id: id }]);
+      var cur = this.selSet || [];
+      var seen = {};
+      cur.forEach(function (s) { seen[s.kind + ':' + s.id] = true; });
+      add.forEach(function (s) { if (!seen[s.kind + ':' + s.id]) cur = cur.concat([s]); });
+      this.selSet = cur;
+      this._syncPrimary(kind, id);
+      return true;
+    },
+
+    _selSetClear: function () {
+      this.selSet = [];
+      var page = this.active;
+      if (page) { page.activeImageId = null; page.activeTextBoxId = null; }
+    },
+
+    // Mirror the selection set into the single active ids. Without an explicit
+    // primary, use the last member (or clear if the set is empty).
+    _syncPrimary: function (preferKind, preferId) {
+      var page = this.active;
+      if (!page) return;
+      var s = this.selSet || [];
+      if (!s.length) { page.activeImageId = null; page.activeTextBoxId = null; return; }
+      var pick = null;
+      if (preferKind && preferId) {
+        for (var i = 0; i < s.length; i++) { if (s[i].kind === preferKind && s[i].id === preferId) { pick = s[i]; break; } }
+      }
+      if (!pick) pick = s[s.length - 1];
+      if (pick.kind === 'textBox') { page.activeTextBoxId = pick.id; page.activeImageId = null; }
+      else { page.activeImageId = pick.id; page.activeTextBoxId = null; }
+    },
+
+    // Is this element id in a group? (template helper)
+    isGrouped: function (id) { return this._isGrouped(id); },
+
+    // Layers-panel chain toggle: if the layer is grouped, unlink it (remove
+    // from its group); otherwise link it with the current selection.
+    toggleLayerGroup: function (layer) {
+      var page = this.active;
+      if (!page || !layer) return;
+      var id = layer.el.id;
+      if (this._isGrouped(id)) {
+        // Unlink: remove this element from its group.
+        if (Array.isArray(page.groups)) {
+          page.groups.forEach(function (g) {
+            var i = (g.memberIds || []).indexOf(id);
+            if (i !== -1) g.memberIds.splice(i, 1);
+          });
+          page.groups = page.groups.filter(function (g) { return (g.memberIds || []).length > 1; });
+        }
+        return;
+      }
+      // Link with selection: if 1+ others are selected, group them together.
+      var sel = (this.selSet || []).slice();
+      var hasThis = sel.some(function (s) { return s.id === id; });
+      if (!hasThis) sel.push({ kind: (layer.kind === 'textBox' ? 'textBox' : 'image'), id: id });
+      if (sel.length < 2) return; // nothing to link to
+      this.selSet = sel;
+      this._syncPrimary();
+      this.groupSelection();
+    },
+
+    // Can the current selection be grouped / ungrouped? (context menu gating)
+    canGroupSelection: function () {
+      var s = this.selSet || [];
+      if (s.length < 2) return false;
+      // Already exactly one group covering the selection? then no "group".
+      return true;
+    },
+    canUngroupSelection: function () {
+      var s = this.selSet || [];
+      var self = this;
+      return s.some(function (r) { return self._isGrouped(r.id); });
+    },
+
+    // Make a group from the current selection (2+ elements).
+    groupSelection: function () {
+      var page = this.active;
+      var s = this.selSet || [];
+      if (!page || s.length < 2) return;
+      if (!Array.isArray(page.groups)) page.groups = [];
+      // Drop any existing groups fully contained in the selection first.
+      var selIds = {};
+      s.forEach(function (r) { selIds[r.id] = true; });
+      page.groups = page.groups.filter(function (g) {
+        return !(g.memberIds || []).every(function (m) { return selIds[m]; });
+      });
+      var id = 'g-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+      page.groups.push({ id: id, memberIds: s.map(function (r) { return r.id; }) });
+    },
+
+    // Ungroup: remove every group that touches the current selection.
+    ungroupSelection: function () {
+      var page = this.active;
+      if (!page || !Array.isArray(page.groups)) return;
+      var selIds = {};
+      (this.selSet || []).forEach(function (r) { selIds[r.id] = true; });
+      page.groups = page.groups.filter(function (g) {
+        return !(g.memberIds || []).some(function (m) { return selIds[m]; });
+      });
+    },
+
+    // The member ids of the set matching a kind.
+    _selIdsOfKind: function (kind) {
+      return (this.selSet || []).filter(function (s) { return s.kind === kind; }).map(function (s) { return s.id; });
+    },
+
+    // Select every element on the current page (Ctrl/Cmd+A). Text boxes
+    // first, then images, so the primary ends up being an image if present.
+    selectAllOnPage: function () {
+      var page = this.active;
+      if (!page) return;
+      var set = [];
+      (page.images || []).forEach(function (im) { set.push({ kind: 'image', id: im.id }); });
+      (page.textBoxes || []).forEach(function (tb) { set.push({ kind: 'textBox', id: tb.id }); });
+      this.selSet = set;
+      this._syncPrimary();
+    },
+
+    // Capture {kind, id, x, y} for every selected element, so a drag can move
+    // them all by a shared delta.
+    _selectionBases: function () {
+      var page = this.active;
+      if (!page) return [];
+      var out = [];
+      (this.selSet || []).forEach(function (s) {
+        var el = null;
+        if (s.kind === 'textBox') {
+          var boxes = page.textBoxes || [];
+          for (var i = 0; i < boxes.length; i++) { if (boxes[i].id === s.id) { el = boxes[i]; break; } }
+        } else {
+          var imgs = page.images || [];
+          for (var j = 0; j < imgs.length; j++) { if (imgs[j].id === s.id) { el = imgs[j]; break; } }
+        }
+        if (el) out.push({ kind: s.kind, id: s.id, x: (typeof el.x === 'number' ? el.x : 0), y: (typeof el.y === 'number' ? el.y : 0) });
+      });
+      return out;
+    },
+
+    // Click handler for an element. Plain click selects (replace); a
+    // shift-click was already handled on mousedown (toggle), so it must NOT
+    // replace the selection here or it would clobber the additive selection.
+    onElementClick: function (kind, el, evt) {
+      if (!el) return;
+      if (evt && evt.shiftKey) return; // mousedown already toggled
+      // A click that follows a real drag must not reset the selection (that
+      // would drop a multi-selection down to the dragged element).
+      if (this._suppressClick) return;
+      if (kind === 'textBox') this.selectTextBox(el);
+      else this.selectImage(el);
+    },
+
     selectImage: function (img) {
       var page = this.active;
       if (!page || !img) return;
-      page.activeImageId = img.id;
-      page.activeTextBoxId = null;
+      this._selSetOnly('image', img.id);
     },
 
     // If a deliberate selection's own box (+ small grace) contains the
@@ -1859,7 +2263,8 @@
         startX: evt.clientX,
         startY: evt.clientY,
         baseX: (typeof el.x === 'number') ? el.x : 0,
-        baseY: (typeof el.y === 'number') ? el.y : 0
+        baseY: (typeof el.y === 'number') ? el.y : 0,
+        bases: this._selectionBases()
       };
       var self = this;
       this.$nextTick(function () { self.injectShapeSpacer(); });
@@ -2291,8 +2696,7 @@
     selectTextBox: function (box) {
       var page = this.active;
       if (!page || !box) return;
-      page.activeTextBoxId = box.id;
-      page.activeImageId = null;
+      this._selSetOnly('textBox', box.id);
     },
     setTextBoxW: function (v) {
       var box = this.activeTextBox;
@@ -2511,6 +2915,13 @@
     },
     onTextBoxMouseDown: function (evt, box) {
       if (!box) return;
+      // Shift-click: toggle membership, no drag / no priority redirect.
+      if (evt.shiftKey) {
+        evt.preventDefault();
+        this._hideOverlapPicker();
+        this._selSetToggle('textBox', box.id);
+        return;
+      }
       // Selection priority: a deliberate selection wins inside its own box.
       var priTb = this._selectedWinsAtPoint(evt);
       if (priTb && !(priTb.kind === 'textBox' && priTb.id === box.id)) {
@@ -2932,7 +3343,17 @@
         // cursor, so the user can pick the one they mean by name.
         overlapPicker: { open: false, x: 0, y: 0, items: [] },
         // Element under the cursor (priority-aware) for the hover highlight.
-        hoveredEl: { kind: '', id: '' }
+        hoveredEl: { kind: '', id: '' },
+        // Track the page id the current selection belongs to, so the active
+        // watcher clears the selection only on a real page change.
+        _selPageId: null,
+        // Rubber-band marquee state (drag on empty page space to select).
+        marquee: { active: false, startX: 0, startY: 0, x: 0, y: 0, w: 0, h: 0, moved: false },
+        // Multi-selection set: array of { kind: 'image'|'textBox', id }.
+        // The single active ids (activeImageId/activeTextBoxId) always reflect
+        // the PRIMARY (last-selected) member, so existing single-element code
+        // keeps working. Reset per page change.
+        selSet: []
       };
     },
     computed: {
@@ -3161,7 +3582,7 @@
     mounted: function () {
       var self = this;
       this._onMouseMove = function (evt) { self.onImageMouseMove(evt); };
-      this._onMouseUp = function () { self.onImageMouseUp(); };
+      this._onMouseUp = function (evt) { self.onImageMouseUp(evt); };
       window.addEventListener("mousemove", this._onMouseMove);
       window.addEventListener("mouseup", this._onMouseUp);
 
@@ -3216,7 +3637,8 @@
           var p = self.active;
           if (!p) return false;
           return !!(p.activeImageId || p.activeTextBoxId);
-        }
+        },
+        selectAll: function () { self.selectAllOnPage(); }
       };
       // Expose zine-level import/export so the masthead (AppShell) can call
       // them even though the logic lives on the editor component.
@@ -3232,7 +3654,16 @@
       // When the active page changes (or its body is replaced by undo),
       // re-sync the contenteditable so it shows the correct content.
       active: {
-        handler: function () {
+        handler: function (newActive) {
+          // Clear the multi-selection ONLY when the PAGE actually changes.
+          // `active` is a computed that re-emits whenever store.pages mutates
+          // (e.g. injectShapeSpacer after a move), so clearing on every emit
+          // collapsed a multi-selection mid-move. Track the page id.
+          var newId = newActive && newActive.id;
+          if (newId !== this._selPageId) {
+            this._selPageId = newId;
+            this.selSet = [];
+          }
           this.syncTextBoxDom();
           this.injectShapeSpacer();
         },
