@@ -380,7 +380,12 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
   };
   if (el.kind === "icon") {
     style.fontSize = ((w / pageW) * zfPageBasePx() * 1.4).toFixed(4) + "em";
-    style.height = (w / pageW * 100).toFixed(4) + "%";
+    // Square box: height must be `w` inches too. Width is a % of the page
+    // WIDTH, so the matching height is a % of the page HEIGHT. Using
+    // w/pageW for the height made the icon box (pageH/pageW) too tall
+    // (e.g. ~1.5x on a 2.75x4.25 page) -- the "icon box taller than glyph"
+    // bug that also stole clicks from neighbors.
+    style.height = (w / pageH * 100).toFixed(4) + "%";
   } else if (typeof el.h === "number") {
     // Decorative elements (tape, scraps) carry an explicit height, so their
     // two resize axes are independent.
@@ -392,6 +397,19 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
   return style;
 }
 
+// Font size for a text box as CSS. Prefers an explicit point size
+// (box.fontPt, e.g. 12 -> "12pt"); otherwise maps the legacy multiplier
+// (box.fontSize, where 1.0 = the ~10pt page base) to points. The mini-page
+// base is 10pt (see --zf-page-base-px = 13.333px at 96dpi).
+function zfBoxFontCss(box) {
+  if (!box) return "10pt";
+  if (typeof box.fontPt === "number" && box.fontPt > 0) {
+    return (Math.round(box.fontPt * 10) / 10) + "pt";
+  }
+  var mult = (typeof box.fontSize === "number" ? box.fontSize : 1.0);
+  return (Math.round(mult * 10 * 10) / 10) + "pt";
+}
+
 // Shared style for a text box (positioned, sized, typography).
 function zfTextBoxStyle(box, pageW, pageH, margin) {
   if (!box) return {};
@@ -400,22 +418,34 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
   var w = (typeof box.w === "number" ? box.w : 1.8);
   var rot = (typeof box.rot === "number" ? box.rot : 0);
   var z = (typeof box.z === "number" ? box.z : 0);
-  var fontSize = (typeof box.fontSize === "number" ? box.fontSize : 1.0);
   var lineHeight = (typeof box.lineHeight === "number" ? box.lineHeight : 1.35);
   var style = {
     position: "absolute",
     left: (x / pageW * 100).toFixed(4) + "%",
     top: (y / pageH * 100).toFixed(4) + "%",
-    width: (w / pageW * 100).toFixed(4) + "%",
+    // Auto-width boxes hug their text. The cap is the distance from the
+    // box's left edge to the page's right edge (NOT the full page width):
+    // a box starting at x inches can only grow (pageW - x) inches before it
+    // would run off the page. Capping at 100% let a box that started inset
+    // overshoot the right edge and "push" the page before wrapping.
+    width: (box.autoWidth ? "max-content" : (w / pageW * 100).toFixed(4) + "%"),
+    maxWidth: (box.autoWidth ? ((Math.max(0.2, pageW - x) / pageW) * 100).toFixed(4) + "%" : "none"),
     // Text boxes with an explicit height (in inches) get a fixed height so
     // framed uses like comic panels can hold a shape; others stay auto.
     height: (typeof box.h === "number" ? (box.h / pageH * 100).toFixed(4) + "%" : "auto"),
     transform: "rotate(" + rot + "deg)",
     transformOrigin: "center center",
-    fontSize: (fontSize * 100) + "%",
+    // Font size: prefer an explicit point size (box.fontPt). Falls back to the
+    // legacy multiplier (box.fontSize, x base 10pt) for older content.
+    fontSize: zfBoxFontCss(box),
     lineHeight: lineHeight,
     zIndex: 100 + z
   };
+  if (box.autoWidth) {
+    // Wrap at the page edge rather than run off it.
+    style.whiteSpace = "pre-wrap";
+    style.wordBreak = "break-word";
+  }
   if (box.align) style.textAlign = box.align;
   if (box.color) style.color = box.color;
   if (box.fontFamily) style.fontFamily = box.fontFamily;

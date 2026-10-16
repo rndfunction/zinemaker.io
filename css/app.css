@@ -365,6 +365,7 @@
        positioned so they tuck beside the page without consuming layout
        width (the middle column can be narrower than page + both ghosts). */
     .zf-canvas-wrap { position: relative; }
+
     /* Ghost pages now FLOW in the centered flex row (.zf-canvas-wrap) instead
        of being absolutely positioned with hardcoded pixel offsets. The old
        approach assumed the page was ~414px wide (Letter); on A4 the page
@@ -372,28 +373,121 @@
        top of the page. As a flex child with align-self:center, a ghost sits
        beside the page at ANY page size, with the wrap's gap providing the
        spacing. */
+    /* The ghost IS the page, scaled down -- a plain frame + click target,
+       no outer white card or padding. The mini-page fills it edge to edge. */
     .zf-ghost-page {
       align-self: center;
-      width: 130px; min-height: 230px;
+      width: 130px;
       flex: 0 0 auto;
-      background: #ffffff; border: 1px solid var(--zf-border); border-radius: 4px;
+      border: 1px solid var(--zf-border); border-radius: 4px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 0.6rem; cursor: pointer; opacity: 0.75;
-      display: flex; flex-direction: column; gap: 0.35rem;
+      cursor: pointer; opacity: 0.85;
+      display: flex; flex-direction: column;
       transition: opacity 0.15s ease, transform 0.15s ease,
                   box-shadow 0.15s ease, border-color 0.15s ease;
       overflow: hidden;
+      background: transparent;
     }
+    /* Scaled, muted render of the real page. Non-interactive. */
+    /* Overlap picker: shown on hover when 2+ elements stack under the cursor. */
+    /* Overlap picker: a horizontal row of paper "chips" listing the elements
+       stacked under the cursor, each with its glyph. Paper/ink palette so it
+       reads as part of the zine, not browser chrome. */
+    .zf-overlap-picker {
+      position: fixed;
+      z-index: 610;
+      min-width: 140px;
+      max-width: min(80vw, 260px);
+      background: #fbf6e8;
+      border: 1px solid #1b1b1b;
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(27,27,27,0.22);
+      padding: 0.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      transform: translate(10px, 12px);
+    }
+    .zf-overlap-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      width: 100%;
+      text-align: left;
+      background: #ffffff;
+      border: 1px solid #1b1b1b;
+      border-radius: 6px;
+      padding: 0.3rem 0.55rem;
+      font-family: var(--zf-serif);
+      font-size: 0.82rem;
+      color: #1b1b1b;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .zf-overlap-glyph { font-size: 1em; flex: 0 0 auto; }
+    .zf-overlap-name { overflow: hidden; text-overflow: ellipsis; }
+    .zf-overlap-item:hover { background: #1b1b1b; color: #fbf6e8; border-color: #1b1b1b; }
+
+    /* Right-click context menu for elements. Fixed at the cursor. */
+    .zf-ctx-menu {
+      position: fixed;
+      z-index: 600;
+      min-width: 160px;
+      background: #ffffff;
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+      padding: 0.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .zf-ctx-item {
+      text-align: left;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.82rem;
+      color: var(--zf-ink);
+      cursor: pointer;
+    }
+    .zf-ctx-item:hover { background: var(--zf-blue, #005ea2); color: #ffffff; }
+    .zf-ctx-sep { height: 1px; background: var(--zf-border); margin: 0.25rem 0; }
+    .zf-ctx-danger { color: #b50909; }
+    .zf-ctx-danger:hover { background: #b50909; color: #ffffff; }
+
+    .zf-ghost-render {
+      pointer-events: none;
+      filter: grayscale(0.15);
+      opacity: 0.9;
+      width: 100%;
+    }
+    .zf-ghost-render .zf-ghost-mini {
+      width: 100% !important;
+      overflow: hidden;
+      border-radius: 3px;
+    }
+    .zf-ghost-mini .zf-mini-body { overflow: hidden; }
     .zf-ghost-page:hover {
       opacity: 1; transform: scale(1.03);
       border-color: var(--zf-accent, #005ea2);
       box-shadow: 0 6px 16px rgba(0,0,0,0.16);
     }
+    .zf-ghost-page:hover .zf-ghost-label,
+    .zf-ghost-page:focus-visible .zf-ghost-label { opacity: 1; }
     .zf-ghost-page:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 3px; opacity: 1; }
 
     .zf-ghost-label {
       font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
       font-weight: 700; color: var(--zf-gray-mid);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      position: absolute;
+      top: 4px; left: 0; right: 0;
+      pointer-events: none;
+      z-index: 2;
     }
     .zf-ghost-title {
       font-family: var(--zf-serif); font-size: 0.95rem; color: var(--zf-ink);
@@ -867,6 +961,16 @@
       border: 1px dashed #005ea2; box-sizing: border-box;
       pointer-events: none;
     }
+    /* Hover: a subtle hint of what a click/drag will grab. Driven by JS
+       (.zf-element-hover) so it respects selection priority -- when the
+       pointer is inside the selected element's box, THAT element highlights,
+       matching what a drag would move. */
+    .zf-img-wrap.zf-element-hover {
+      outline: 1px dashed rgba(0,94,162,0.55);
+      outline-offset: 2px;
+    }
+    /* Selected: stronger than hover (heavier + solid-color dashed) so the
+       active element reads clearly, in the app's established dashed style. */
     .zf-img-wrap.zf-img-selected {
       outline: 2px dashed var(--zf-blue);
       outline-offset: 2px;
@@ -917,6 +1021,13 @@
       outline: none;
     }
     .zf-textbox:hover { border-color: rgba(0,94,162,0.35); }
+    /* Hover: subtle hint of what a click/drag will grab (JS-driven, matches
+       selection priority). */
+    .zf-textbox.zf-element-hover {
+      outline: 1px dashed rgba(0,94,162,0.55);
+      outline-offset: 2px;
+    }
+    /* Selected: stronger than hover (heavier dashed), in the app's style. */
     .zf-textbox-selected {
       border: 1px dashed var(--zf-blue) !important;
       outline: 2px dashed var(--zf-blue);

@@ -1122,6 +1122,38 @@
       el.z = prevZ;
     },
     // -------- Element deletion and duplication --------
+    // -------- Right-click context menu --------
+    openContextMenu: function (evt, kind, id) {
+      var page = this.active;
+      if (!page) return;
+      this._selectElementById(kind, id);
+      this.ctxMenu = { open: true, x: evt.clientX, y: evt.clientY, kind: kind, id: id };
+    },
+    closeContextMenu: function () {
+      if (this.ctxMenu.open) this.ctxMenu = { open: false, x: 0, y: 0, kind: '', id: '' };
+    },
+    _selectElementById: function (kind, id) {
+      var page = this.active;
+      if (!page) return;
+      if (kind === 'textBox') { page.activeTextBoxId = id; page.activeImageId = null; }
+      else { page.activeImageId = id; page.activeTextBoxId = null; }
+    },
+    ctxAction: function (action) {
+      var m = this.ctxMenu;
+      if (!m.open) return;
+      this._selectElementById(m.kind, m.id);
+      switch (action) {
+        case 'front': this.bringToFront(); break;
+        case 'forward': this.bringForward(); break;
+        case 'backward': this.sendBackward(); break;
+        case 'back': this.sendToBack(); break;
+        case 'duplicate': this.duplicateSelectedElement(); break;
+        case 'copy': this.copySelected(); break;
+        case 'delete': this.deleteSelectedElement(); break;
+      }
+      this.closeContextMenu();
+    },
+
     deleteSelectedElement: function () {
       var page = this.active;
       if (!page) return;
@@ -1264,6 +1296,43 @@
     goToPageId: function (id) {
       if (id) store.activePageId = id;
     },
+    // Style for the ghost's scaled mini-page: same theme + aspect as the
+    // real page, small, with a tiny page scale so fonts/padding shrink.
+    ghostPageStyle: function (page) {
+      var m = this.activeModel;
+      if (!m) return {};
+      var theme = (window.ZFThemes && store.theme()) ? window.ZFThemes.pageStyle(store.theme()) : {};
+      var cssPxW = 130;
+      var scale = cssPxW / (m.page.width * 96);
+      var margin = (store.modelMarginIn ? store.modelMarginIn() : 0.1);
+      return Object.assign({}, theme, {
+        position: 'relative',
+        width: '100%',
+        height: (cssPxW * (m.page.height / m.page.width)) + 'px',
+        padding: margin + 'in',
+        '--zf-page-scale': scale,
+        '--zf-page-margin': margin + 'in',
+        transform: 'none'
+      });
+    },
+    ghostBlockStyle: function (img) {
+      var m = this.activeModel;
+      if (!m || !img || !img.src) return {};
+      return zfElementStyle(img, m.page.width, m.page.height, 0, { block: true });
+    },
+    ghostFreeStyle: function (img) {
+      var m = this.activeModel;
+      if (!m || !img) return {};
+      var decor = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
+      if (!img.src && !decor[img.kind]) return {};
+      return zfElementStyle(img, m.page.width, m.page.height, 0, {});
+    },
+    ghostTextBoxStyle: function (box) {
+      var m = this.activeModel;
+      if (!m || !box) return {};
+      return zfTextBoxStyle(box, m.page.width, m.page.height, 0);
+    },
+
     ghostSnippet: function (page) {
       if (!page) return '';
       var t = '';
@@ -1410,14 +1479,26 @@
         // Placeholder slots (from templates): clicking one asks for a
         // replacement photo instead of starting a drag. The new image
         // inherits the slot's geometry; only src changes.
-        if (img.placeholder) {
-          this._replaceTargetId = img.id;
-          var ri = this.$refs.replaceInput;
-          if (ri) ri.click();
-          return;
-        }
-        if (this.active) this.active.activeImageId = img.id;
-        // Focus the wrapper so Delete/Backspace reach the element handler
+      if (img.placeholder) {
+        this._replaceTargetId = img.id;
+        var ri = this.$refs.replaceInput;
+        if (ri) ri.click();
+        return;
+      }
+      // Selection priority: if an element is ALREADY selected and the pointer
+      // is inside that element's own box (+ small grace), drag THAT element --
+      // do not let z-order re-pick a different one. Respects a deliberate
+      // selection without the over-eager behavior of global stickiness (it
+      // only applies within the selected element's box).
+      var pri = this._selectedWinsAtPoint(evt);
+      if (pri && !(pri.kind === 'image' && pri.id === img.id)) {
+        this._startMoveDrag(pri.kind, pri.id, evt);
+        return;
+      }
+      // Selecting an element hides the overlap picker.
+      this._hideOverlapPicker();
+      if (this.active) this.active.activeImageId = img.id;
+      // Focus the wrapper so Delete/Backspace reach the element handler
         // instead of being swallowed by a contenteditable elsewhere.
         try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
         // Re-inject flow spacers so the selection outline moves.
@@ -1472,12 +1553,23 @@
       if (!box) return;
       evt.stopPropagation();
       evt.preventDefault();
+      // Manual resize takes the box out of auto-width mode: from here it has
+      // a fixed width and wraps within it.
+      box.autoWidth = false;
       var px = 96 * this.imageScale;
       var pageEl = this.$refs.miniPage;
       if (!pageEl) return;
       var pr = pageEl.getBoundingClientRect();
       var margin = store.modelMarginIn();
+      // Capture the box's CURRENT rendered width as the base for resizing, so
+      // the first drag starts from where it visually is (not the stored w).
       var w = (typeof box.w === 'number') ? box.w : 1.8;
+      var wrapEl = this.$el ? this.$el.querySelector('[data-zf-text-id="' + box.id + '"]') : null;
+      if (wrapEl) {
+        var wr = wrapEl.getBoundingClientRect();
+        var m2 = this.activeModel;
+        if (m2 && pr.width) w = (wr.width / pr.width) * m2.page.width;
+      }
       var cxIn = (typeof box.x === 'number' ? box.x : 0) + margin + w / 2;
       var cyIn = (typeof box.y === 'number' ? box.y : 0) + margin + 0.4;
       var cx = pr.left + cxIn * px;
@@ -1491,7 +1583,10 @@
         isText: true,
         startDist: startDist,
         baseW: w,
-        baseFontSize: (typeof box.fontSize === 'number') ? box.fontSize : 1.0,
+        // Base font in POINTS: explicit fontPt, else legacy multiplier x 10pt.
+        baseFontPt: (typeof box.fontPt === 'number' && box.fontPt > 0)
+          ? box.fontPt
+          : ((typeof box.fontSize === 'number' ? box.fontSize : 1.0) * 10),
         cx: cx,
         cy: cy
       };
@@ -1582,13 +1677,16 @@
         var sdist = Math.sqrt(sdx * sdx + sdy * sdy) || 1;
         var sratio = sdist / this.imageDrag.startDist;
         var nw = this.imageDrag.baseW * sratio;
-        var nf = this.imageDrag.baseFontSize * sratio;
+        var nfPt = (this.imageDrag.baseFontPt || 12) * sratio;
         if (nw < 0.4) nw = 0.4;
         if (nw > 8) nw = 8;
-        if (nf < 0.3) nf = 0.3;
-        if (nf > 4) nf = 4;
+        if (nfPt < 4) nfPt = 4;
+        if (nfPt > 200) nfPt = 200;
         img.w = Math.round(nw * 100) / 100;
-        img.fontSize = Math.round(nf * 100) / 100;
+        // Resizing the box scales the font and UPDATES the point number, so
+        // the control reflects the new effective size.
+        img.fontPt = Math.round(nfPt * 2) / 2; // round to 0.5pt
+        delete img.fontSize; // migrate off the legacy multiplier
       } else if (mode === "rotate") {
         var rdx = evt.clientX - this.imageDrag.cx;
         var rdy = evt.clientY - this.imageDrag.cy;
@@ -1714,6 +1812,299 @@
       if (!page || !img) return;
       page.activeImageId = img.id;
       page.activeTextBoxId = null;
+    },
+
+    // If a deliberate selection's own box (+ small grace) contains the
+    // pointer, return { kind, id } so the caller drags the SELECTED element
+    // instead of letting z-order re-pick. Else null (normal behavior).
+    _selectedWinsAtPoint: function (evt) {
+      var page = this.active;
+      if (!page) return null;
+      var kind = page.activeImageId ? 'image' : (page.activeTextBoxId ? 'textBox' : null);
+      var id = page.activeImageId || page.activeTextBoxId;
+      if (!kind || !id) return null;
+      var sel = page.activeImageId ? '[data-zf-img-id="' + id + '"]' : '[data-zf-text-id="' + id + '"]';
+      var el = this.$el ? this.$el.querySelector(sel) : null;
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      var m = 4; // small grace so pressing at the very edge still grabs it
+      if (evt.clientX >= r.left - m && evt.clientX <= r.right + m &&
+          evt.clientY >= r.top - m && evt.clientY <= r.bottom + m) {
+        return { kind: kind, id: id };
+      }
+      return null;
+    },
+
+    // Begin a move-drag on the given element (used when a selection takes
+    // priority over the clicked element). Selects it, then sets up imageDrag.
+    _startMoveDrag: function (kind, id, evt) {
+      var page = this.active;
+      if (!page) return;
+      this._hideOverlapPicker();
+      var el = null;
+      if (kind === 'textBox') {
+        var boxes = page.textBoxes || [];
+        for (var i = 0; i < boxes.length; i++) { if (boxes[i].id === id) { el = boxes[i]; break; } }
+        page.activeTextBoxId = id; page.activeImageId = null;
+      } else {
+        var imgs = page.images || [];
+        for (var j = 0; j < imgs.length; j++) { if (imgs[j].id === id) { el = imgs[j]; break; } }
+        page.activeImageId = id; page.activeTextBoxId = null;
+      }
+      if (!el) return;
+      this.imageDrag = {
+        imgId: id,
+        isText: (kind === 'textBox'),
+        mode: 'move',
+        startX: evt.clientX,
+        startY: evt.clientY,
+        baseX: (typeof el.x === 'number') ? el.x : 0,
+        baseY: (typeof el.y === 'number') ? el.y : 0
+      };
+      var self = this;
+      this.$nextTick(function () { self.injectShapeSpacer(); });
+    },
+
+    // -------- Overlap picker --------
+    // Human-readable name for an element, used in the overlap picker.
+    _elementName: function (kind, id) {
+      var page = this.active;
+      if (!page) return '';
+      if (kind === 'textBox') {
+        var boxes = page.textBoxes || [];
+        for (var i = 0; i < boxes.length; i++) {
+          if (boxes[i].id === id) {
+            var t = (boxes[i].html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            return t ? (t.length > 28 ? t.slice(0, 28) + '...' : t) : 'Text box';
+          }
+        }
+        return 'Text box';
+      }
+      var imgs = page.images || [];
+      for (var j = 0; j < imgs.length; j++) {
+        if (imgs[j].id !== id) continue;
+        var k = imgs[j].kind || 'photo';
+        if (k === 'icon') {
+          var nm = String(imgs[j].src || '').split(':').pop().replace(/-/g, ' ');
+          return nm ? (nm.charAt(0).toUpperCase() + nm.slice(1)) : 'Icon';
+        }
+        if (k === 'tape') return 'Tape';
+        if (k === 'scrap') return 'Paper scrap';
+        if (k === 'sticky') return 'Sticky note';
+        if (k === 'sticker') return 'Sticker';
+        return 'Image';
+      }
+      return 'Element';
+    },
+
+    // Build the list of selectable elements stacked under a screen point,
+    // topmost first. Each entry: { kind, id, name }.
+    _elementsAtPoint: function (x, y) {
+      var els = (document.elementsFromPoint ? document.elementsFromPoint(x, y) : []) || [];
+      var list = [];
+      var seen = {};
+      for (var i = 0; i < els.length; i++) {
+        var e = els[i];
+        if (!e || !e.getAttribute) continue;
+        var iid = e.getAttribute('data-zf-img-id');
+        var tid = e.getAttribute('data-zf-text-id');
+        var kind = iid ? 'image' : (tid ? 'textBox' : null);
+        var id = iid || tid;
+        if (!kind || !id) continue;
+        var key = kind + ':' + id;
+        if (seen[key]) continue;
+        seen[key] = true;
+        list.push({
+          kind: kind,
+          id: id,
+          name: this._elementName(kind, id),
+          glyph: this._elementGlyph(kind, id)
+        });
+      }
+      return list;
+    },
+
+    // An iconify icon name to show as a small glyph in the overlap picker.
+    // Icons show their own icon; other kinds get a representative glyph.
+    _elementGlyph: function (kind, id) {
+      var page = this.active;
+      if (!page) return 'ph:square';
+      if (kind === 'textBox') return 'ph:text-t';
+      var imgs = page.images || [];
+      for (var j = 0; j < imgs.length; j++) {
+        if (imgs[j].id !== id) continue;
+        var k = imgs[j].kind || 'photo';
+        if (k === 'icon') return imgs[j].src || 'ph:star';
+        if (k === 'tape') return 'ph:tape';
+        if (k === 'scrap') return 'ph:note';
+        if (k === 'sticky') return 'ph:note-pencil';
+        if (k === 'sticker') return 'ph:seal';
+        return 'ph:image';
+      }
+      return 'ph:square';
+    },
+
+    // Mousemove over the editor: if >=2 elements overlap at the cursor, show
+    // a small picker listing them so the user can choose the one they want.
+    onEditorHoverForPicker: function (evt) {
+      // Ignore while dragging/drawing.
+      if (this.imageDrag || this.drawingMode) {
+        this._hideOverlapPicker();
+        this._setHoveredElement(null);
+        return;
+      }
+      var x = evt.clientX, y = evt.clientY;
+
+      // Hover highlight: reflect what a MOUSEDOWN would actually target --
+      // the selected element if the pointer is inside its own box, otherwise
+      // the topmost element. This keeps the highlight consistent with the
+      // drag behavior (no highlighting a different element than you'll move).
+      var pri = this._selectedWinsAtPoint(evt);
+      if (pri) {
+        this._setHoveredElement(pri);
+      } else {
+        var at = this._elementsAtPoint(x, y);
+        this._setHoveredElement(at.length ? { kind: at[0].kind, id: at[0].id } : null);
+      }
+
+      // Overlap picker. If it is ALREADY open, do NOT recompute/reposition it
+      // on every move (that made it chase the cursor and vanish as you moved
+      // toward it). Keep it open while the pointer is over the picker itself
+      // or over the stack region; hide it only when the pointer is over
+      // neither. If it is not open, open it (debounced) over a stack.
+      var self = this;
+      if (this._overPicker(x, y)) {
+        // Pointer is over the open picker: keep it open, ignore.
+        return;
+      }
+      if (this.overlapPicker.open) {
+        // Still over the stack? keep it. Otherwise hide.
+        var here = this._elementsAtPoint(x, y);
+        if (here.length < 2) this._hideOverlapPicker();
+        return;
+      }
+      if (this._pickerTimer) clearTimeout(this._pickerTimer);
+      this._pickerTimer = setTimeout(function () {
+        var list = self._elementsAtPoint(x, y);
+        if (list.length < 2) { self._hideOverlapPicker(); return; }
+        self.overlapPicker = { open: true, x: x, y: y, items: list };
+      }, 260);
+    },
+
+    // Is the screen point over the currently-open overlap picker?
+    _overPicker: function (x, y) {
+      var el = this.$el ? this.$el.querySelector('.zf-overlap-picker') : null;
+      if (!el) return false;
+      var r = el.getBoundingClientRect();
+      return (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
+    },
+
+    // Position the selection overlay to exactly cover the editor page, and
+    // compute the selected element's outline box within it. Called on
+    // mount/update/resize and whenever the selection changes.
+    _positionOverlay: function () {
+      if (this._overlayPending) return;
+      this._overlayPending = true;
+      var self = this;
+      this.$nextTick(function () {
+        self._overlayPending = false;
+        var pageEl = self.$refs.miniPage;
+        var wrapEl = pageEl && pageEl.parentElement;
+        var ov = self.$refs.selOverlay;
+        if (!pageEl || !wrapEl || !ov) return;
+        var pr = pageEl.getBoundingClientRect();
+        var wr = wrapEl.getBoundingClientRect();
+        var box = {
+          left: (pr.left - wr.left) + 'px',
+          top: (pr.top - wr.top) + 'px',
+          width: pr.width + 'px',
+          height: pr.height + 'px'
+        };
+        // Only assign if changed -- avoids re-triggering renders.
+        if (JSON.stringify(self.selectionOverlayStyle) !== JSON.stringify(box)) {
+          self.selectionOverlayStyle = box;
+        }
+        // Outline for the selected element (image or text box), positioned as
+        // a % of the page (matches the overlay which equals the page box).
+        var page = self.active;
+        var el = null;
+        if (page && page.activeImageId) {
+          var imgs = page.images || [];
+          for (var i = 0; i < imgs.length; i++) { if (imgs[i].id === page.activeImageId) { el = imgs[i]; break; } }
+        } else if (page && page.activeTextBoxId) {
+          var boxes = page.textBoxes || [];
+          for (var j = 0; j < boxes.length; j++) { if (boxes[j].id === page.activeTextBoxId) { el = boxes[j]; break; } }
+        }
+        var m = self.activeModel;
+        if (!el || !m) {
+          if (self.selectionOutline !== null) self.selectionOutline = null;
+          return;
+        }
+        var margin = store.modelMarginIn();
+        var x = (typeof el.x === 'number' ? el.x : 0) + margin;
+        var y = (typeof el.y === 'number' ? el.y : 0) + margin;
+        var w = (typeof el.w === 'number' ? el.w : 0.6);
+        var h;
+        if (el.kind === 'icon') h = w;
+        else if (typeof el.h === 'number') h = el.h;
+        else h = null; // content-driven (text box auto height) -> measure DOM
+        if (h === null) {
+          // Measure the rendered element for its height.
+          var sel = page.activeImageId ? '[data-zf-img-id="' + el.id + '"]' : '[data-zf-text-id="' + el.id + '"]';
+          var domEl = self.$el ? self.$el.querySelector(sel) : null;
+          if (domEl) {
+            var dr = domEl.getBoundingClientRect();
+            h = (dr.height / pr.height) * m.page.height;
+            w = (dr.width / pr.width) * m.page.width;
+            x = ((dr.left - pr.left) / pr.width) * m.page.width;
+            y = ((dr.top - pr.top) / pr.height) * m.page.height;
+          }
+        }
+        var nextOutline = {
+          left: (x / m.page.width * 100) + '%',
+          top: (y / m.page.height * 100) + '%',
+          width: (w / m.page.width * 100) + '%',
+          height: (h / m.page.height * 100) + '%',
+          transform: 'rotate(' + (el.rot || 0) + 'deg)',
+          transformOrigin: 'center center'
+        };
+        if (JSON.stringify(self.selectionOutline) !== JSON.stringify(nextOutline)) {
+          self.selectionOutline = nextOutline;
+        }
+      });
+    },
+
+    // Set the hovered element (drives the hover highlight class).
+    _setHoveredElement: function (el) {
+      var cur = this.hoveredEl;
+      if (!el) {
+        if (cur && cur.id) this.hoveredEl = { kind: '', id: '' };
+        return;
+      }
+      if (cur && cur.kind === el.kind && cur.id === el.id) return;
+      this.hoveredEl = { kind: el.kind, id: el.id };
+    },
+
+    _hideOverlapPicker: function () {
+      if (this._pickerTimer) { clearTimeout(this._pickerTimer); this._pickerTimer = null; }
+      if (this.overlapPicker && this.overlapPicker.open) {
+        this.overlapPicker = { open: false, x: 0, y: 0, items: [] };
+      }
+    },
+
+    // The picker is hovered: suppress hide-on-move so the user can reach it.
+    onPickerEnter: function () {
+      this._pickerHovered = true;
+    },
+    onPickerLeave: function () {
+      this._pickerHovered = false;
+    },
+
+    // Choose an element from the overlap picker.
+    pickOverlap: function (item) {
+      if (!item) return;
+      this._selectElementById(item.kind, item.id);
+      this._hideOverlapPicker();
     },
     // Replace the image inside a placeholder slot in place: keep the
     // element's position/size/rotation/etc., swap only src, and drop the
@@ -1874,9 +2265,16 @@
         html: 'New text',
         x: 0.3,
         y: 0.3,
-        w: 1.8,
+        // Small starting width; the box hugs its text while autoWidth is true
+        // (grows with what you type, wrapping at the page edge). A manual
+        // resize turns autoWidth off and commits a fixed width.
+        w: 1.0,
         rot: 0,
-        fontSize: 1.0  // multiplier on base body font size
+        autoWidth: true,
+        // Explicit point size (12pt). Resizing the box scales this and
+        // updates the number; setting the number directly does not resize
+        // the box.
+        fontPt: 12
       };
       page.textBoxes.push(box);
       page.activeTextBoxId = box.id;
@@ -1906,10 +2304,26 @@
       if (!box) return;
       box.rot = Math.round(Number(v));
     },
+    // Set the text box font size in POINTS. This does NOT resize the box:
+    // the user chose the size deliberately. (Resizing the box, by contrast,
+    // scales the font and updates this number -- see onImageMouseMove.)
+    // Effective font size in points for a text box: explicit fontPt, else the
+    // legacy multiplier (x base 10pt). Used by the control to display the
+    // current value.
+    textBoxFontPt: function (box) {
+      if (!box) return 12;
+      if (typeof box.fontPt === 'number' && box.fontPt > 0) return Math.round(box.fontPt * 2) / 2;
+      var mult = (typeof box.fontSize === 'number' ? box.fontSize : 1.0);
+      return Math.round(mult * 10 * 2) / 2;
+    },
+
     setTextBoxFontSize: function (v) {
       var box = this.activeTextBox;
       if (!box) return;
-      box.fontSize = Math.max(0.5, Math.min(3, Number(v)));
+      var pt = Number(v);
+      if (isNaN(pt)) return;
+      box.fontPt = Math.max(4, Math.min(200, Math.round(pt * 2) / 2));
+      delete box.fontSize; // migrate off the legacy multiplier
     },
     resetTextBox: function () {
       var box = this.activeTextBox;
@@ -1918,7 +2332,8 @@
       box.y = 0.3;
       box.w = 1.8;
       box.rot = 0;
-      box.fontSize = 1.0;
+      box.fontPt = 12;
+      delete box.fontSize;
     },
     textStyle: function (box) {
       if (!box) return {};
@@ -2096,6 +2511,14 @@
     },
     onTextBoxMouseDown: function (evt, box) {
       if (!box) return;
+      // Selection priority: a deliberate selection wins inside its own box.
+      var priTb = this._selectedWinsAtPoint(evt);
+      if (priTb && !(priTb.kind === 'textBox' && priTb.id === box.id)) {
+        evt.preventDefault();
+        this._startMoveDrag(priTb.kind, priTb.id, evt);
+        return;
+      }
+      this._hideOverlapPicker();
       var page = this.active;
       var alreadyActive = page && page.activeTextBoxId === box.id;
       if (evt.target && evt.target.isContentEditable) {
@@ -2500,7 +2923,16 @@
         drawSmoothing: 3,
         drawVelocity: false,
         drawOpacity: 1,
-        drawOptionsOpen: false
+        drawOptionsOpen: false,
+        // Right-click context menu state: open flag, cursor position, and the
+        // target element (kind + id) so an action knows what to operate on.
+        // Declared here so the template + methods can safely read it.
+        ctxMenu: { open: false, x: 0, y: 0, kind: '', id: '' },
+        // Overlap picker: shown on hover when 2+ elements stack under the
+        // cursor, so the user can pick the one they mean by name.
+        overlapPicker: { open: false, x: 0, y: 0, items: [] },
+        // Element under the cursor (priority-aware) for the hover highlight.
+        hoveredEl: { kind: '', id: '' }
       };
     },
     computed: {
@@ -2732,10 +3164,46 @@
       this._onMouseUp = function () { self.onImageMouseUp(); };
       window.addEventListener("mousemove", this._onMouseMove);
       window.addEventListener("mouseup", this._onMouseUp);
+
       // Auto-commit the drawing when the user clicks outside the canvas and
       // the draw panel, so wandering off never loses a drawing.
       this._onDrawDocDown = function (evt) { self.onDrawDocPointerDown(evt); };
       document.addEventListener("pointerdown", this._onDrawDocDown, true);
+      // Hover detection for the overlap picker + hover highlight. Tracked at
+      // the DOCUMENT level (not just the mini-page) so that moving the cursor
+      // from the page ONTO the picker -- which is a fixed element outside the
+      // page -- does not fire a page mouseleave that hides the picker before
+      // the user can reach it.
+      this._onHoverPicker = function (evt) {
+        // Only react when the pointer is over the page OR over the picker.
+        var overPicker = self._overPicker(evt.clientX, evt.clientY);
+        var miniEl = self.$refs.miniPage;
+        var overPage = miniEl ? (function () {
+          var r = miniEl.getBoundingClientRect();
+          return evt.clientX >= r.left && evt.clientX <= r.right &&
+                 evt.clientY >= r.top && evt.clientY <= r.bottom;
+        })() : false;
+        if (overPage || overPicker) {
+          self.onEditorHoverForPicker(evt);
+        } else {
+          self._setHoveredElement(null);
+          self._hideOverlapPicker();
+        }
+      };
+      document.addEventListener("mousemove", this._onHoverPicker);
+      // Dismiss the context menu on any outside click / Esc / scroll.
+      this._onCtxDismiss = function (evt) {
+        if (!self.ctxMenu.open) return;
+        var t = evt.target;
+        var menu = self.$el ? self.$el.querySelector('.zf-ctx-menu') : null;
+        if (menu && menu.contains(t)) return;
+        self.closeContextMenu();
+      };
+      document.addEventListener("pointerdown", this._onCtxDismiss, true);
+      this._onCtxKey = function (evt) { if (evt.key === 'Escape') self.closeContextMenu(); };
+      document.addEventListener("keydown", this._onCtxKey);
+      this._onCtxScroll = function () { self.closeContextMenu(); };
+      window.addEventListener("scroll", this._onCtxScroll, true);
       this.injectShapeSpacer();
       this.syncTextBoxDom();
       // Expose editor actions for global keyboard shortcuts.
@@ -2770,6 +3238,7 @@
         },
         deep: false
       },
+
       // While RE-EDITING a drawing, changing a property control applies to
       // the whole drawing (all its strokes), re-rendering the canvas live.
       // For a brand-new drawing these controls only set defaults for the
@@ -2783,7 +3252,13 @@
     beforeUnmount: function () {
       window.removeEventListener("mousemove", this._onMouseMove);
       window.removeEventListener("mouseup", this._onMouseUp);
+
       if (this._onDrawDocDown) document.removeEventListener("pointerdown", this._onDrawDocDown, true);
+      if (this._onHoverPicker) document.removeEventListener("mousemove", this._onHoverPicker);
+      if (this._pickerTimer) clearTimeout(this._pickerTimer);
+      if (this._onCtxDismiss) document.removeEventListener("pointerdown", this._onCtxDismiss, true);
+      if (this._onCtxKey) document.removeEventListener("keydown", this._onCtxKey);
+      if (this._onCtxScroll) window.removeEventListener("scroll", this._onCtxScroll, true);
       window.ZFEditorActions = null;
     },
     updated: function () {

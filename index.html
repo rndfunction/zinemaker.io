@@ -283,11 +283,44 @@
         <div class="zf-canvas-wrap">
           <div class="zf-ghost-page zf-ghost-prev" v-if="prevPage" role="button" tabindex="0"
                @click="goToPageId(prevPage.id)" @keydown.enter="goToPageId(prevPage.id)"
-               :aria-label="'Go to previous page: ' + (prevPage.heading || 'Untitled')"
-               :title="'Go to ' + (prevPage.heading || 'previous page')">
+               :aria-label="'Go to previous page'"
+               :title="'Go to previous page'">
             <span class="zf-ghost-label">Page {{ activeIndex }}</span>
-            <div class="zf-ghost-title">{{ prevPage.heading || 'Untitled' }}</div>
-            <div class="zf-ghost-snippet">{{ ghostSnippet(prevPage) }}</div>
+            <div class="zf-ghost-render" aria-hidden="true">
+              <div class="zf-mini-page zf-ghost-mini" :style="ghostPageStyle(prevPage)">
+                <template v-for="img in (prevPage.images || [])" :key="'gpb-' + img.id">
+                  <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+                       class="zf-mini-image zf-block-image" :src="img.src" alt=""
+                       :style="ghostBlockStyle(img)" />
+                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
+                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <div class="zf-mini-body" v-html="prevPage.body"></div>
+                <template v-for="img in (prevPage.images || [])" :key="'gpf-' + img.id">
+                  <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+                       class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+                       class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+                       class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, ghostFreeStyle(img))"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+                       class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
+                  <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+                       class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
+                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
+                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <template v-for="box in (prevPage.textBoxes || [])" :key="'gpt-' + box.id">
+                  <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"
+                       :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }"
+                       :style="ghostTextBoxStyle(box)">
+                    <div class="zf-textbox-content" v-html="box.html"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
           <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)">
             <template v-for="g in safeGuides" :key="g.key">
@@ -331,12 +364,13 @@
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                   :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }]"
+                    :class="[{ 'zf-textbox-selected': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && active.activeTextBoxId !== box.id }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
-                   @mousedown="onTextBoxMouseDown($event, box)"
-                   @click.stop="selectTextBox(box)"
-                   @keydown="onTextBoxKeydown($event, box)">
+                    @mousedown="onTextBoxMouseDown($event, box)"
+                    @click.stop="selectTextBox(box)"
+                    @contextmenu.prevent.stop="openContextMenu($event, 'textBox', box.id)"
+                    @keydown="onTextBoxKeydown($event, box)">
                 <div class="zf-textbox-content"
                      :data-zf-text-content-id="box.id"
                      contenteditable="true"
@@ -354,14 +388,16 @@
             <template v-for="img in (active.images || [])" :key="'ovl-' + img.id">
               <div v-if="(img.wrap === 'free' || !img.wrap) && !img.hidden && img.id !== editDrawingId"
                    class="zf-img-wrap"
+                   :data-zf-img-id="img.id"
                    tabindex="0"
-                   :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder }"
+                    :class="{ 'zf-img-selected': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && active.activeImageId !== img.id }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
-                   @mousedown="onImageMouseDownItem($event, img)"
-                   @click.stop="selectImage(img)"
-                   @dblclick.stop="editDrawing(img)"
-                   @keydown.delete.prevent="deleteSelectedElement"
-                   @keydown.backspace.prevent="deleteSelectedElement">
+                    @mousedown="onImageMouseDownItem($event, img)"
+                    @click.stop="selectImage(img)"
+                    @dblclick.stop="editDrawing(img)"
+                    @contextmenu.prevent.stop="openContextMenu($event, 'image', img.id)"
+                    @keydown.delete.prevent="deleteSelectedElement"
+                    @keydown.backspace.prevent="deleteSelectedElement">
                  <div v-if="img.kind === 'tape'" class="zf-tape" :class="'zf-tape-' + (img.color || 'beige')" aria-hidden="true"></div>
                  <div v-else-if="img.kind === 'scrap'" class="zf-scrap" :class="'zf-scrap-' + (img.color || 'kraft')" aria-hidden="true"></div>
                  <div v-else-if="img.kind === 'sticky'" class="zf-sticky" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, {})" aria-hidden="true"></div>
@@ -377,14 +413,73 @@
               </div>
             </template>
           </div>
+
           <div class="zf-ghost-page zf-ghost-next" v-if="nextPage" role="button" tabindex="0"
                @click="goToPageId(nextPage.id)" @keydown.enter="goToPageId(nextPage.id)"
-               :aria-label="'Go to next page: ' + (nextPage.heading || 'Untitled')"
-               :title="'Go to ' + (nextPage.heading || 'next page')">
+               :aria-label="'Go to next page'"
+               :title="'Go to next page'">
             <span class="zf-ghost-label">Page {{ activeIndex + 2 }}</span>
-            <div class="zf-ghost-title">{{ nextPage.heading || 'Untitled' }}</div>
-            <div class="zf-ghost-snippet">{{ ghostSnippet(nextPage) }}</div>
+            <div class="zf-ghost-render" aria-hidden="true">
+              <div class="zf-mini-page zf-ghost-mini" :style="ghostPageStyle(nextPage)">
+                <template v-for="img in (nextPage.images || [])" :key="'gnb-' + img.id">
+                  <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+                       class="zf-mini-image zf-block-image" :src="img.src" alt=""
+                       :style="ghostBlockStyle(img)" />
+                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
+                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <div class="zf-mini-body" v-html="nextPage.body"></div>
+                <template v-for="img in (nextPage.images || [])" :key="'gnf-' + img.id">
+                  <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+                       class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+                       class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+                       class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, ghostFreeStyle(img))"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+                       class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
+                  <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+                       class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
+                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
+                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <template v-for="box in (nextPage.textBoxes || [])" :key="'gnt-' + box.id">
+                  <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"
+                       :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }"
+                       :style="ghostTextBoxStyle(box)">
+                    <div class="zf-textbox-content" v-html="box.html"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
           </div>
+        </div>
+        <!-- Overlap picker: lists the elements stacked under the cursor so a
+             specific one can be chosen by name when they overlap. -->
+        <div v-if="overlapPicker.open" class="zf-overlap-picker"
+             :style="{ top: overlapPicker.y + 'px', left: overlapPicker.x + 'px' }" role="listbox" aria-label="Overlapping elements"
+             @mouseenter="onPickerEnter" @mouseleave="onPickerLeave">
+          <button v-for="(item, oi) in overlapPicker.items" :key="'ov-' + oi"
+                  type="button" class="zf-overlap-item" role="option"
+                  @click.stop="pickOverlap(item)">
+            <iconify-icon class="zf-overlap-glyph" :icon="item.glyph" aria-hidden="true"></iconify-icon>
+            <span class="zf-overlap-name">{{ item.name }}</span>
+          </button>
+        </div>
+        <!-- Right-click context menu for any element (everything is a layer).
+             Positioned at the cursor; closes on outside click / Esc / scroll. -->
+        <div v-if="ctxMenu.open" class="zf-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
+             role="menu" @contextmenu.prevent>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('front')">Bring to Front</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('forward')">Bring Forward</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('backward')">Send Backward</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('back')">Send to Back</button>
+          <div class="zf-ctx-sep" aria-hidden="true"></div>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('duplicate')">Duplicate</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('copy')">Copy</button>
+          <button type="button" class="zf-ctx-item zf-ctx-danger" role="menuitem" @click="ctxAction('delete')">Delete</button>
         </div>
         <zine-icon-picker
           :open="iconPickerOpen"
@@ -675,9 +770,14 @@
                    :value="activeTextBox.rot || 0" @input="setTextBoxRot($event.target.value)" style="flex:1;" />
           </div>
           <div class="zf-image-control-row">
-            <label class="zf-image-control-label">Font size ({{ (activeTextBox.fontSize || 1.0).toFixed(2) }}x)</label>
-            <input type="range" min="0.5" max="3" step="0.05"
-                   :value="activeTextBox.fontSize || 1.0" @input="setTextBoxFontSize($event.target.value)" style="flex:1;" />
+            <label class="zf-image-control-label">Font size (pt)</label>
+            <input type="number" min="4" max="200" step="0.5" style="width:64px;"
+                   :value="textBoxFontPt(activeTextBox)"
+                   @input="setTextBoxFontSize($event.target.value)"
+                   @change="setTextBoxFontSize($event.target.value)" aria-label="Font size in points" />
+            <input type="range" min="4" max="72" step="0.5" style="flex:1;"
+                   :value="textBoxFontPt(activeTextBox)"
+                   @input="setTextBoxFontSize($event.target.value)" aria-label="Font size slider" />
           </div>
           <div class="zf-image-control-row">
             <label class="zf-image-control-label">Line height ({{ (activeTextBox.lineHeight || 1.35).toFixed(2) }})</label>
