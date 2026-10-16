@@ -1383,6 +1383,7 @@
     copySelected: function () {
       var page = this.active;
       if (!page) return;
+      try { zfLog('COPY selSet=' + (this.selSet || []).length + ' activeImg=' + page.activeImageId + ' activeTb=' + page.activeTextBoxId); } catch (e) {}
       // Multi-copy: buffer every selected element so a paste recreates them.
       if (this.selSet && this.selSet.length > 1) {
         var items = [];
@@ -1426,6 +1427,7 @@
     // selected so it can be moved or restyled immediately.
     pasteElement: function () {
       var clip = window.zfClipboard;
+      try { zfLog('PASTE clipType=' + (clip && clip.type) + ' items=' + (clip && clip.items ? clip.items.length : (clip && clip.data ? 1 : 0)) + ' page=' + (this.active && this.active.id)); } catch (e) {}
       if (!clip) return;
       var page = this.active;
       if (!page) return;
@@ -1824,7 +1826,6 @@
       // Group resize: if several are selected, snapshot them and use the
       // group pivot (the pointer distance is measured from the pivot).
       var gsnap = this._groupTransformSnapshot();
-      try { zfLog('IMGRES gsnap=' + (gsnap ? gsnap.items.length : 'null') + ' selSet=' + (this.selSet || []).length); } catch (e) {}
       if (gsnap) {
         var gpx = pr.left + gsnap.pivot.x * px;
         var gpy = pr.top + gsnap.pivot.y * px;
@@ -1933,7 +1934,6 @@
       };
       // Group rotate: snapshot the selection and rotate about its pivot.
       var gsnapR = this._groupTransformSnapshot();
-      try { zfLog('IMGROT gsnap=' + (gsnapR ? gsnapR.items.length : 'null') + ' selSet=' + (this.selSet || []).length); } catch (e) {}
       if (gsnapR) {
         var gpxR = pr.left + gsnapR.pivot.x * px;
         var gpyR = pr.top + gsnapR.pivot.y * px;
@@ -2122,7 +2122,6 @@
       var wasDragging = !!this.imageDrag;
       var wasText = this.imageDrag && this.imageDrag.isText;
       var moved = !!(this.imageDrag && this.imageDrag.moved);
-      try { zfLog('IMGUP mode=' + (this.imageDrag && this.imageDrag.mode) + ' moved=' + moved + ' selSet=' + (this.selSet || []).length); } catch (e) {}
       this.imageDrag = null;
       if (wasDragging && !wasText) {
         var self = this;

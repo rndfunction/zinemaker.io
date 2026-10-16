@@ -64,12 +64,21 @@
   window.zfBuildSlot = zfBuildSlot;
 
   var ZineSheet = {
-    data: function () { return { store: store, showPageNumbers: true }; },
+    data: function () { return { store: store, showPageNumbers: true, iconEpoch: 0 }; },
     watch: {
       "store.view": function (v) {
         if (v === "sheet") {
           var self = this;
           this.$nextTick(function () { self.sheetInjectFlows(); });
+          // Prefetch the icon names used so the sheet renders them as inline
+          // SVG (print-safe) rather than hundreds of web components.
+          if (window.zfIconSvg) {
+            var names = [];
+            (store.pages || []).forEach(function (p) {
+              (p.images || []).forEach(function (im) { if (im.kind === 'icon' && im.src) names.push(im.src); });
+            });
+            window.zfIconSvg.prefetch(names);
+          }
         }
       },
       "store.pages": {
@@ -171,6 +180,25 @@
       }
     },
     methods: {
+      // Inline SVG for an icon if its body is cached; otherwise an
+      // <iconify-icon> fallback (and kick off a fetch so it upgrades to
+      // inline SVG on the next render). Rendering icons as PLAIN <svg> in the
+      // sheet is what makes many-icon pages PRINT reliably -- the browser's
+      // print snapshot truncates when there are hundreds of <iconify-icon>
+      // web components, but handles plain SVG fine.
+      iconInline: function (img) {
+        if (!img || img.kind !== 'icon') return '';
+        var name = img.src;
+        var cached = window.zfIconSvg ? window.zfIconSvg.get(name) : null;
+        if (cached) {
+          var color = img.color || 'currentColor';
+          return '<svg viewBox="' + cached.viewBox + '" width="100%" height="100%" ' +
+                 'style="color:' + color + ';fill:currentColor;" aria-hidden="true">' +
+                 cached.body + '</svg>';
+        }
+        if (window.zfIconSvg) window.zfIconSvg.ensure(name);
+        return '<iconify-icon icon="' + name + '" style="color:' + (img.color || 'inherit') + ';"></iconify-icon>';
+      },
       slotBlockImageStyleFor: function (img, s) {
         var m = this.model;
         if (!m || !img || !img.src) return {};
@@ -303,6 +331,11 @@
       this.installPaperCss();
       this.sheetInjectFlows();
       var self = this;
+      // When an icon SVG body finishes loading, bump iconEpoch so the sheet
+      // re-renders and swaps the fallback web component for inline SVG.
+      if (window.zfIconSvg && window.zfIconSvg.onLoad) {
+        window.zfIconSvg.onLoad(function () { self.iconEpoch++; });
+      }
       this._onBeforePrint = function () {
         try {
           self.installPaperCss();
@@ -375,10 +408,10 @@
                   '<img v-if="img.wrap === \'block\' && img.kind !== \'icon\'" ' +
                     'class="zf-mini-image zf-block-image" :src="img.src" alt="" ' +
                     ':style="slotBlockImageStyleFor(img, s)" />' +
-                  '<iconify-icon v-else-if="img.wrap === \'block\' && img.kind === \'icon\'" ' +
+                  '<span v-else-if="img.wrap === \'block\' && img.kind === \'icon\'" ' +
                     'class="zf-mini-image zf-block-image zf-block-icon" ' +
-                    ':icon="img.src" ' +
-                    ':style="Object.assign({}, slotBlockImageStyleFor(img, s), { color: img.color || \'inherit\' })"></iconify-icon>' +
+                    ':style="slotBlockImageStyleFor(img, s)" ' +
+                    'v-html="iconInline(img)"></span>' +
                 '</template>' +
                 '<div class="zf-mini-body" :data-slot-page="s.pageNum" v-html="s.bodyHtml" style="position: relative;"></div>' +
                 '<template v-for="img in (s.page.images || [])" :key="\'sl-free-\' + img.id">' +
@@ -400,9 +433,9 @@
                   '<div v-else-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'icon\'" ' +
                     'class="zf-mini-image zf-positioned zf-positioned-icon-wrap" ' +
                     ':style="slotFreeImageStyleFor(img, s)">' +
-                    '<iconify-icon class="zf-icon-element" ' +
-                      ':icon="img.src" ' +
-                      ':style="{ width: \'100%\', height: \'100%\', color: img.color || \'inherit\' }"></iconify-icon>' +
+                    '<span class="zf-icon-element" ' +
+                      'style="display:block;width:100%;height:100%;" ' +
+                      'v-html="iconInline(img)"></span>' +
                   '</div>' +
                 '</template>' +
                 '<template v-for="box in (s.page.textBoxes || [])" :key="\'sl-tb-\' + box.id">' +
@@ -426,6 +459,34 @@
   };
 
   window.ZineSheet = ZineSheet;
+
+  // Diagnostic: call ZFPrintWeight() in the app console before printing to
+  // see each page's byte weight (sum of image data-URL lengths) and element
+  // count. Print renderers can truncate a page when the DOM carries too
+  // much inline data; this shows which page / element is heaviest.
+  window.ZFPrintWeight = function () {
+    var store = window.ZF_STORE;
+    if (!store) return 'no store';
+    var out = [];
+    (store.pages || []).forEach(function (p, i) {
+      var bytes = 0, imgs = 0, biggest = 0;
+      (p.images || []).forEach(function (im) {
+        imgs++;
+        var len = (im.src && im.src.length) || 0;
+        bytes += len;
+        if (len > biggest) biggest = len;
+      });
+      (p.textBoxes || []).forEach(function (tb) { bytes += (tb.html || '').length; });
+      out.push({
+        page: i + 1,
+        images: imgs,
+        textBoxes: (p.textBoxes || []).length,
+        approxKB: Math.round(bytes / 1024),
+        biggestImageKB: Math.round(biggest / 1024)
+      });
+    });
+    return out;
+  };
 
   // Diagnostic: ZFDiag() from the app's own console dumps live sheet geometry.
   window.ZFDiag = function () {

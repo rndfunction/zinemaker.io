@@ -452,6 +452,70 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
   return style;
 }
 
+// -------- Icon SVG cache (print-safe icons) --------
+// Icons are stored as a name (e.g. "ph:star"). The <iconify-icon> web
+// component resolves them at runtime, but a page full of web components does
+// NOT print reliably -- the browser's print snapshot truncates when there are
+// many. So the SHEET (print) view renders icons as plain inline <svg> instead,
+// using these cached SVG bodies. Nothing is stored on the element, so editing
+// (recolor / scale / transform) keeps full vector power; only the print
+// rendering swaps in inline SVG.
+//
+// Bodies are fetched once per icon name from the Iconify API and cached in
+// memory + localStorage, so printing never depends on a runtime fetch.
+var ZF_ICON_LS_KEY = 'zf-icon-svg-v1';
+var zfIconSvg = (function () {
+  var mem = {};
+  try {
+    var raw = localStorage.getItem(ZF_ICON_LS_KEY);
+    if (raw) mem = JSON.parse(raw) || {};
+  } catch (e) {}
+  var pending = {};
+  var listeners = [];
+  function persist() {
+    try { localStorage.setItem(ZF_ICON_LS_KEY, JSON.stringify(mem)); } catch (e) {}
+  }
+  // name -> { body, viewBox }  (body is the inner SVG markup)
+  function get(name) {
+    if (!name) return null;
+    return mem[name] || null;
+  }
+  function fetchOne(name) {
+    if (mem[name] || pending[name]) return;
+    pending[name] = true;
+    var parts = String(name).split(':');
+    if (parts.length !== 2) { pending[name] = false; return; }
+    var url = 'https://api.iconify.design/' + parts[0] + '/' + parts[1] + '.svg';
+    fetch(url)
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (svg) {
+        pending[name] = false;
+        if (!svg) return;
+        // Parse out the <svg> viewBox + inner body so we can render inline.
+        var vbMatch = svg.match(/viewBox="([^"]+)"/);
+        var bodyMatch = svg.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
+        if (!bodyMatch) return;
+        mem[name] = { body: bodyMatch[1], viewBox: vbMatch ? vbMatch[1] : '0 0 24 24' };
+        persist();
+        // Notify subscribers (components re-render inline SVG).
+        for (var i = 0; i < listeners.length; i++) {
+          try { listeners[i](); } catch (e) {}
+        }
+      })
+      .catch(function () { pending[name] = false; });
+  }
+  return {
+    get: get,
+    ensure: fetchOne,
+    onLoad: function (fn) { listeners.push(fn); },
+    // Batch-prefetch a list of names.
+    prefetch: function (names) {
+      (names || []).forEach(fetchOne);
+    }
+  };
+})();
+window.zfIconSvg = zfIconSvg;
+
 // -------- Vector drawings --------
 // A drawing is stored as a list of strokes (vector), not as a baked image.
 // Each stroke records the tool and settings plus its points, all in PAGE
