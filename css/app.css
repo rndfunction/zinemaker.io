@@ -985,6 +985,69 @@
       border: 1px dashed var(--zf-blue) !important;
       box-shadow: 0 0 0 2px var(--zf-blue);
     }
+
+    /* Multi-select: members keep a SOFT outline (thin dashed, no solid ring,
+       no handles) so they still read as selected, while ONE group box
+       carries the visual weight + (later) the handles. */
+    .zf-multi-selected.zf-img-wrap,
+    .zf-multi-selected.zf-textbox {
+      outline: 1px dashed var(--zf-blue);
+      outline-offset: 1px;
+    }
+    /* In multi-select, suppress the strong single-selection ring/border so
+       the soft outline is what shows on each member. */
+    .zf-multi-selected.zf-img-wrap.zf-img-selected {
+      box-shadow: none;
+    }
+    .zf-multi-selected.zf-textbox.zf-textbox-selected {
+      border-color: transparent !important;
+      box-shadow: none;
+    }
+    /* Never show per-element handles inside a multi-selection (the group
+       box owns interaction). Belt-and-suspenders with the v-if gating. */
+    .zf-multi-selected .zf-img-handle { display: none !important; }
+
+    /* The single GROUP selection box around a multi-selection. Visual only
+       for now (pointer-events: none); handles wire on in the next step. */
+    .zf-group-select-box {
+      position: absolute;
+      box-sizing: border-box;
+      /* EXACTLY the individual-selection look: a 2px solid blue ring via
+         box-shadow, no border, no radius, no halo -- so group and single
+         selections read as the same design. */
+      box-shadow: 0 0 0 2px var(--zf-blue);
+      pointer-events: none;
+      z-index: 400;
+    }
+    /* corner dots removed to match the individual selection ring */
+
+    /* Group-box handles: the box is pointer-events:none, so handles re-enable
+       their own pointer events to be grabbable. Corners = resize; the top
+       circle = rotate. */
+    .zf-group-handle {
+      position: absolute;
+      pointer-events: auto;
+      /* Match the individual element handles: BLUE fill, WHITE border, thin
+         blue outline -- the "blue inside white" look. */
+      background: var(--zf-blue);
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1px var(--zf-blue);
+      box-sizing: border-box;
+      z-index: 401;
+    }
+    .zf-group-handle-corner {
+      width: 12px; height: 12px;
+      border-radius: 2px;
+      cursor: nwse-resize;
+    }
+    .zf-group-handle-rotate {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      left: 50%;
+      top: -22px;
+      margin-left: -7px;
+      cursor: grab;
+    }
     .zf-textbox .zf-textbox-content {
       outline: none;
       min-height: 1em;

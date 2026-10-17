@@ -1174,9 +1174,44 @@
           if (page.images[i].id === this.imageDrag.imgId) { img = page.images[i]; break; }
         }
       }
-      if (!img) return;
+      // A group-box drag has no imgId; do NOT bail on it -- fall through so
+      // the early group branch (just below) can transform the whole selection.
+      var isGroupBoxDrag = this.imageDrag && this.imageDrag.group && !this.imageDrag.imgId;
+      if (!img && !isGroupBoxDrag) return;
       var pxPerInch = 96 * this.imageScale;
       var mode = this.imageDrag.mode || "move";
+      // GROUP-BOX drags have no imgId; handle resize/rotate straight from
+      // the group pivot here, before the per-element `if (!img) return`.
+      if (this.imageDrag.group && !this.imageDrag.imgId) {
+        if (mode === "rotate") {
+          var gbax = evt.clientX - this.imageDrag.gcx;
+          var gbay = evt.clientY - this.imageDrag.gcy;
+          var gbang = Math.atan2(gbay, gbax) * 180 / Math.PI;
+          var gbdelta = gbang - this.imageDrag.startAngle;
+          // Rotate the ELEMENTS...
+          this._applyGroupTransform(this.imageDrag.group, 1, gbdelta);
+          // ...and rotate the BOX rigidly about its center, so the frame and
+          // its handles orbit with the content instead of the axis-aligned
+          // bounds reshaping every step. Do NOT call updateGroupBox here.
+          var gboxEl = this.$refs.groupBoxEl;
+          if (gboxEl) {
+            gboxEl.style.transformOrigin = "center center";
+            gboxEl.style.transform = "rotate(" + gbdelta + "deg)";
+          }
+          return;
+        }
+        if (mode === "resize" || mode === "resize-scaled") {
+          var gbdx = evt.clientX - this.imageDrag.gcx;
+          var gbdy = evt.clientY - this.imageDrag.gcy;
+          var gbdist = Math.sqrt(gbdx * gbdx + gbdy * gbdy) || 1;
+          var gbs = gbdist / this.imageDrag.startDist;
+          if (gbs < 0.1) gbs = 0.1;
+          if (gbs > 12) gbs = 12;
+          this._applyGroupTransform(this.imageDrag.group, gbs, 0);
+          this.updateGroupBox();
+          return;
+        }
+      }
       if (mode === "move") {
         // Mark that a real drag happened (moved beyond a few px), so the
         // click that follows mouseup does not collapse the selection.
@@ -3037,6 +3072,38 @@
         if (hasText) return 'text';
         return 'none';
       },
+      // True when more than one element is selected (multi-select).
+      isMultiSelected: function () {
+        return (this.selSet || []).length > 1;
+      },
+      // Union bounding box of the multi-selection, as page-relative
+      // percentages, for rendering ONE group selection box. Derived from
+      // the same geometry _groupTransformSnapshot uses.
+      groupBoxStyle: function () {
+        var g = this._groupTransformSnapshot();
+        var m = this.activeModel;
+        if (!g || !m) return null;
+        var margin = store.modelMarginIn();
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        g.items.forEach(function (it) {
+          if (it.cx - it.w/2 < minX) minX = it.cx - it.w/2;
+          if (it.cy - it.h/2 < minY) minY = it.cy - it.h/2;
+          if (it.cx + it.w/2 > maxX) maxX = it.cx + it.w/2;
+          if (it.cy + it.h/2 > maxY) maxY = it.cy + it.h/2;
+        });
+        // cx/cy in _groupTransformSnapshot are page inches INCLUDING margin;
+        // subtract margin to get back to the element coordinate space, then
+        // convert to % of page.
+        var leftIn = minX - margin, topIn = minY - margin;
+        var wIn = maxX - minX, hIn = maxY - minY;
+        var pw = m.page.width, ph = m.page.height;
+        return {
+          left: (leftIn / pw * 100) + '%',
+          top: (topIn / ph * 100) + '%',
+          width: (wIn / pw * 100) + '%',
+          height: (hIn / ph * 100) + '%'
+        };
+      },
       models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
       activeModel: function () { return store.model(); },
       themes: function () { return (window.ZFThemes) ? window.ZFThemes.listThemes() : []; },
@@ -3236,7 +3303,7 @@
       this._onPanelReflow = function () { self.positionTextPanel(); };
       window.addEventListener("resize", this._onPanelReflow);
       window.addEventListener("scroll", this._onPanelReflow, true);
-      this.$nextTick(function () { self.positionTextPanel(); });
+      this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
 
       // Auto-commit the drawing when the user clicks outside the canvas and
       // the draw panel, so wandering off never loses a drawing.
@@ -3306,15 +3373,15 @@
       // added/removed. Reposition on the next tick so it measures the real rail.
       selectedTextBox: function (tb) {
         var self = this;
-        this.$nextTick(function () { self.positionTextPanel(); });
+        this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
       },
       selectedImage: function (im) {
         var self = this;
-        this.$nextTick(function () { self.positionTextPanel(); });
+        this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
       },
       panelMode: function (m) {
         var self = this;
-        this.$nextTick(function () { self.positionTextPanel(); });
+        this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
       },
       // When the active page changes (or its body is replaced by undo),
       // re-sync the contenteditable so it shows the correct content.
@@ -3387,6 +3454,111 @@
         }
         panel.style.top = Math.max(8, top) + 'px';
         panel.style.left = Math.max(8, left) + 'px';
+      },
+      // Position the group selection box to exactly wrap the multi-selection.
+      // The box lives in .zf-canvas-wrap (unclipped), so its px are relative
+      // to that wrap. We convert the union rect (page inches) to px using the
+      // page's rendered scale, then offset by the page's position in the wrap.
+      // This lets the box (and later its handles) extend past the page edge.
+      updateGroupBox: function () {
+        var boxEl = this.$refs.groupBoxEl;
+        if (!boxEl) return;
+        // Clear any rigid-rotation left over from a prior rotate drag so a
+        // freshly computed (axis-aligned) box is not shown pre-rotated.
+        boxEl.style.transform = "";
+        if (!this.isMultiSelected) return;
+        var g = this._groupTransformSnapshot();
+        var m = this.activeModel;
+        var pageEl = this.$refs.miniPage;
+        var wrapEl = boxEl.parentNode;
+        if (!g || !m || !pageEl || !wrapEl) return;
+        // Measure each selected element's ACTUAL rendered rect and take the
+        // true union. This accounts for rotation, real icon size, and text
+        // box height -- so every element sits fully INSIDE the group box
+        // (the snapshot's approximate w/h could under-size the box).
+        var wrapRect = wrapEl.getBoundingClientRect();
+        var pageEl2 = this.$refs.miniPage;
+        var sel = this.selSet || [];
+        var uMinX = Infinity, uMinY = Infinity, uMaxX = -Infinity, uMaxY = -Infinity;
+        var found = 0;
+        for (var si = 0; si < sel.length; si++) {
+          var s = sel[si];
+          var node = null;
+          if (s.kind === 'image') node = pageEl2.querySelector('[data-zf-img-id="' + s.id + '"]');
+          else node = pageEl2.querySelector('[data-zf-text-id="' + s.id + '"]');
+          if (!node) continue;
+          var nr = node.getBoundingClientRect();
+          if (nr.width < 0.5 && nr.height < 0.5) continue;
+          var lx = nr.left - wrapRect.left, ty = nr.top - wrapRect.top;
+          var rx = lx + nr.width, byy = ty + nr.height;
+          if (lx < uMinX) uMinX = lx;
+          if (ty < uMinY) uMinY = ty;
+          if (rx > uMaxX) uMaxX = rx;
+          if (byy > uMaxY) uMaxY = byy;
+          found++;
+        }
+        if (!found) return;
+        var bx = uMinX, by = uMinY, bw = (uMaxX - uMinX), bh = (uMaxY - uMinY);
+        // Clamp so the box's edges (and the ~6px handle overhang) always sit
+        // inside the visible canvas workspace -- handles stay reachable even
+        // when the selection overhangs the page. The box may not perfectly
+        // wrap an extreme overhang, but every control stays grabbable.
+        var inset = 8;
+        var wrapW = wrapEl.clientWidth;
+        var wrapH = wrapEl.clientHeight;
+        var minLeft = inset, maxRight = wrapW - inset;
+        var minTop = inset, maxBottom = wrapH - inset;
+        // Clamp width first, then left, so right edge stays within maxRight.
+        if (bx < minLeft) { bw -= (minLeft - bx); bx = minLeft; }
+        if (by < minTop) { bh -= (minTop - by); by = minTop; }
+        if (bx + bw > maxRight) { bw = maxRight - bx; }
+        if (by + bh > maxBottom) { bh = maxBottom - by; }
+        if (bw < 10) bw = 10;
+        if (bh < 10) bh = 10;
+        boxEl.style.left = bx + 'px';
+        boxEl.style.top = by + 'px';
+        boxEl.style.width = bw + 'px';
+        boxEl.style.height = bh + 'px';
+      },
+      // Start a GROUP resize drag from a corner handle on the group box.
+      // Pivot = current group-box center (screen px). No imgId -> the early
+      // group branch in onImageMouseMove handles the transform.
+      onGroupResizeStart: function (evt) {
+        evt.stopPropagation(); evt.preventDefault();
+        var boxEl = this.$refs.groupBoxEl;
+        var g = this._groupTransformSnapshot();
+        if (!boxEl || !g) return;
+        var r = boxEl.getBoundingClientRect();
+        var gcx = r.left + r.width / 2;
+        var gcy = r.top + r.height / 2;
+        var dx = evt.clientX - gcx, dy = evt.clientY - gcy;
+        this.imageDrag = {
+          mode: 'resize',
+          group: g,
+          gcx: gcx, gcy: gcy,
+          startDist: Math.sqrt(dx * dx + dy * dy) || 1,
+          startX: evt.clientX, startY: evt.clientY,
+          moved: false
+        };
+      },
+      // Start a GROUP rotate drag from the rotate handle.
+      onGroupRotateStart: function (evt) {
+        evt.stopPropagation(); evt.preventDefault();
+        var boxEl = this.$refs.groupBoxEl;
+        var g = this._groupTransformSnapshot();
+        if (!boxEl || !g) return;
+        var r = boxEl.getBoundingClientRect();
+        var gcx = r.left + r.width / 2;
+        var gcy = r.top + r.height / 2;
+        var dx = evt.clientX - gcx, dy = evt.clientY - gcy;
+        this.imageDrag = {
+          mode: 'rotate',
+          group: g,
+          gcx: gcx, gcy: gcy,
+          startAngle: Math.atan2(dy, dx) * 180 / Math.PI,
+          startX: evt.clientX, startY: evt.clientY,
+          moved: false
+        };
       },
       // Wrapper so the template can call this via the component instance
       // (plain script functions like zfLoadTemplate are not reachable

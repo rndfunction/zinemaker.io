@@ -165,7 +165,7 @@
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
                    tabindex="0"
-                      :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-handle-owner': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
+                      :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-handle-owner': active.activeTextBoxId === box.id && !isMultiSelected, 'zf-multi-selected': isMultiSelected && isSelected('textBox', box.id), 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
                      @mousedown="onTextBoxMouseDown($event, box)"
@@ -178,10 +178,10 @@
                      @input="onTextBoxInput($event, box)"
                      @paste="onTextBoxPaste($event, box)"
                      @mousedown.stop></div>
-                <span class="zf-img-handle zf-img-handle-resize"
+                <span v-if="!isMultiSelected" class="zf-img-handle zf-img-handle-resize"
                       title="Drag to resize (scales text)"
                       @mousedown.stop.prevent="onTextBoxResizeStartScaled($event, box)"></span>
-                <span class="zf-img-handle zf-img-handle-rotate"
+                <span v-if="!isMultiSelected" class="zf-img-handle zf-img-handle-rotate"
                       title="Drag to rotate"
                       @mousedown.stop.prevent="onTextBoxRotateStart($event, box)"></span>
               </div>
@@ -192,7 +192,7 @@
                    class="zf-img-wrap"
                    :data-zf-img-id="img.id"
                    tabindex="0"
-                      :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-handle-owner': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
+                      :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-handle-owner': active.activeImageId === img.id && !isMultiSelected, 'zf-multi-selected': isMultiSelected && isSelected('image', img.id), 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
                    :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
                      @mousedown="onImageMouseDownItem($event, img)"
                      @click.stop="onElementClick('image', img, $event)"
@@ -214,6 +214,7 @@
                       @mousedown.stop.prevent="onRotateStart($event, img)"></span>
               </div>
             </template>
+
           </div>
 
           <div class="zf-ghost-page zf-ghost-next" v-if="nextPage" role="button" tabindex="0"
@@ -256,6 +257,18 @@
                 </template>
               </div>
             </div>
+          </div>
+          <!-- Group selection box: ONE box around the whole multi-selection.
+               Rendered OUTSIDE the mini-page (which clips content) so it can
+               extend past the page into the workspace and stay reachable.
+               Positioned by JS (updateGroupBox). -->
+          <div v-if="isMultiSelected" ref="groupBoxEl" class="zf-group-select-box">
+            <span class="zf-group-handle zf-group-handle-rotate" title="Rotate selection"
+                  @mousedown.stop.prevent="onGroupRotateStart($event)"></span>
+            <span class="zf-group-handle zf-group-handle-corner" style="left:-6px;top:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
+            <span class="zf-group-handle zf-group-handle-corner" style="right:-6px;top:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
+            <span class="zf-group-handle zf-group-handle-corner" style="left:-6px;bottom:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
+            <span class="zf-group-handle zf-group-handle-corner" style="right:-6px;bottom:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
           </div>
         </div>
         <!-- Rubber-band marquee: a fixed (un-clipped) box drawn while
