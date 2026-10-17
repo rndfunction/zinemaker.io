@@ -388,7 +388,7 @@
            shown when a text box is selected. Not a grid child, so it cannot
            shift the canvas. Includes inline B/I/U (selected text) plus
            box-level type controls. -->
-      <aside v-if="selectedTextBox && !drawingMode" ref="textPanelEl" class="zf-text-panel" role="region" aria-label="Text properties">
+      <aside v-if="panelMode === 'text' && !drawingMode" ref="textPanelEl" class="zf-text-panel" role="region" aria-label="Text properties">
         <div class="zf-text-panel-head">Text</div>
 
         <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} in)</label>
@@ -479,7 +479,7 @@
            selected. Carries the image controls that used to live only in the
            slide-out inspector. No layer buttons: z-order is served by the
            right-click menu and the Layers list. -->
-      <aside v-if="selectedImage && !drawingMode" ref="imagePanelEl" class="zf-image-panel" role="region" aria-label="Image properties">
+      <aside v-if="panelMode === 'image' && !drawingMode" ref="imagePanelEl" class="zf-image-panel" role="region" aria-label="Image properties">
         <div class="zf-text-panel-head">Image</div>
 
         <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} in)</label>

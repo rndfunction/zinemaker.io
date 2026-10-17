@@ -1510,10 +1510,22 @@
       var s = this.selSet || [];
       if (!s.length) { page.activeImageId = null; page.activeTextBoxId = null; return; }
       var pick = null;
+      // If the caller named the element the user actively clicked, use it.
       if (preferKind && preferId) {
         for (var i = 0; i < s.length; i++) { if (s[i].kind === preferKind && s[i].id === preferId) { pick = s[i]; break; } }
       }
-      if (!pick) pick = s[s.length - 1];
+      // No preference (e.g. a marquee drag): choose a primary by KIND, not by
+      // raw array order. Prefer an image if the set has any image, so
+      // multi-selecting icons shows the Image panel instead of flipping to
+      // Text just because text boxes were appended later in the loop.
+      if (!pick) {
+        var firstImage = null, firstText = null, anyImage = false;
+        for (var j = 0; j < s.length; j++) {
+          if (s[j].kind === 'image') { anyImage = true; if (!firstImage) firstImage = s[j]; }
+          else if (!firstText) firstText = s[j];
+        }
+        pick = anyImage ? firstImage : (firstText || s[s.length - 1]);
+      }
       if (pick.kind === 'textBox') { page.activeTextBoxId = pick.id; page.activeImageId = null; }
       else { page.activeImageId = pick.id; page.activeTextBoxId = null; }
     },
@@ -3002,6 +3014,29 @@
         }
         return null;
       },
+      // Single source of truth for which floating panel to show:
+      //   'text'  -- a text box is the primary selection
+      //   'image' -- an image is the primary selection
+      //   'mixed' -- the selection contains BOTH kinds
+      //   'none'  -- nothing (or an empty selection) is selected
+      // Templates gate on this. Today 'mixed' shows NO panel (property
+      // panels are for homogeneous selections; the context menu still
+      // handles structural ops on mixes). When a generic/common-properties
+      // panel is added, 'mixed' can map to it here without touching the
+      // templates or the selection logic.
+      panelMode: function () {
+        var s = this.selSet || [];
+        if (!s.length) return 'none';
+        var hasImg = false, hasText = false;
+        for (var i = 0; i < s.length; i++) {
+          if (s[i].kind === 'image') hasImg = true;
+          else if (s[i].kind === 'textBox') hasText = true;
+        }
+        if (hasImg && hasText) return 'mixed';
+        if (hasImg) return 'image';
+        if (hasText) return 'text';
+        return 'none';
+      },
       models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
       activeModel: function () { return store.model(); },
       themes: function () { return (window.ZFThemes) ? window.ZFThemes.listThemes() : []; },
@@ -3274,6 +3309,10 @@
         this.$nextTick(function () { self.positionTextPanel(); });
       },
       selectedImage: function (im) {
+        var self = this;
+        this.$nextTick(function () { self.positionTextPanel(); });
+      },
+      panelMode: function (m) {
         var self = this;
         this.$nextTick(function () { self.positionTextPanel(); });
       },
