@@ -262,13 +262,13 @@
                Rendered OUTSIDE the mini-page (which clips content) so it can
                extend past the page into the workspace and stay reachable.
                Positioned by JS (updateGroupBox). -->
-          <div v-if="isMultiSelected" ref="groupBoxEl" class="zf-group-select-box">
+          <div v-if="isMultiSelected" ref="groupBoxEl" class="zf-group-select-box"
+               @mousedown.stop.prevent="onGroupMoveStart($event)">
             <span class="zf-group-handle zf-group-handle-rotate" title="Rotate selection"
+                  style="right:-8px;top:-8px;left:auto;margin-left:0;"
                   @mousedown.stop.prevent="onGroupRotateStart($event)"></span>
-            <span class="zf-group-handle zf-group-handle-corner" style="left:-6px;top:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
-            <span class="zf-group-handle zf-group-handle-corner" style="right:-6px;top:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
-            <span class="zf-group-handle zf-group-handle-corner" style="left:-6px;bottom:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
-            <span class="zf-group-handle zf-group-handle-corner" style="right:-6px;bottom:-6px;" @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
+            <span class="zf-group-handle zf-group-handle-corner" style="right:-6px;bottom:-6px;"
+                  @mousedown.stop.prevent="onGroupResizeStart($event)"></span>
           </div>
         </div>
         <!-- Rubber-band marquee: a fixed (un-clipped) box drawn while

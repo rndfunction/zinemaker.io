@@ -1183,6 +1183,20 @@
       // GROUP-BOX drags have no imgId; handle resize/rotate straight from
       // the group pivot here, before the per-element `if (!img) return`.
       if (this.imageDrag.group && !this.imageDrag.imgId) {
+        if (mode === "move") {
+          var gmDx = (evt.clientX - this.imageDrag.startX) / pxPerInch;
+          var gmDy = (evt.clientY - this.imageDrag.startY) / pxPerInch;
+          var gmBases = this.imageDrag.bases || [];
+          for (var gbi = 0; gbi < gmBases.length; gbi++) {
+            var gb = gmBases[gbi];
+            var gtarget = null;
+            if (gb.kind === 'textBox') { var gtb = page.textBoxes || []; for (var gti = 0; gti < gtb.length; gti++) { if (gtb[gti].id === gb.id) { gtarget = gtb[gti]; break; } } }
+            else { var gim = page.images || []; for (var gii = 0; gii < gim.length; gii++) { if (gim[gii].id === gb.id) { gtarget = gim[gii]; break; } } }
+            if (gtarget) { gtarget.x = Math.round((gb.x + gmDx) * 100) / 100; gtarget.y = Math.round((gb.y + gmDy) * 100) / 100; }
+          }
+          this.updateGroupBox();
+          return;
+        }
         if (mode === "rotate") {
           var gbax = evt.clientX - this.imageDrag.gcx;
           var gbay = evt.clientY - this.imageDrag.gcy;
@@ -3523,6 +3537,21 @@
       // Start a GROUP resize drag from a corner handle on the group box.
       // Pivot = current group-box center (screen px). No imgId -> the early
       // group branch in onImageMouseMove handles the transform.
+      // Drag the group box itself to MOVE the whole selection. Mirrors the
+      // element move (mode:'move' + bases) but with no single imgId, so the
+      // multi-move branch in onImageMouseMove shifts every selected element.
+      onGroupMoveStart: function (evt) {
+        evt.stopPropagation(); evt.preventDefault();
+        var bases = this._selectionBases();
+        if (!bases || !bases.length) return;
+        this.imageDrag = {
+          mode: 'move',
+          group: true,
+          startX: evt.clientX, startY: evt.clientY,
+          moved: false,
+          bases: bases
+        };
+      },
       onGroupResizeStart: function (evt) {
         evt.stopPropagation(); evt.preventDefault();
         var boxEl = this.$refs.groupBoxEl;
