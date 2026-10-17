@@ -47,10 +47,15 @@
         if (!window.ZFLibrary) return;
         var count = (store.library || []).length;
         if (!count) return;
-        if (!confirm('Delete all ' + count + ' saved zines from your library? This cannot be undone.')) return;
-        window.ZFLibrary.clearAll();
-        store.library = window.ZFLibrary.list();
-        if (store.currentZineId && !window.ZFLibrary.get(store.currentZineId)) store.currentZineId = null;
+        zfConfirm(
+          'Delete all ' + count + ' saved zines from your library? This cannot be undone.',
+          function () {
+            window.ZFLibrary.clearAll();
+            store.library = window.ZFLibrary.list();
+            if (store.currentZineId && !window.ZFLibrary.get(store.currentZineId)) store.currentZineId = null;
+          },
+          { title: 'Delete all saved zines?', confirmLabel: 'Delete all', danger: true }
+        );
       },
       newZineClick: function () { if (window.ZFNewZine) window.ZFNewZine(); },
       openZine: function (id) { store.loadFromLibrary(id); },

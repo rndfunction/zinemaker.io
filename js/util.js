@@ -74,6 +74,112 @@ function zfDeepCopyPage(page, reid) {
 // (import, library load, shared link). Loaders previously assigned raw
 // numbers, so a hand-edited file with marginIn: 500 produced a broken
 // layout. This keeps every write in range.
+// -------- Accessible confirm() replacement --------
+// Native confirm() is blocking, unstyled, and cannot carry a title or an
+// aria-describedby. zfConfirm() renders a styled modal in the current
+// document with the same yes/no contract -- the callback fires on confirm,
+// and cancel/Escape/backdrop-click dismiss without firing. Focus is trapped
+// inside the modal and returned to the opener on close. Only one modal can
+// be open at a time: calling again while one is open is a no-op.
+var _zfConfirmEl = null;
+function zfConfirm(message, onYes, opts) {
+  opts = opts || {};
+  if (_zfConfirmEl) return;
+  var title = opts.title || 'Please confirm';
+  var confirmLabel = opts.confirmLabel || 'OK';
+  var cancelLabel = opts.cancelLabel || 'Cancel';
+  var danger = !!opts.danger;
+
+  var opener = document.activeElement;
+
+  var backdrop = document.createElement('div');
+  backdrop.className = 'zf-modal-backdrop';
+  backdrop.setAttribute('role', 'presentation');
+
+  var dialog = document.createElement('div');
+  dialog.className = 'zf-modal';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'zf-confirm-title');
+  dialog.setAttribute('aria-describedby', 'zf-confirm-body');
+
+  var header = document.createElement('div');
+  header.className = 'zf-modal-header';
+  var h2 = document.createElement('h2');
+  h2.id = 'zf-confirm-title';
+  h2.textContent = title;
+  header.appendChild(h2);
+
+  var body = document.createElement('div');
+  body.id = 'zf-confirm-body';
+  body.className = 'zf-confirm-body';
+  body.style.cssText = 'white-space:pre-line;';
+  body.textContent = String(message == null ? '' : message);
+
+  var footer = document.createElement('div');
+  footer.className = 'zf-modal-footer';
+  footer.style.cssText = 'display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;';
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'zf-btn';
+  cancelBtn.textContent = cancelLabel;
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.type = 'button';
+  confirmBtn.className = 'zf-btn ' + (danger ? 'zf-btn-danger' : 'zf-btn-primary');
+  if (danger) confirmBtn.style.borderColor = 'var(--zf-red)';
+  confirmBtn.textContent = confirmLabel;
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(confirmBtn);
+  dialog.appendChild(header);
+  dialog.appendChild(body);
+  dialog.appendChild(footer);
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+  _zfConfirmEl = backdrop;
+
+  function cleanup() {
+    document.removeEventListener('keydown', onKey, true);
+    if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    if (_zfConfirmEl === backdrop) _zfConfirmEl = null;
+    try { if (opener && opener.focus) opener.focus(); } catch (e) {}
+  }
+  function close(yes) {
+    cleanup();
+    if (yes && typeof onYes === 'function') {
+      try { onYes(); } catch (e) { zfLog('zfConfirm callback threw: ' + (e && e.message ? e.message : e)); }
+    }
+  }
+  function onKey(evt) {
+    if (evt.key === 'Escape') { evt.preventDefault(); evt.stopPropagation(); close(false); return; }
+    if (evt.key === 'Enter' && document.activeElement !== cancelBtn) {
+      evt.preventDefault(); evt.stopPropagation(); close(true); return;
+    }
+    if (evt.key === 'Tab') {
+      var focusables = [cancelBtn, confirmBtn];
+      var i = focusables.indexOf(document.activeElement);
+      if (i === -1) { evt.preventDefault(); confirmBtn.focus(); return; }
+      if (evt.shiftKey) {
+        evt.preventDefault(); focusables[(i - 1 + focusables.length) % focusables.length].focus();
+      } else {
+        evt.preventDefault(); focusables[(i + 1) % focusables.length].focus();
+      }
+    }
+  }
+
+  cancelBtn.addEventListener('click', function () { close(false); });
+  confirmBtn.addEventListener('click', function () { close(true); });
+  backdrop.addEventListener('click', function (evt) {
+    if (evt.target === backdrop) close(false);
+  });
+  document.addEventListener('keydown', onKey, true);
+
+  setTimeout(function () { try { confirmBtn.focus(); } catch (e) {} }, 0);
+}
+window.zfConfirm = zfConfirm;
+
 function zfClampNumber(value, min, max, fallback) {
   var n = Number(value);
   if (isNaN(n)) return fallback;
@@ -87,6 +193,7 @@ function zfMigratePage(page) {
   if (!page) return page;
   if (!Array.isArray(page.images)) page.images = [];
   if (!Array.isArray(page.textBoxes)) page.textBoxes = [];
+  // Legacy single-image field -> images[].
   if (page.image && !page.images.length) {
     page.images.push({
       id: zfNewImageId(),
@@ -95,15 +202,14 @@ function zfMigratePage(page) {
       y: (typeof page.imageY === "number") ? page.imageY : 0,
       w: (typeof page.imageW === "number") ? page.imageW : 1.5,
       rot: (typeof page.imageRot === "number") ? page.imageRot : 0,
-      wrap: page.imageWrap || 'free'
+      wrap: 'free'
     });
   }
   for (var ii = 0; ii < page.images.length; ii++) {
     if (!page.images[ii].kind) page.images[ii].kind = 'photo';
+    // Flow-wrap is retired. Anything still carrying it becomes free.
+    if (page.images[ii].wrap === 'flow') page.images[ii].wrap = 'free';
   }
-  // Migrate a legacy fixed page heading into a placed, movable title text box.
-  // Runs once per page (guarded by _headingMigrated). The title becomes a
-  // free element the user can drag, resize, or remove like any other box.
   if (page.heading && !page._headingMigrated) {
     page.textBoxes.push({
       id: zfNewTextBoxId(),
@@ -118,8 +224,36 @@ function zfMigratePage(page) {
       z: 10,
       hidden: false
     });
-    page._headingMigrated = true;
   }
+  // Legacy inline body -> one full-content-area text box, positioned where
+  // the body used to render (below the title zone). Guarded by
+  // _bodyMigrated so a save/load round trip never doubles it.
+  if (page.body && !page._bodyMigrated) {
+    page.textBoxes.push({
+      id: zfNewTextBoxId(),
+      kind: '',
+      role: '',
+      html: zfSanitizeHtml(page.body),
+      x: 0.1,
+      y: 0.85,
+      w: 2.55,
+      rot: 0,
+      fontSize: 1.0,
+      z: 5,
+      hidden: false
+    });
+  }
+  // Strip retired inline fields so they do not keep riding along.
+  delete page.heading;
+  delete page.body;
+  delete page.image;
+  delete page.imageX;
+  delete page.imageY;
+  delete page.imageW;
+  delete page.imageRot;
+  delete page.imageWrap;
+  delete page._headingMigrated;
+  delete page._bodyMigrated;
   return page;
 }
 function zfMigrateAllPages(pages) {
@@ -331,7 +465,11 @@ function zfPageBasePx() {
   if (ZF_PAGE_BASE_PX_CACHE !== null) return ZF_PAGE_BASE_PX_CACHE;
   var fallback = 13.333;
   try {
-    var probe = document.querySelector('.zf-mini-page');
+    // Probe ONLY a real page canvas, never a library-card thumbnail.
+    // Thumbnails set font-size: 4px (see zf-library-view previewPageStyle),
+    // so reading from the first .zf-mini-page in the DOM could poison the
+    // cache with a tiny base and mis-size every icon for the whole session.
+    var probe = document.querySelector('[data-zf-page-base], .zf-editor .zf-mini-page, .zf-reader .zf-mini-page, .zf-sheet .zf-mini-page');
     if (!probe) return fallback;
     var raw = getComputedStyle(probe).getPropertyValue('--zf-page-base-px');
     var n = parseFloat(raw);
@@ -712,7 +850,13 @@ function zfRepeatPagesToCount(pages, count) {
   var out = [];
   for (var i = 0; i < count; i++) {
     var src = pages[i % pages.length];
-    var copy = JSON.parse(JSON.stringify(src));
+    // Use the shared deep-copy + re-id helper so nested element ids
+    // (images, text boxes) are fresh on every repetition. The previous
+    // JSON round trip only re-ided the PAGE, so a repeated template could
+    // produce duplicate element ids across pages -- matching the policy
+    // zfDeepCopyPage already uses everywhere else (store duplicatePage,
+    // library duplicate) and avoiding future selection/undo keyed by id.
+    var copy = zfDeepCopyPage(src, true);
     copy.id = 'p' + i + '-' + Math.random().toString(36).slice(2, 7);
     out.push(copy);
   }

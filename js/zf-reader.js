@@ -15,7 +15,16 @@
     shareLink: function () {
       var self = this;
       try {
-        var payload = { t: store.title, a: store.author, p: store.pages.map(function (p) { return { h: p.heading, b: p.body, i: p.image }; }) };
+        // Share the rich page content (images + text boxes), since text
+        // lives in text boxes now. Each page is encoded as {tb, im}.
+        // (Legacy {h,b,i} compact links are still handled by the loader
+        // for links already shared with the old format.)
+        var payload = { t: store.title, a: store.author, p: store.pages.map(function (p) {
+          return {
+            tb: Array.isArray(p.textBoxes) ? p.textBoxes : [],
+            im: Array.isArray(p.images) ? p.images : []
+          };
+        }) };
         var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
         var url = location.origin + location.pathname + "#z=" + b64;
         var done = function (msg) { self.shareStatus = msg; setTimeout(function () { self.shareStatus = ""; }, 4000); };
@@ -49,16 +58,14 @@
       // the reader view. Mirrors the editor and sheet components.
       stickyStyle: function (img, base) {
         var out = Object.assign({}, base || {});
-        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
-          out['--zf-sticky-bg'] = img.color;
-        }
+        var safe = (img && typeof zfSafeColor === 'function') ? zfSafeColor(img.color) : '';
+        if (safe) out['--zf-sticky-bg'] = safe;
         return out;
       },
       stickerStyle: function (img, base) {
         var out = Object.assign({}, base || {});
-        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
-          out['--zf-sticker-bg'] = img.color;
-        }
+        var safe = (img && typeof zfSafeColor === 'function') ? zfSafeColor(img.color) : '';
+        if (safe) out['--zf-sticker-bg'] = safe;
         return out;
       },
       readerTextBoxStyleFor: function (box) {
@@ -67,56 +74,10 @@
         if (!m) return {};
         return zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
       },
-      injectReaderFlow: function () {
-        var self = this;
-        this.$nextTick(function () {
-          self._attemptReaderInject(0);
-        });
-      },
-      _attemptReaderInject: function (attempt) {
-        var self = this;
-        if (attempt > 20) return;
-        // Only retry while the reader view is actually active.
-        if (store.view !== "reader") return;
-        var el = self.$refs.bodyReader;
-        if (!el) { self._schedReaderRetry(attempt); return; }
-        var page = self.page;
-        if (!page) { self._schedReaderRetry(attempt); return; }
-        var rect = el.getBoundingClientRect();
-        // If the reader isn't visible yet, wait and retry.
-        if (rect.width < 20 || rect.height < 20) {
-          self._schedReaderRetry(attempt);
-          return;
-        }
-        var stale = el.querySelectorAll("[data-zf-spacer=\"1\"], [data-zf-flow-img=\"1\"]");
-        for (var i = 0; i < stale.length; i++) stale[i].remove();
-        // Support both the current multi-image model (page.images[] entries
-        // with wrap === 'flow') and the legacy single-image fields
-        // (page.image + page.imageWrap). The editor writes flow state to
-        // page.images[].wrap, so keying only off the legacy fields meant
-        // flow-wrap never fired in the reader for new-style pages.
-        var flowImgs = [];
-        if (Array.isArray(page.images) && page.images.length) {
-          for (var fi = 0; fi < page.images.length; fi++) {
-            if (page.images[fi].wrap === 'flow') flowImgs.push(page.images[fi]);
-          }
-        } else if (page.image && page.imageWrap === 'flow') {
-          flowImgs.push({ src: page.image, x: page.imageX || 0, y: page.imageY || 0, w: page.imageW || 1.5, rot: page.imageRot || 0 });
-        }
-        if (!flowImgs.length) return;
-        var m = store.model();
-        if (!m) return;
-        var longSide = Math.max(m.page.width, m.page.height);
-        var pxPerIn = 560 / longSide;
-        var bodyWIn = rect.width / pxPerIn;
-        var bodyHIn = rect.height / pxPerIn;
-        zfLog("reader inject: firing for page " + (self.currentIndex + 1) + " w=" + Math.round(rect.width) + " h=" + Math.round(rect.height));
-        window.zfInjectMergedFlow(el, flowImgs, pxPerIn, bodyWIn, bodyHIn, { draggable: false });
-      },
-      _schedReaderRetry: function (attempt) {
-        var self = this;
-        setTimeout(function () { self._attemptReaderInject(attempt + 1); }, 80);
-      }
+      // Flow-wrap is retired, and the reader has no inline body to wrap.
+      // This is a no-op kept so the existing watch/mounted/updated hooks
+      // that call injectReaderFlow() stay valid without hunting call sites.
+      injectReaderFlow: function () {}
   };
 
   var ZineReader = {
@@ -128,10 +89,7 @@
         if (!window.ZFThemes || !store.theme()) return {};
         return window.ZFThemes.pageStyle(store.theme());
       },
-      bodyHtml: function () {
-        if (!this.page) return "";
-        return this.page.body || "";
-      },
+      // bodyHtml computed removed (inline body retired).
       readerPageStyle: function () {
         var m = store.model();
         if (!m || !m.page) return {};

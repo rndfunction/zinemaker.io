@@ -55,12 +55,12 @@
       themeId: record.themeId || 'classic',
       modelId: record.modelId || 'mini-8',
       pages: (record.pages || []).map(function (p) {
-        // Preserve the full page object (images, textBoxes, icons, and any
-        // future fields). Only normalize the core text fields; do not
-        // rebuild the page from scratch or decorated content is lost.
+        // Preserve the full page object (images, textBoxes, icons, groups,
+        // and any future fields). Only ensure the arrays exist; do not
+        // rebuild from named fields or decorated content is lost. (The
+        // inline heading/body fields are retired -- migration happens on
+        // load, and new pages never carry them.)
         return Object.assign({}, p, {
-          heading: p.heading || '',
-          body: p.body || '',
           images: Array.isArray(p.images) ? p.images : [],
           textBoxes: Array.isArray(p.textBoxes) ? p.textBoxes : []
         });

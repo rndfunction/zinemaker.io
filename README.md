@@ -117,10 +117,13 @@ reads back):
 
     {
       id,                       // regenerated on load; must be unique in-session
-      heading, body,            // core text
       images: [ <element>, ... ],   // photos, icons, tape, scraps, stickies
       textBoxes: [ <text box>, ... ]
     }
+
+A page is a blank canvas: placed elements and positioned text boxes only.
+All text lives in text boxes. (The old inline `heading`/`body` fields
+are retired; see the migration note below.)
 
 **Element** (entry in `pages[].images`): `{ id, kind, src, x, y, w, h?, rot,
 z?, color?, shape?, wrap?, hidden? }`. `kind` is one of `photo`, `icon`,
@@ -132,19 +135,27 @@ fontSize?, lineHeight?, align?, color?, fontFamily?, z?, kind?, hidden? }`.
 > **Round-trip invariant.** Page objects must be stored and loaded
 > *whole*. `ZFLibrary.upsert`, `ZFLibrary.duplicate`, and
 > `loadFromLibrary` must copy the full page (spreading the existing object
-> and only normalizing the core fields) -- never rebuild a page from just
-> `{ heading, body, image }`. Rebuilding drops `images` and `textBoxes`
-> silently, which destroys every tape strip, sticky note, icon, and
-> positioned text box on save. Legacy single-`image` pages are upgraded by
-> `zfMigrateAllPages` in `js/util.js` on load.
+> and only ensuring the arrays exist) -- never rebuild a page from named
+> fields. Rebuilding drops `images` and `textBoxes` silently, which
+> destroys every tape strip, sticky note, icon, and positioned text box
+> on save.
+>
+> **One-time migration.** Older zines carried an inline `heading` and
+> `body` (plus legacy single-`image` fields). On load, `zfMigrateAllPages`
+> in `js/util.js` converts the heading into a title text box, the body
+> into a full content-area text box, and a legacy single image into an
+> `images[]` element, then strips the retired fields. Migration is
+> idempotent and runs once per page; after it, pages carry only
+> `images`/`textBoxes` (and `groups`).
 
 ## Design notes
 
 - **One renderer, three views.** The editor canvas, the reader page, and
   the printed sheet slot all render the same content inside a
-  `.zf-mini-page`, so what you type matches what you read and what you
-  print. A `--zf-page-scale` variable maps physical inches to the current
-  on-screen size.
+  `.zf-mini-page`, so what you place matches what you read and what you
+  print. All text is placed in text boxes; there is no separate inline
+  page body. A `--zf-page-scale` variable maps physical inches to the
+  current on-screen size.
 - **Print uses physical units.** In print, `--zf-page-scale` is reset to
   `1` so padding and type resolve to real inches and points. The page
   margin honors the user's setting via `--zf-page-margin`.

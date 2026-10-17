@@ -150,20 +150,10 @@
       // heading would also work, but a text box is guaranteed to render on
       // every view (editor, reader, sheet) identically.
       var p = window.zfEmptyPage();
-      p.heading = 'Page ' + i;
-      // Put the number in the BODY, vertically centered and as far from the
-      // paper edges as possible, so it can't fall in a printer's unprintable
-      // margin. A big centered number is unmissable in every view and proves
-      // whether the issue is edge-clipping or something else. The text box is
-      // ALSO placed dead-center for the same reason (it used to sit at the
-      // top-left corner, x:0.1 y:0.1, which is near the paper edge on corner
-      // slots).
-      //
-      // Body: a flex container filling the page, centering the digit.
-      p.body = '<div style="display:flex;align-items:center;justify-content:center;' +
-               'width:100%;height:100%;font-size:2.6em;font-weight:bold;">' +
-               i + '</div>';
-      // Text box: centered in the page, big.
+      // The imposition test used to fill heading+body; those inline fields
+      // are retired, so the number lives ONLY in a centered text box.
+      // Placed dead-center so it can't fall in the printer's unprintable
+      // margin and is unmissable in every view.
       var tbW = Math.max(1.2, (m.page.width || 2.75) * 0.7);
       var tbH = Math.max(0.8, (m.page.height || 4.25) * 0.3);
       p.textBoxes = [{
@@ -201,23 +191,35 @@
     try {
       var parsed = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
       if (!parsed || !Array.isArray(parsed.p)) return;
+      // BUILD FIRST, ASSIGN SECOND. Previously we mutated store.title and
+      // store.author before calling zfBuildPagesFromData; if that call
+      // threw, we'd end up with the shared title on the user's old pages
+      // (an inconsistent state). Build the pages first (may throw), then
+      // save the draft (so mid-edit work is not lost), then commit.
+      // Accept the rich share format ({tb, im}) used by current clients,
+      // and keep the legacy compact format ({h,b,i}) working for links
+      // shared before inline bodies were retired. The legacy fields are
+      // passed through transiently so zfBuildPagesFromData migrates them
+      // into text boxes / image elements, same as any old stored zine.
+      var sharedPages = parsed.p.map(function (p) {
+        if (p && (Array.isArray(p.tb) || Array.isArray(p.im))) {
+          return {
+            textBoxes: Array.isArray(p.tb) ? p.tb : [],
+            images: Array.isArray(p.im) ? p.im : []
+          };
+        }
+        return { heading: p.h || '', body: p.b || '', image: p.i || '' };
+      });
+      var built = window.zfBuildPagesFromData(sharedPages);
+      if (!Array.isArray(built) || !built.length) return;
       // Save the current work before a shared link replaces it. Without
       // this, clicking a #z= link mid-edit could discard up to one autosave
       // interval (1.5s) of changes. saveDraft is cheap and idempotent.
       try { store.saveDraft(); } catch (eSave) {}
       store.title = parsed.t || 'Untitled Zine';
       store.author = parsed.a || '';
-      // Translate the compact share payload ({h,b,i}) into the rich page
-      // format and route it through zfBuildPagesFromData, the same choke
-      // point used by import/template/example loading. That applies HTML
-      // sanitization (closing a stored-XSS hole in shared links) and runs
-      // page migration, so a shared heading becomes a title text box and
-      // the images/textBoxes arrays exist.
-      var sharedPages = parsed.p.map(function (p) {
-        return { heading: p.h || '', body: p.b || '', image: p.i || '' };
-      });
-      store.pages = window.zfBuildPagesFromData(sharedPages);
-      store.activePageId = store.pages[0].id;
+      store.pages = built;
+      store.activePageId = built[0].id;
       store.view = 'reader';
     } catch (e) { zfLog('bad share link: ' + e.message); }
   }

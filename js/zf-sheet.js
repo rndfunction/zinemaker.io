@@ -50,14 +50,13 @@
       rect: rect,
       page: page,
       isEmpty: !page || (
-        !page.heading && !page.body && !page.image &&
         !(page.images && page.images.length) &&
         !(page.textBoxes && page.textBoxes.length)
       ),
       pageScale: slotScale,
       pageMargin: store.modelMarginIn() + 'in',
-      safeEdges: safeEdges,
-      bodyHtml: page ? (page.body || '') : ''
+      safeEdges: safeEdges
+      // bodyHtml removed: the sheet renders images + text boxes only.
     };
   }
 
@@ -190,14 +189,21 @@
         if (!img || img.kind !== 'icon') return '';
         var name = img.src;
         var cached = window.zfIconSvg ? window.zfIconSvg.get(name) : null;
+        // Sanitize the color before it lands in a style attribute. A shared
+        // link or imported file can carry an arbitrary string here; today
+        // none of the browsers execute style-embedded payloads, but the
+        // single contract (zfSafeColor) should own this, not a string concat.
+        var safeColor = (typeof zfSafeColor === 'function')
+          ? zfSafeColor(img.color)
+          : (img.color || '');
         if (cached) {
-          var color = img.color || 'currentColor';
+          var color = safeColor || 'currentColor';
           return '<svg viewBox="' + cached.viewBox + '" width="100%" height="100%" ' +
                  'style="color:' + color + ';fill:currentColor;" aria-hidden="true">' +
                  cached.body + '</svg>';
         }
         if (window.zfIconSvg) window.zfIconSvg.ensure(name);
-        return '<iconify-icon icon="' + name + '" style="color:' + (img.color || 'inherit') + ';"></iconify-icon>';
+        return '<iconify-icon icon="' + name + '" style="color:' + (safeColor || 'inherit') + ';"></iconify-icon>';
       },
       slotBlockImageStyleFor: function (img, s) {
         var m = this.model;
@@ -215,16 +221,14 @@
       },
       stickyStyle: function (img, base) {
         var out = Object.assign({}, base || {});
-        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
-          out['--zf-sticky-bg'] = img.color;
-        }
+        var safe = (img && typeof zfSafeColor === 'function') ? zfSafeColor(img.color) : '';
+        if (safe) out['--zf-sticky-bg'] = safe;
         return out;
       },
       stickerStyle: function (img, base) {
         var out = Object.assign({}, base || {});
-        if (img && typeof img.color === 'string' && img.color.charAt(0) === '#') {
-          out['--zf-sticker-bg'] = img.color;
-        }
+        var safe = (img && typeof zfSafeColor === 'function') ? zfSafeColor(img.color) : '';
+        if (safe) out['--zf-sticker-bg'] = safe;
         return out;
       },
       slotTextBoxStyleFor: function (box, s) {
@@ -232,63 +236,9 @@
         if (!m || !box) return {};
         return zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
       },
-      sheetInjectFlows: function () {
-        var self = this;
-        this.$nextTick(function () {
-          self._attemptSheetInject(0);
-        });
-      },
-      _attemptSheetInject: function (attempt) {
-        var self = this;
-        if (attempt > 20) return;
-        if (store.view !== "sheet") return;
-        var root = self.$el;
-        if (!root) { self._schedSheetRetry(attempt); return; }
-        var bodies = root.querySelectorAll('.zf-mini-body[data-slot-page]');
-        if (!bodies.length) { self._schedSheetRetry(attempt); return; }
-        var firstRect = bodies[0].getBoundingClientRect();
-        if (firstRect.width < 20 || firstRect.height < 20) {
-          self._schedSheetRetry(attempt);
-          return;
-        }
-        for (var i = 0; i < bodies.length; i++) {
-          var el = bodies[i];
-          var pageNum = Number(el.getAttribute('data-slot-page'));
-          var page = store.pages[pageNum - 1];
-          if (!page) continue;
-          var stale = el.querySelectorAll('[data-zf-spacer="1"], [data-zf-flow-img="1"]');
-          for (var k = 0; k < stale.length; k++) stale[k].remove();
-          var flowImgs = [];
-          if (Array.isArray(page.images) && page.images.length) {
-            for (var fi = 0; fi < page.images.length; fi++) {
-              if (page.images[fi].wrap === 'flow') flowImgs.push(page.images[fi]);
-            }
-          } else if (page.image && page.imageWrap === 'flow') {
-            flowImgs.push({ src: page.image, x: page.imageX || 0, y: page.imageY || 0, w: page.imageW || 1.5, rot: page.imageRot || 0 });
-          }
-          if (!flowImgs.length) continue;
-          var m = self.model;
-          if (!m) continue;
-          var slotEl = el.closest('.zf-mini-page');
-          var slotScale = 1;
-          if (slotEl) {
-            var styleScale = slotEl.style.getPropertyValue('--zf-page-scale');
-            slotScale = parseFloat(styleScale) || 1;
-          }
-          var px = 96 * slotScale;
-          var rect = el.getBoundingClientRect();
-          if (rect.width < 20 || rect.height < 20) continue;
-          var bodyWIn = rect.width / px;
-          var bodyHIn = rect.height / px;
-          for (var fk = 0; fk < flowImgs.length; fk++) {
-            window.zfInjectFlow(el, flowImgs[fk], px, bodyWIn, bodyHIn);
-          }
-        }
-      },
-      _schedSheetRetry: function (attempt) {
-        var self = this;
-        setTimeout(function () { self._attemptSheetInject(attempt + 1); }, 80);
-      },
+      // Flow-wrap is retired, and the sheet has no inline body to wrap.
+      // No-op kept so existing watch/mounted/updated hooks stay valid.
+      sheetInjectFlows: function () {},
       slotMiniPageStyle: function (s) {
         var scale = (s && s.pageScale) ? s.pageScale : 1;
         var margin = store.modelMarginIn();
@@ -413,7 +363,7 @@
                     ':style="slotBlockImageStyleFor(img, s)" ' +
                     'v-html="iconInline(img)"></span>' +
                 '</template>' +
-                '<div class="zf-mini-body" :data-slot-page="s.pageNum" v-html="s.bodyHtml" style="position: relative;"></div>' +
+                // (body div removed from sheet: images and text boxes render directly.)
                 '<template v-for="img in (s.page.images || [])" :key="\'sl-free-\' + img.id">' +
                   '<div v-if="(img.wrap === \'free\' || !img.wrap) && img.kind === \'tape\'" ' +
                     'class="zf-tape zf-positioned" :class="\'zf-tape-\' + (img.color || \'beige\')" ' +

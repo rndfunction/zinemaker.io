@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zine Forge - Make and share zines</title>
+  <!-- Content-Security-Policy: report-only first. Flip to enforcing
+       (change Content-Security-Policy-Report-Only to Content-Security-Policy)
+       once the console is clean across every view: editor, reader, sheet,
+       library, share link, and print. style-src needs unsafe-inline because
+       the mini-page uses inline style= for element positioning; the
+       zfSanitizeHtml allowlist already restricts which style props survive.
+       connect-src allows the Iconify search/SVG APIs. -->
+  <meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'; script-src 'self' https://unpkg.com https://code.iconify.design; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://api.iconify.design; object-src 'none'; base-uri 'self';" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
   <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
@@ -164,7 +172,7 @@
                class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
                :style="Object.assign({}, readerBlockImageStyleFor(img), { color: img.color || 'inherit' })"></iconify-icon>
         </template>
-        <div class="zf-mini-body" ref="bodyReader" v-html="bodyHtml"></div>
+        <!-- Inline page body retired (reader): text lives in text boxes. -->
         <template v-for="img in (page.images || [])" :key="'r-free-' + img.id">
           <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
                class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')"
@@ -359,13 +367,7 @@
                    :icon="img.src"
                    :style="Object.assign({}, imageBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
             </template>
-             <div class="zf-mini-body zf-editable"
-                  ref="bodyEditor"
-                  :key="active.id"
-                  contenteditable="true"
-                  @input="onBodyInput"
-                  @paste="onBodyPaste"
-                  @focus="clearElementSelection"></div>
+              <!-- Inline page body retired: text lives in text boxes only. -->
 
             <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
               <div v-if="!box.hidden" class="zf-textbox"
@@ -381,6 +383,7 @@
                      :data-zf-text-content-id="box.id"
                      contenteditable="true"
                      @input="onTextBoxInput($event, box)"
+                     @paste="onTextBoxPaste($event, box)"
                      @mousedown.stop></div>
                 <span class="zf-img-handle zf-img-handle-resize"
                       title="Drag to resize (scales text)"
@@ -735,14 +738,12 @@
           </div>
           <div class="zf-image-control-row">
             <label class="zf-image-control-label">Layout</label>
-            <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'flow') ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'flow') ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('flow')">Text flows around</button>
             <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'free' || !activeImage.wrap) ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'free' || !activeImage.wrap) ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('free')">Text behind image</button>
             <button class="zf-btn" :style="{ borderColor: 'var(--zf-border)', background: (activeImage.wrap === 'block') ? 'var(--zf-blue)' : '#ffffff', color: (activeImage.wrap === 'block') ? '#ffffff' : 'var(--zf-blue-dark)' }" @click="setImageWrap('block')">Above text</button>
           </div>
           <div class="zf-image-control-row">
             <button class="zf-btn" style="border-color:var(--zf-border);" @click="fitImage">Fit width</button>
             <button class="zf-btn" style="border-color:var(--zf-border);" @click="resetImage">Reset</button>
-            <span class="zf-muted" style="font-size:0.8rem;" v-if="activeImage.wrap === 'flow'">Drag the image to move it. Text reflows around it as you drag.</span>
             <span class="zf-muted" style="font-size:0.8rem;" v-else-if="activeImage.wrap === 'free' || !activeImage.wrap">Drag the image. Text sits underneath it.</span>
             <span class="zf-muted" style="font-size:0.8rem;" v-else>Sits above the body text.</span>
           </div>
@@ -853,6 +854,8 @@
        zf-boot wires everything together and mounts Vue last. -->
   <script src="js/zf-store.js"></script>
   <script src="js/zf-app-shell.js"></script>
+  <script src="js/zf-editor-layers.js"></script>
+  <script src="js/zf-editor-drawing.js"></script>
   <script src="js/zf-editor.js"></script>
   <script src="js/zf-editor-component.js"></script>
   <script src="js/zf-reader.js"></script>

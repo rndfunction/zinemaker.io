@@ -18,8 +18,9 @@
   function zfEmptyPage() {
     return {
       id: 'p' + Math.random().toString(36).slice(2, 9),
-      heading: '',
-      body: '',
+      // A page is a blank canvas: placed images and text boxes only.
+      // The old inline heading/body fields are retired; existing content
+      // is migrated to text boxes by zfMigratePage.
       images: [],
       textBoxes: [],
       // Groups: [{ id, memberIds: ['<elId>', ...] }]. A group binds elements
@@ -37,21 +38,19 @@
     if (!Array.isArray(pages)) return [zfEmptyPage()];
     var built = pages.map(function (p, i) {
       var page = {
-        id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
-        heading: p.heading || '',
-        // Sanitize stored HTML on the way IN so no downstream view
-        // (reader / sheet / library thumb) can render script, event
-        // handlers, or other active content from an imported file,
-        // shared link, template, or example. zfSanitizeHtml is an
-        // allowlist walker defined in /js/util.js.
-        body: zfSanitizeHtml(p.body || ''),
-        image: p.image || '',
-        imageX: typeof p.imageX === 'number' ? p.imageX : 0,
-        imageY: typeof p.imageY === 'number' ? p.imageY : 0,
-        imageW: typeof p.imageW === 'number' ? p.imageW : 1.5,
-        imageRot: typeof p.imageRot === 'number' ? p.imageRot : 0,
-        imageWrap: p.imageWrap || 'free'
+        id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7)
       };
+      // Legacy inline fields are attached TEMPORARILY so zfMigratePage
+      // below can convert them into text boxes / image elements, then
+      // stripped. New data never carries heading/body after migration.
+      if (p.heading) page.heading = p.heading;
+      if (p.body) page.body = zfSanitizeHtml(p.body);
+      if (p.image) page.image = p.image;
+      if (typeof p.imageX === 'number') page.imageX = p.imageX;
+      if (typeof p.imageY === 'number') page.imageY = p.imageY;
+      if (typeof p.imageW === 'number') page.imageW = p.imageW;
+      if (typeof p.imageRot === 'number') page.imageRot = p.imageRot;
+      if (p.imageWrap) page.imageWrap = p.imageWrap;
       var imgs = [];
       if (Array.isArray(p.images)) imgs = imgs.concat(p.images);
       if (Array.isArray(p.icons)) imgs = imgs.concat(p.icons);
@@ -271,7 +270,16 @@
       var it = this.pages.splice(idx, 1)[0];
       this.pages.splice(t, 0, it);
     },
-    newZine: function () {
+    newZine: function (modelId) {
+      // If a model id is passed, adopt it BEFORE seeding blank pages so
+      // the seed uses the new model's sheet capacity. Previously the
+      // ordering was the caller's responsibility (newZineInModel set
+      // modelId then called newZine), which was correct but fragile --
+      // a future caller doing newZine() then modelId = x would silently
+      // seed the OLD model's count and then only pad upward (never
+      // shrink), leaving an over-length draft. Owning the order here
+      // makes the invariant local and impossible to break.
+      if (modelId) this.modelId = modelId;
       if (this.currentZineId && this.saveToLibrary) this.saveToLibrary();
       this.currentZineId = window.ZFLibrary ? window.ZFLibrary.newId() : null;
       this.title = 'Untitled Zine'; this.author = ''; this.pages = zfBlankPagesForModel(this.modelId);
@@ -279,12 +287,12 @@
       if (window.ZFLibrary) this.library = window.ZFLibrary.list();
     },
     // Start a new zine in a chosen model (seeds the right number of pages).
+    // newZine(modelId) owns the ordering (adopt id, then seed), so this
+    // is now a one-liner with no ordering trap. zfEnsureModelCapacity()
+    // is kept as a belt-and-suspenders no-op in case a custom model's
+    // blank seed ever drifts from its derived sheet capacity.
     newZineInModel: function (modelId) {
-      if (modelId && modelId !== this.modelId) this.modelId = modelId;
-      this.newZine();
-      // newZine seeds a full sheet for the model, but if the model id
-      // changed in the line above AFTER the seed used the old model, make
-      // sure we still have a full sheet's worth of pages.
+      this.newZine(modelId);
       this.zfEnsureModelCapacity();
     },
     setView: function (v) { this.view = v; },
@@ -336,8 +344,6 @@
       for (var i = 0; i < pages.length; i++) {
         var p = pages[i];
         if (!p) continue;
-        if (p.heading && String(p.heading).trim()) return true;
-        if (p.body && String(p.body).trim()) return true;
         if (Array.isArray(p.images) && p.images.length) return true;
         if (Array.isArray(p.textBoxes) && p.textBoxes.length) return true;
       }
@@ -392,12 +398,12 @@
         // id is regenerated to avoid id collisions across zines. Legacy
         // pages that only have a single `image` field are migrated below
         // by zfMigrateAllPages.
+        // Pass the raw stored page through. Legacy heading/body (and
+        // legacy single-image fields) may still be on old records;
+        // zfMigrateAllPages below converts and strips them. Only the
+        // page id is regenerated to avoid collisions across zines.
         return Object.assign({}, p, {
-          id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7),
-          heading: p.heading || '',
-          body: p.body || '',
-          images: Array.isArray(p.images) ? p.images : [],
-          textBoxes: Array.isArray(p.textBoxes) ? p.textBoxes : []
+          id: 'p' + i + '-' + Math.random().toString(36).slice(2, 7)
         });
       });
       if (window.zfMigrateAllPages) this.pages = window.zfMigrateAllPages(this.pages);
@@ -428,10 +434,16 @@
       if (!window.ZFLibrary) return;
       var rec = window.ZFLibrary.get(id);
       if (!rec) return;
-      if (!confirm('Delete "' + rec.title + '" from your library? This cannot be undone.')) return;
-      window.ZFLibrary.remove(id);
-      this.library = window.ZFLibrary.list();
-      if (this.currentZineId === id) this.currentZineId = null;
+      var self = this;
+      zfConfirm(
+        'Delete "' + rec.title + '" from your library? This cannot be undone.',
+        function () {
+          window.ZFLibrary.remove(id);
+          self.library = window.ZFLibrary.list();
+          if (self.currentZineId === id) self.currentZineId = null;
+        },
+        { title: 'Delete this zine?', confirmLabel: 'Delete', danger: true }
+      );
     },
 
     model: function () {
@@ -474,20 +486,27 @@
       // If the zine already has content, warn: switching changes the page
       // size but does NOT resize existing content.
       var hasContent = (this.pages || []).some(function (p) {
-        return (p.heading && p.heading.trim()) ||
-               (p.body && p.body.trim()) ||
-               (p.images && p.images.length) ||
-               (p.textBoxes && p.textBoxes.length) ||
-               (p.image);
+        return (p.images && p.images.length) ||
+               (p.textBoxes && p.textBoxes.length);
       });
+      var self = this;
       if (hasContent) {
-        var ok = confirm(
-          'Switch zine format to "' + window.ZFModels.getModel(id).label + '"?\n\n' +
+        var label = window.ZFModels.getModel(id).label;
+        // Use zfConfirm (styled, accessible) instead of native confirm().
+        // The whole switch is inside the callback so cancel is a clean
+        // no-op -- no early-return semantics to reason about.
+        zfConfirm(
+          'Switch zine format to "' + label + '"?\n\n' +
           'Your pages are kept, but the page size changes. Existing content is ' +
-          'NOT resized, so it may need adjusting for the new format.'
+          'NOT resized, so it may need adjusting for the new format.',
+          function () { self._applyModel(id); },
+          { title: 'Switch zine format?', confirmLabel: 'Switch' }
         );
-        if (!ok) return;
+        return;
       }
+      this._applyModel(id);
+    },
+    _applyModel: function (id) {
       this.modelId = id;
       // A model change can raise the pages-per-sheet (e.g. 8 -> 16 for a
       // 2-sided W-fold). Pad the page array so the imposition has a full
