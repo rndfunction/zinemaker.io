@@ -11,6 +11,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-editor-drawing', ['ZF_STORE', 'zfRenderStrokes']);
+
   var methods = {
     _drawToInches: function (p) {
       var m = this.activeModel;

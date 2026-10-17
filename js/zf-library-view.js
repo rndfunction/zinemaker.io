@@ -6,6 +6,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-library-view', ['ZF_STORE', 'ZFLibrary', 'ZFModels', 'ZFThemes']);
+
   var store = window.ZF_STORE;
 
   function zfRelativeTime(ts) {

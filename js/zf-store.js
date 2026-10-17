@@ -13,6 +13,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-store', ['Vue', 'ZFModels', 'ZFThemes', 'ZFLibrary', 'zfSanitizeHtml', 'zfClampNumber']);
+
   var STORAGE_KEY = 'zine-forge-draft-v1';
 
   function zfEmptyPage() {

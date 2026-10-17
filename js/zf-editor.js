@@ -11,6 +11,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-editor', ['ZF_STORE', 'zfGetImageSize', 'zfCompressImageAsync', 'zfCompressImageSync']);
+
   var store = window.ZF_STORE;
 
   // Legacy: single-image injector. Kept for callers that haven't been

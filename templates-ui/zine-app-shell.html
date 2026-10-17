@@ -1,0 +1,130 @@
+<!-- zine-app-shell-template -- UI template partial, fetched and injected as a -->
+<!-- <template> element by zf-boot.js before the app mounts. -->
+  <template id="zine-app-shell-template">
+    <div>
+      <header class="zf2-masthead">
+        <div class="zf2-masthead-titles">
+          <span class="zf2-kicker">Zine &middot; {{ store.view }}</span>
+          <input
+            class="zf2-title zf2-title-input"
+            v-model="store.title"
+            placeholder="Untitled Zine"
+            aria-label="Zine title"
+            title="Click to rename this zine"
+            maxlength="80"
+          />
+          <div class="zf2-meta">
+            <span v-if="store.author">by {{ store.author }}</span>
+            <span v-if="store.author" aria-hidden="true">&middot;</span>
+            <span class="zf-save-indicator" v-if="savedLabel" title="Your draft is saved in this browser" aria-live="polite">{{ savedLabel }}</span>
+          </div>
+        </div>
+        <div class="zf2-masthead-actions">
+          <button class="zf2-ghost" @click="goLibrary" :aria-current="store.view === 'library'" title="Browse your saved zines">
+            <iconify-icon icon="ph:books" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Library
+          </button>
+          <span class="zf2-masthead-sep" aria-hidden="true"></span>
+          <button class="zf2-ghost" @click="onNew">New</button>
+          <label class="zf2-ghost" style="cursor:pointer;" title="Load a previously exported .zine.json file">
+            Import
+            <input type="file" accept=".json,application/json" style="display:none;" @change="onImport" />
+          </label>
+          <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
+          <button class="zf2-ghost" @click="onSaveToLibrary" title="Save this zine to your library">
+            <iconify-icon icon="ph:floppy-disk" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Save
+          </button>
+          <button class="zf2-ghost" @click="store.settingsOpen = !store.settingsOpen" :aria-expanded="store.settingsOpen" title="Toggle zine settings" aria-haspopup="dialog">
+            <iconify-icon icon="ph:gear-six" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            Settings
+          </button>
+        </div>
+      </header>
+      <nav class="zf2-viewtabs" aria-label="Sections">
+        <button class="zf2-tab" :aria-current="store.view === 'editor'" @click="goEditor">Editor</button>
+        <button class="zf2-tab" :aria-current="store.view === 'reader'" @click="goReader">Read</button>
+        <button class="zf2-tab" :aria-current="store.view === 'sheet'" @click="goSheet">Print</button>
+      </nav>
+
+      <main class="zf-main">
+        <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
+        <section data-zf-view="editor" v-show="store.view === 'editor'"><zf-error-boundary><zine-editor></zine-editor></zf-error-boundary></section>
+        <section data-zf-view="reader" v-show="store.view === 'reader'"><zf-error-boundary><zine-reader></zine-reader></zf-error-boundary></section>
+        <section data-zf-view="sheet" v-show="store.view === 'sheet'"><zf-error-boundary><zine-sheet></zine-sheet></zf-error-boundary></section>
+        <section data-zf-view="library" v-show="store.view === 'library'"><zf-error-boundary><zine-library></zine-library></zf-error-boundary></section>
+      </main>
+
+      <div class="zf-modal-backdrop" v-if="store.newZineOpen" @click.self="cancelNewZine">
+        <div class="zf-modal" role="dialog" aria-label="Start a new zine">
+          <div class="zf-modal-header">
+            <h2>Start a new zine</h2>
+            <button class="zf-modal-close" @click="cancelNewZine" aria-label="Close">&times;</button>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-new-model">Format</label>
+            <select id="zf-new-model" class="zf-input" v-model="store.pendingModelId">
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+            </select>
+          </div>
+          <div class="zf-field">
+            <label class="zf-label" for="zf-new-template">Template</label>
+            <select id="zf-new-template" class="zf-input" v-model="store.pendingTemplateId">
+              <option v-for="t in store.newZineTemplates" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
+          <div class="zf-muted" style="font-size:0.8rem;margin-bottom:1rem;">
+            This replaces your current zine with blank pages in the chosen format.
+          </div>
+          <div class="zf-header-actions" style="justify-content:flex-end;">
+            <button class="zf-btn" style="border-color:var(--zf-border);" @click="cancelNewZine">Cancel</button>
+            <button class="zf-btn zf-btn-primary" @click="confirmNewZine">Create</button>
+          </div>
+        </div>
+      </div>
+      <div class="zf-settings-backdrop" v-if="store.settingsOpen" @click="store.settingsOpen = false" aria-hidden="true"></div>
+      <div class="zf-settings-slide" :class="{ open: store.settingsOpen }" role="dialog" aria-label="Zine settings" @keydown.esc="store.settingsOpen = false">
+        <div class="zf-settings-slide-head">
+          <strong>Zine settings</strong>
+          <button class="zf-icon-btn" @click="store.settingsOpen = false" aria-label="Close settings">&times;</button>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-model">Zine model</label>
+          <select id="zf-zine-model" class="zf-input" :value="store.modelId" @change="store.setModel($event.target.value)">
+            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-theme">Theme</label>
+          <select id="zf-zine-theme" class="zf-input" :value="store.themeId" @change="store.setTheme($event.target.value)">
+            <option v-for="t in themes" :key="t.id" :value="t.id">{{ t.label }}</option>
+          </select>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-margin">Page margin ({{ store.marginIn }} in)</label>
+          <input id="zf-zine-margin" type="range" min="0.04" max="0.35" step="0.01"
+                 :value="store.marginIn" @input="store.setMargin($event.target.value)" style="width:100%;" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-printer-safety">Printer safe area ({{ store.printerSafetyIn }} in)</label>
+          <input id="zf-zine-printer-safety" type="range" min="0" max="0.5" step="0.01"
+                 :value="store.printerSafetyIn" @input="store.setPrinterSafety($event.target.value)" style="width:100%;" />
+          <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Shows where most printers can't reach. Content outside this area may be clipped.</div>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-safe-edge">Edge safety margin ({{ store.safeEdgeIn }} in)</label>
+          <input id="zf-zine-safe-edge" type="range" min="0" max="0.75" step="0.01"
+                 :value="store.safeEdgeIn" @input="store.setSafeEdge($event.target.value)" style="width:100%;" />
+          <div class="zf-muted" style="font-size:0.75rem;margin-top:0.15rem;">Extra padding auto-applied to the outer edge of corner pages so your printer doesn't clip them.</div>
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-title">Zine title</label>
+          <input id="zf-zine-title" class="zf-input" v-model="store.title" />
+        </div>
+        <div class="zf-field">
+          <label class="zf-label" for="zf-zine-author">Author</label>
+          <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+        </div>
+      </div>
+    </div>
+  </template>

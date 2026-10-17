@@ -7,6 +7,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-editor-layers', ['ZF_STORE']);
+
   var methods = {
     layerDragClass: function (i) {
       if (this.layerDropIndex !== i || this.layerDragIndex < 0) return '';

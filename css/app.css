@@ -142,7 +142,7 @@
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
       font-weight: 700; color: var(--zf-gray-mid); margin-bottom: 0.35rem;
     }
-    .zf-layers-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow: hidden; }
+    .zf-layers-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--zf-border); border-radius: 6px; overflow-x: hidden; overflow-y: auto; max-height: 19.5rem; scrollbar-gutter: stable; }
     .zf-layers-list li {
       display: flex; align-items: center; gap: 0.4rem;
       padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--zf-border);
@@ -271,7 +271,7 @@
     .zf-error-boundary p { color: var(--zf-gray-mid); margin: 0 0 1rem; }
     .zf-error { color: var(--zf-red); font-size: 0.9rem; }
     .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
-    .zf-editor { display: grid; grid-template-columns: 240px 1fr auto; gap: 1.25rem; align-items: start; }
+    .zf-editor { display: grid; grid-template-columns: 240px 1fr auto; gap: 1.25rem; align-items: start; position: relative; }
     .zf-canvas-col { min-width: 0; }
     /* Vertical right rail: formatting + insert controls. Sits in the open
        space to the right of the tall canvas. Buttons match the "+ Add sheet"
@@ -472,10 +472,12 @@
       pointer-events: none;
       filter: grayscale(0.15);
       opacity: 0.9;
-      width: 100%;
+      /* width/height are set inline by ghostFrameStyle (130px x scaled). */
     }
     .zf-ghost-render .zf-ghost-mini {
-      width: 100% !important;
+      /* No width override: the inline style sets the real design width and a
+         transform:scale() shrinks it into the frame. A width:100% here would
+         collapse the page and defeat the uniform scale. */
       overflow: hidden;
       border-radius: 3px;
     }
@@ -517,70 +519,8 @@
 
     /* ---- Right inspector panel: an overlay, not a grid column, so the
        page canvas keeps the full width and stays centered. ---- */
-    .zf-editor > .zf-tools-col {
-      position: fixed;
-      top: 0; right: 0;
-      height: 100vh;
-      width: 340px;
-      z-index: 200;
-      display: flex; flex-direction: column; gap: 0.5rem;
-      padding: 0.9rem;
-      background: #ffffff;
-      border-left: 2px solid var(--zf2-line-strong);
-      box-shadow: -8px 0 24px rgba(20,23,26,0.12);
-      overflow-y: auto;
-      transform: translateX(0);
-      transition: transform 0.2s ease;
-    }
-    .zf-editor > .zf-tools-col.zf-inspector-collapsed {
-      transform: translateX(100%);
-    }
     /* A persistent tab to reopen the collapsed inspector. */
-    .zf-inspector-tab {
-      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
-      z-index: 201;
-      background: var(--zf2-ink); color: #ffffff; border: none;
-      border-radius: 8px 0 0 8px; padding: 0.7rem 0.5rem;
-      writing-mode: vertical-rl; text-orientation: mixed;
-      font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
-      font-weight: 700; cursor: pointer;
-    }
-    .zf-inspector-tab:hover { background: var(--zf2-accent); }
-    .zf-inspector-tab:focus-visible { outline: 3px solid var(--zf2-focus); outline-offset: 2px; }
-    .zf-inspector-backdrop {
-      position: fixed; inset: 0; z-index: 199;
-      background: rgba(20,23,26,0.12);
-    }
-    .zf-inspector-head {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 0.4rem; margin-bottom: 0.25rem;
-    }
-    .zf-inspector-title {
-      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
-      font-weight: 700; color: var(--zf-gray-mid);
-    }
-    .zf-inspector-toggle {
-      border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px;
-      width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 1rem;
-      color: var(--zf-blue-dark); flex: 0 0 auto;
-    }
-    .zf-inspector-toggle:hover { background: var(--zf-gray-light); }
-    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-format-toolbar,
-    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-inline-tools,
-    .zf-editor > .zf-tools-col.zf-inspector-collapsed .zf-image-controls {
-      display: none;
-    }
-    .zf-editor > .zf-tools-col .zf-inline-tools { gap: 0.3rem; flex-wrap: wrap; }
     /* Selected-item control panels live inline in the right inspector. */
-    .zf-editor > .zf-tools-col .zf-image-controls {
-      position: static;
-      width: auto;
-      background: #ffffff;
-      color: var(--zf-ink);
-      border: 1px solid var(--zf-border);
-      border-radius: 6px;
-      z-index: 160;
-    }
 
     .zf-canvas-empty-hint {
       margin-bottom: 0.75rem;
@@ -592,18 +532,8 @@
       font-size: 0.9rem;
       line-height: 1.35;
     }
-    .zf-tools-col {
-      min-width: 0;
-      padding: 0.75rem;
-      background: var(--zf-gray-light);
-      border-radius: 6px;
-      align-self: start;
-      position: sticky;
-      top: 0.75rem;
-    }
     @media (max-width: 1200px) {
       .zf-editor { grid-template-columns: 240px 1fr; }
-      .zf-tools-col { grid-column: 1 / -1; }
     }
     @media (max-width: 800px) { .zf-editor { grid-template-columns: 1fr; } }
     /* -------- Mobile / narrow-screen adjustments -------- */
@@ -620,7 +550,6 @@
       .zf-pager { flex-wrap: wrap; justify-content: center; }
       .zf-sheet-view { padding: 0.75rem; }
       .zf-library-grid { grid-template-columns: 1fr; }
-      .zf-tools-col { position: static; }
     }
     /* Cap the page list height so a 16-page (or longer) zine scrolls inside
        the list instead of stretching the sidebar and pushing everything
@@ -673,7 +602,6 @@
     .zf-page-heading { font-family: var(--zf-page-heading-font, var(--zf-serif)); font-size: 1.5rem; border: none; border-bottom: 2px solid var(--zf-page-accent, var(--zf-ink)); padding: 0.25rem 0; width: 100%; outline: none; background: transparent; color: inherit; }
     .zf-page-body { flex: 1; border: none; resize: vertical; font-family: var(--zf-page-body-font, var(--zf-serif)); font-size: 1rem; line-height: 1.5; width: 100%; outline: none; background: transparent; color: inherit; }
     .zf-page-image { max-width: 100%; border-radius: 4px; }
-    .zf-inline-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .zf-label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--zf-gray-mid); text-transform: uppercase; letter-spacing: 0.03em; }
     .zf-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--zf-border); border-radius: 4px; font-size: 0.9rem; }
     .zf-field { margin-bottom: 0.75rem; }
@@ -850,23 +778,7 @@
       font-style: italic;
       pointer-events: none;
     }
-    .zf-format-toolbar {
-      display: flex;
-      gap: 0.25rem;
-      padding: 0.25rem;
-      background: var(--zf-gray-light);
-      border: 1px solid var(--zf-border);
-      border-radius: 4px;
-      width: fit-content;
-    }
     /* Iconify icons inside our buttons */
-    .zf-format-toolbar iconify-icon {
-      font-size: 1.05rem;
-      line-height: 1;
-      color: var(--zf-blue-dark);
-      display: inline-block;
-      vertical-align: middle;
-    }
     .zf-icon-btn iconify-icon {
       font-size: 1.05rem;
       line-height: 1;
@@ -1142,6 +1054,51 @@
        keeps its full width and is never squished). It is fixed to the right
        edge on wide screens; on narrow screens where there is no free space
        it is hidden (see the media query below) so it cannot cover the page. */
+
+    /* Text panel: absolutely-positioned overlay to the RIGHT of the rail.
+       Anchored to .zf-editor (position: relative), NOT a grid child, so the
+       3-column grid is untouched. Hidden in print and on narrow screens. */
+    .zf-text-panel,
+    .zf-image-panel {
+      /* Position is driven by JS (positionTextPanel) so the panel top
+         aligns with the rail top and its left sits one grid-gap to the
+         right of the rail -- resize/scroll stable. These are fallbacks
+         for the first frame before JS runs. */
+      position: fixed;
+      top: 122px;
+      left: 0;
+      width: 260px;
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding: 0.75rem;
+      background: #ffffff;
+      border: 1px solid var(--zf-border);
+      border-radius: 8px;
+      /* No drop shadow: the panel is docked UI, not a floating/grabbable
+         element. Border + flat bg keep it distinct without implying drag. */
+    }
+    .zf-text-panel-head,
+    .zf-image-panel .zf-text-panel-head {
+      font-weight: 700; font-size: 0.8rem; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--zf-gray-mid); margin-bottom: 0.2rem;
+    }
+    .zf-text-panel-label,
+    .zf-image-panel .zf-text-panel-label {
+      font-size: 0.75rem; font-weight: 600; color: var(--zf-ink); margin-top: 0.35rem;
+    }
+    .zf-text-panel-row,
+    .zf-image-panel .zf-text-panel-row { display: flex; align-items: center; gap: 0.4rem; }
+    .zf-text-panel-align,
+    .zf-image-panel .zf-text-panel-align { flex-wrap: wrap; }
+    .zf-text-panel-align .zf-btn,
+    .zf-image-panel .zf-text-panel-align .zf-btn { flex: 1 1 auto; font-size: 0.8rem; padding: 0.25rem 0.4rem; }
+    @media (max-width: 1200px) { .zf-text-panel, .zf-image-panel { display: none !important; } }
+    @media print { .zf-text-panel, .zf-image-panel { display: none !important; } }
+
     .zf-draw-panel {
       display: flex;
       flex-direction: column;
@@ -1806,7 +1763,7 @@
     }
     @media print {
       .zf-header, .zf2-masthead, .zf2-viewtabs, .zf-no-print, .zf-pager,
-      .zf-settings-slide, .zf-editor > .zf-tools-col, .zf-canvas-empty-hint {
+      .zf-settings-slide, .zf-canvas-empty-hint {
         display: none !important;
       }
       body { background: #ffffff; margin: 0; padding: 0; }

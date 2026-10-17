@@ -5,6 +5,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-app-shell', ['ZF_STORE', 'ZFModels', 'ZFThemes']);
+
   var store = window.ZF_STORE;
 
   var AppShell = {

@@ -6,6 +6,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-reader', ['ZF_STORE', 'ZFModels', 'ZFThemes', 'zfElementStyle', 'zfTextBoxStyle']);
+
   var store = window.ZF_STORE;
 
   var ZF_READER_METHODS = {
@@ -25,7 +27,7 @@
             im: Array.isArray(p.images) ? p.images : []
           };
         }) };
-        var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        var b64 = zfB64EncodeUtf8(JSON.stringify(payload));
         var url = location.origin + location.pathname + "#z=" + b64;
         var done = function (msg) { self.shareStatus = msg; setTimeout(function () { self.shareStatus = ""; }, 4000); };
         if (navigator.clipboard && navigator.clipboard.writeText) {

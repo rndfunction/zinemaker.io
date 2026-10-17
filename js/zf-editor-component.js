@@ -6,6 +6,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-editor-component', ['ZF_STORE', 'ZFModels', 'zfElementStyle', 'zfTextBoxStyle', 'zfSanitizeHtml', 'zfNewImageId', 'zfNewTextBoxId', 'zfCompressAndPlace']);
+
   var store = window.ZF_STORE;
 
   // Force reference to avoid unused warnings in some linters.
@@ -34,7 +36,12 @@
       // and they cannot be grabbed. Derived from selection, so it reverts
       // automatically on deselect (the stored z is never changed).
       var page = this.active;
-      if (page && this.isSelected('image', img.id)) {
+      // Boost z ONLY while actively dragging so handles are grabbable. When
+      // idle-selected, show the element at its TRUE z -- otherwise a "send to
+      // back" looks like it did nothing (the selection boost kept it on top)
+      // until deselect, which was confusing. Selection is still indicated by
+      // the outline/handles.
+      if (page && this.isSelected('image', img.id) && this.imageDrag) {
         base.zIndex = base.zIndex + (page.activeImageId === img.id ? 20000 : 10000);
       }
       return base;
@@ -599,7 +606,7 @@
         if (newSet.length) {
           this.selSet = newSet;
           this._syncPrimary();
-          this.$nextTick(function () { selfP.syncTextBoxDom(); selfP.injectShapeSpacer(); });
+          this.$nextTick(function () { selfP.syncTextBoxDom(); });
         }
         store.status = 'Pasted ' + newSet.length + ' elements.';
         setTimeout(function () { if (store.status.indexOf('Pasted') === 0) store.status = ''; }, 1500);
@@ -632,7 +639,6 @@
         page.activeImageId = img.id;
         page.activeTextBoxId = null;
         var self = this;
-        this.$nextTick(function () { self.injectShapeSpacer(); });
       }
       store.status = 'Pasted.';
       setTimeout(function () { if (store.status === 'Pasted.') store.status = ''; }, 1500);
@@ -663,7 +669,7 @@
         if (newSet.length) {
           this.selSet = newSet;
           this._syncPrimary();
-          this.$nextTick(function () { selfD.syncTextBoxDom(); selfD.injectShapeSpacer(); });
+          this.$nextTick(function () { selfD.syncTextBoxDom(); });
         }
         return;
       }
@@ -702,7 +708,6 @@
             page.images.push(copyImg);
             page.activeImageId = copyImg.id;
             var self = this;
-            this.$nextTick(function () { self.injectShapeSpacer(); });
             return;
           }
         }
@@ -713,39 +718,84 @@
     },
     // Style for the ghost's scaled mini-page: same theme + aspect as the
     // real page, small, with a tiny page scale so fonts/padding shrink.
-    ghostPageStyle: function (page) {
+    // The ghost is a TRUE thumbnail: render the mini-page at its real
+    // design size (page inches * 96 px) with --zf-page-scale: 1, then
+    // transform:scale() the whole thing down into the ~130px frame. This is
+    // the only way text-box font sizes (absolute pt) shrink correctly --
+    // percent positions and em icons would scale with a smaller base font,
+    // but pt is absolute, so a shrunken container just overflowed and the
+    // ghost looked like overlapping, mismatched text.
+    // EXACT-FIDELITY ghost geometry: the ghost inner is a pixel-identical
+    // clone of the REAL page (same renderedW/renderedH and --zf-page-scale
+    // the live page computes in pageStyle), then uniformly transform:scale()d
+    // down into the frame. Deriving from the live page's own formula (rather
+    // than a hardcoded 96dpi design) is what keeps every ratio -- padding,
+    // em icons, pt text, percent positions -- matching the real page.
+    _ghostMetrics: function () {
       var m = this.activeModel;
-      if (!m) return {};
+      if (!m) return null;
+      var w = m.page.width, h = m.page.height;
+      var longSide = Math.max(w, h);
+      var screenScale = 640 / longSide;   // same onscreen target as pageStyle
+      var renderedW = w * screenScale;
+      var renderedH = h * screenScale;
+      var unit = m.page.unit || 'in';
+      var physicalInches = unit === 'mm' ? w / 25.4 : w;
+      var physicalCssPx = physicalInches * 96;
+      var pageScale = renderedW / physicalCssPx;
+      var frameW = 130;
+      var outer = frameW / renderedW;
+      return {
+        renderedW: renderedW,
+        renderedH: renderedH,
+        pageScale: pageScale,
+        frameW: frameW,
+        frameH: renderedH * outer,
+        outer: outer
+      };
+    },
+    ghostPageStyle: function (page) {
+      var met = this._ghostMetrics();
+      if (!met) return {};
       var theme = (window.ZFThemes && store.theme()) ? window.ZFThemes.pageStyle(store.theme()) : {};
-      var cssPxW = 130;
-      var scale = cssPxW / (m.page.width * 96);
-      var margin = (store.modelMarginIn ? store.modelMarginIn() : 0.1);
       return Object.assign({}, theme, {
-        position: 'relative',
-        width: '100%',
-        height: (cssPxW * (m.page.height / m.page.width)) + 'px',
-        padding: margin + 'in',
-        '--zf-page-scale': scale,
-        '--zf-page-margin': margin + 'in',
-        transform: 'none'
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: met.renderedW + 'px',
+        height: met.renderedH + 'px',
+        '--zf-page-scale': met.pageScale,
+        '--zf-page-margin': store.modelMarginIn() + 'in',
+        transform: 'scale(' + met.outer + ')',
+        transformOrigin: 'top left'
       });
+    },
+    ghostFrameStyle: function (page) {
+      var met = this._ghostMetrics();
+      if (!met) return {};
+      return {
+        position: 'relative',
+        width: met.frameW + 'px',
+        height: met.frameH + 'px',
+        overflow: 'hidden'
+      };
     },
     ghostBlockStyle: function (img) {
       var m = this.activeModel;
       if (!m || !img || !img.src) return {};
-      return zfElementStyle(img, m.page.width, m.page.height, 0, { block: true });
+      return zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), { block: true });
     },
     ghostFreeStyle: function (img) {
       var m = this.activeModel;
       if (!m || !img) return {};
       var decor = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
       if (!img.src && !decor[img.kind]) return {};
-      return zfElementStyle(img, m.page.width, m.page.height, 0, {});
+      return zfElementStyle(img, m.page.width, m.page.height, store.modelMarginIn(), {});
     },
     ghostTextBoxStyle: function (box) {
       var m = this.activeModel;
       if (!m || !box) return {};
-      return zfTextBoxStyle(box, m.page.width, m.page.height, 0);
+      return zfTextBoxStyle(box, m.page.width, m.page.height, store.modelMarginIn());
     },
 
     ghostSnippet: function (page) {
@@ -909,7 +959,6 @@
         this._hideOverlapPicker();
         this._selSetToggle('image', img.id);
         var selfSh = this;
-        this.$nextTick(function () { selfSh.injectShapeSpacer(); });
         return;
       }
       // Selection priority: if an element is ALREADY selected and the pointer
@@ -930,7 +979,6 @@
         try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
         // Re-inject flow spacers so the selection outline moves.
         var self = this;
-        this.$nextTick(function () { self.injectShapeSpacer(); });
       this.imageDrag = {
         imgId: img.id,
         mode: "move",
@@ -1257,7 +1305,6 @@
           this._spacerScheduled = true;
           requestAnimationFrame(function () {
             self._spacerScheduled = false;
-            self.injectShapeSpacer();
           });
         }
       }
@@ -1275,7 +1322,6 @@
       this.imageDrag = null;
       if (wasDragging && !wasText) {
         var self = this;
-        this.$nextTick(function () { self.injectShapeSpacer(); });
       }
       // A real drag should NOT be followed by a click that re-selects (which
       // would collapse a multi-selection). Suppress the next click.
@@ -1322,7 +1368,6 @@
       img.rot = 0;
       img.wrap = "free";
       var self = this;
-      this.$nextTick(function () { self.injectShapeSpacer(); });
     },
     fitImage: function () {
       var img = this.activeImage;
@@ -1335,7 +1380,6 @@
       img.w = Math.max(0.5, w - margin * 2);
       img.rot = 0;
       var self = this;
-      this.$nextTick(function () { self.injectShapeSpacer(); });
     },
     // -------- Multi-selection helpers --------
     // The selection set is the source of truth for "what is selected"; the
@@ -1738,7 +1782,6 @@
         bases: this._selectionBases()
       };
       var self = this;
-      this.$nextTick(function () { self.injectShapeSpacer(); });
     },
 
     // -------- Overlap picker --------
@@ -2064,7 +2107,6 @@
       page.activeTextBoxId = null;
       this.iconPickerOpen = false;
       var self = this;
-      this.$nextTick(function () { self.injectShapeSpacer(); });
     },
     // -------- QR codes --------
     openQrModal: function () {
@@ -2127,7 +2169,6 @@
         store.status = 'QR code added.';
         var self = this;
         setTimeout(function () { if (store.status === 'QR code added.') store.status = ''; }, 2000);
-        this.$nextTick(function () { self.injectShapeSpacer(); });
       } catch (e) {
         store.status = 'Could not make QR code: ' + (e && e.message ? e.message : e);
       }
@@ -2220,7 +2261,9 @@
       // Layered z boost (see imageStyle). Selected above unselected; primary
       // above other selected; reverts on deselect.
       var page = this.active;
-      if (page && this.isSelected('textBox', box.id)) {
+      // Boost z ONLY while a drag is in progress (see imageStyle). Idle-
+      // selected text boxes show their true z so z-order commands are visible.
+      if (page && this.isSelected('textBox', box.id) && this.imageDrag) {
         base.zIndex = base.zIndex + (page.activeTextBoxId === box.id ? 20000 : 10000);
       }
       return base;
@@ -2229,6 +2272,14 @@
       var box = this.activeTextBox;
       if (!box) return;
       box.align = align;
+      // Justify only has a visible effect on WRAPPED lines, which requires a
+      // fixed width. Auto-width boxes hug their text, so justify would look
+      // like a no-op. Turning off autoWidth on justify gives it lines to
+      // distribute. (Left/center/right work fine either way.)
+      if (align === "justify" && box.autoWidth) {
+        box.autoWidth = false;
+        if (typeof box.w !== "number" || box.w < 0.5) box.w = 1.8;
+      }
     },
     setTextBoxLineHeight: function (v) {
       var box = this.activeTextBox;
@@ -2332,28 +2383,109 @@
       if (this.activeImage) { this.setIconColor(''); return; }
       try { document.execCommand('foreColor', false, ''); } catch (e) {}
     },
+    // Apply bold/italic/underline. Two modes:
+    //   1) If text is HIGHLIGHTED inside a text box -> format just that
+    //      selection (document.execCommand), then sync the box html.
+    //   2) If a text box is active but NOTHING is highlighted -> toggle the
+    //      format on the WHOLE box (wrap/unwrap its html in the tag). This
+    //      handles the common case of a one-word box where highlighting
+    //      feels like overkill.
     execCmdOnActive: function (cmd) {
-      try {
-        document.execCommand(cmd, false, null);
-      } catch (e) {
-        console.warn('execCommand failed', e);
-      }
       var el = document.activeElement;
-      if (el && el.classList && el.classList.contains('zf-textbox-content')) {
+      var inBox = el && el.classList && el.classList.contains('zf-textbox-content');
+      var sel = window.getSelection ? window.getSelection() : null;
+      var hasSel = false;
+      if (sel && sel.rangeCount && inBox) {
+        var range = sel.getRangeAt(0);
+        hasSel = !range.collapsed && el.contains(range.commonAncestorContainer);
+      }
+
+      if (hasSel) {
+        // Mode 1: format the highlighted text.
+        try { document.execCommand(cmd, false, null); } catch (e) { console.warn('execCommand failed', e); }
+        var tid = el.getAttribute('data-zf-text-content-id');
         var page = this.active;
-        if (page && Array.isArray(page.textBoxes)) {
-          var tid = el.getAttribute('data-zf-text-content-id');
+        if (page && Array.isArray(page.textBoxes) && tid) {
           for (var i = 0; i < page.textBoxes.length; i++) {
-            if (page.textBoxes[i].id === tid) {
-              page.textBoxes[i].html = zfSanitizeHtml(el.innerHTML);
-              break;
-            }
+            if (page.textBoxes[i].id === tid) { page.textBoxes[i].html = zfSanitizeHtml(el.innerHTML); break; }
           }
         }
-      } else {
-        var bEl = this.$refs.bodyEditor;
-        if (bEl && this.active) this.active.body = zfSanitizeHtml(zfStripSpacers(bEl.innerHTML));
+        return;
       }
+
+      // Mode 2: no selection -> toggle the whole selected box, if any.
+      var box = this.selectedTextBox;
+      if (box) {
+        var tag = cmd === 'bold' ? 'b' : (cmd === 'italic' ? 'i' : (cmd === 'underline' ? 'u' : null));
+        if (tag) { this._toggleWholeBoxFormat(box, tag); }
+      }
+    },
+    // Wrap or unwrap a box's entire html in a formatting tag. If the content
+    // is already fully wrapped in that tag, remove the wrapper (toggle off).
+    // Toggle a format across the WHOLE box, independently of the others.
+    // If the tag appears anywhere, strip that tag everywhere (leaving inner
+    // content + other formats intact, even when nested). Otherwise wrap the
+    // entire content in the tag. String ops only (no regex) -- the sanitizer
+    // guarantees only known tags exist.
+    _toggleWholeBoxFormat: function (box, tag) {
+      if (!box) return;
+      var html = box.html || '';
+      var present = this.boxHasFormat(tag);
+      var aliases = { b: ['b', 'strong'], i: ['i', 'em'], u: ['u'] };
+      var names = aliases[tag] || [tag];
+      if (present) {
+        // Remove every opening/closing tag of this format (and aliases),
+        // case-insensitively, via split/join (no regex).
+        for (var n = 0; n < names.length; n++) {
+          var t = names[n];
+          html = this._stripTag(html, t);
+        }
+        box.html = html;
+      } else {
+        box.html = '<' + tag + '>' + (html || '&nbsp;') + '</' + tag + '>';
+      }
+      var self = this;
+      this.$nextTick(function () { self.syncTextBoxDom(); });
+    },
+    // Remove all <tag> and </tag> (case-insensitive) via split/join.
+    _stripTag: function (html, tag) {
+      var lower = html.toLowerCase();
+      var open = '<' + tag + '>';
+      var close = '</' + tag + '>';
+      // Case-insensitive removal: split on lower-open, but we must remove the
+      // actual-cased occurrences. Since tags are ASCII, walk and rebuild.
+      var result = html;
+      // Repeatedly remove open/close until none remain (handles nesting).
+      var guard = 0;
+      while (guard++ < 50) {
+        var lo = result.toLowerCase();
+        var io = lo.indexOf(open);
+        var ic = lo.indexOf(close);
+        if (io === -1 && ic === -1) break;
+        // Remove the earliest occurrence.
+        if (io !== -1 && (ic === -1 || io < ic)) {
+          result = result.slice(0, io) + result.slice(io + open.length);
+        } else {
+          result = result.slice(0, ic) + result.slice(ic + close.length);
+        }
+      }
+      return result;
+    },
+    // Whether the whole selected box is currently wrapped in a format tag,
+    // for the panel buttons' pressed state. String checks only (no regex).
+    // True if this format is present ANYWHERE in the box, so B/I/U can all
+    // light up independently when a box uses several at once. Matches the
+    // tag pair plus common aliases (strong/em).
+    boxHasFormat: function (tag) {
+      var box = this.selectedTextBox;
+      if (!box || !box.html) return false;
+      var h = box.html.toLowerCase();
+      var variants = { b: ['<b>', '<strong>'], i: ['<i>', '<em>'], u: ['<u>'] };
+      var tags = variants[tag] || ['<' + tag + '>'];
+      for (var k = 0; k < tags.length; k++) {
+        if (h.indexOf(tags[k]) !== -1) return true;
+      }
+      return false;
     },
     onTextBoxInput: function (evt, box) {
       // Read innerHTML only. Do NOT write it back via Vue's v-html (that
@@ -2538,11 +2670,6 @@
       if (idx >= 0) page.textBoxes.splice(idx, 1);
       page.activeTextBoxId = null;
     },
-    // Retired: the old flow-wrap machinery is gone along with
-    // the inline page body. Kept as a no-op so the ~19 existing call sites
-    // stay valid without a sweeping edit; a future pass can delete the
-    // calls themselves.
-    injectShapeSpacer: function () {},
     // (Inline body editing methods removed: the page body is a blank
     onDragStart: function (evt, i) {
       this.dragIndex = i;
@@ -2752,7 +2879,6 @@
         iconPickerQuery: '',
         qrModalOpen: false,
         qrUrl: '',
-        inspectorOpen: false,
         layerDragIndex: -1,
         layerDropIndex: -1,
         layersOpen: true,
@@ -2854,6 +2980,27 @@
           }
         }
         return p.textBoxes[p.textBoxes.length - 1];
+      },
+      // STRICT selection: only the box the user actually selected (by id),
+      // or null. Unlike activeTextBox, this does NOT fall back to "last box",
+      // so the floating Text panel can hide when nothing is selected.
+      selectedTextBox: function () {
+        var p = this.active;
+        if (!p || !p.activeTextBoxId || !Array.isArray(p.textBoxes)) return null;
+        for (var i = 0; i < p.textBoxes.length; i++) {
+          if (p.textBoxes[i].id === p.activeTextBoxId) return p.textBoxes[i];
+        }
+        return null;
+      },
+      // STRICT image selection: only the image the user actually selected
+      // (by activeImageId), or null. No 'last image' fallback.
+      selectedImage: function () {
+        var p = this.active;
+        if (!p || !p.activeImageId || !Array.isArray(p.images)) return null;
+        for (var i = 0; i < p.images.length; i++) {
+          if (p.images[i].id === p.activeImageId) return p.images[i];
+        }
+        return null;
       },
       models: function () { return (window.ZFModels) ? window.ZFModels.listModels() : []; },
       activeModel: function () { return store.model(); },
@@ -3050,6 +3197,12 @@
       window.addEventListener("mousemove", this._onMouseMove);
       window.addEventListener("mouseup", this._onMouseUp);
 
+      // Keep the floating text panel anchored to the rail on resize/scroll.
+      this._onPanelReflow = function () { self.positionTextPanel(); };
+      window.addEventListener("resize", this._onPanelReflow);
+      window.addEventListener("scroll", this._onPanelReflow, true);
+      this.$nextTick(function () { self.positionTextPanel(); });
+
       // Auto-commit the drawing when the user clicks outside the canvas and
       // the draw panel, so wandering off never loses a drawing.
       this._onDrawDocDown = function (evt) { self.onDrawDocPointerDown(evt); };
@@ -3089,7 +3242,6 @@
       document.addEventListener("keydown", this._onCtxKey);
       this._onCtxScroll = function () { self.closeContextMenu(); };
       window.addEventListener("scroll", this._onCtxScroll, true);
-      this.injectShapeSpacer();
       this.syncTextBoxDom();
       // Expose editor actions for global keyboard shortcuts.
       window.ZFEditorActions = {
@@ -3115,13 +3267,23 @@
       };
     },
     watch: {
+      // When a text box becomes selected/deselected, the floating panel is
+      // added/removed. Reposition on the next tick so it measures the real rail.
+      selectedTextBox: function (tb) {
+        var self = this;
+        this.$nextTick(function () { self.positionTextPanel(); });
+      },
+      selectedImage: function (im) {
+        var self = this;
+        this.$nextTick(function () { self.positionTextPanel(); });
+      },
       // When the active page changes (or its body is replaced by undo),
       // re-sync the contenteditable so it shows the correct content.
       active: {
         handler: function (newActive) {
           // Clear the multi-selection ONLY when the PAGE actually changes.
           // `active` is a computed that re-emits whenever store.pages mutates
-          // (e.g. injectShapeSpacer after a move), so clearing on every emit
+          // (e.g. a move), so clearing on every emit
           // collapsed a multi-selection mid-move. Track the page id.
           var newId = newActive && newActive.id;
           if (newId !== this._selPageId) {
@@ -3129,7 +3291,6 @@
             this.selSet = [];
           }
           this.syncTextBoxDom();
-          this.injectShapeSpacer();
         },
         deep: false
       },
@@ -3147,6 +3308,10 @@
     beforeUnmount: function () {
       window.removeEventListener("mousemove", this._onMouseMove);
       window.removeEventListener("mouseup", this._onMouseUp);
+      if (this._onPanelReflow) {
+        window.removeEventListener("resize", this._onPanelReflow);
+        window.removeEventListener("scroll", this._onPanelReflow, true);
+      }
 
       if (this._onDrawDocDown) document.removeEventListener("pointerdown", this._onDrawDocDown, true);
       if (this._onHoverPicker) document.removeEventListener("mousemove", this._onHoverPicker);
@@ -3157,10 +3322,33 @@
       window.ZFEditorActions = null;
     },
     updated: function () {
-      this.injectShapeSpacer();
       this.syncTextBoxDom();
+      this.positionTextPanel();
     },
     methods: Object.assign({}, ZF_EDITOR_METHODS, {
+      // Anchor the floating text panel to the rail's actual box: its top
+      // matches the rail's top, and its left sits one grid-gap (20px) to the
+      // right of the rail -- the same gap that separates the rail from the
+      // canvas. Runs on show, resize, and scroll so it stays aligned.
+      // Position whichever floating panel is currently visible (text or
+      // image) against the rail: top aligned to the rail top, left one grid
+      // gap to its right (flips to the left if it would run off-screen).
+      // Only one panel is ever visible at a time, so we pick the present ref.
+      positionTextPanel: function () {
+        var panel = this.$refs.textPanelEl || this.$refs.imagePanelEl;
+        var rail = this.$refs.railEl;
+        if (!panel || !rail) return;
+        var rr = rail.getBoundingClientRect();
+        var gap = 20; // .zf-editor gap: 1.25rem at 16px root
+        var panelW = panel.offsetWidth || 260;
+        var top = rr.top;
+        var left = rr.right + gap;
+        if (left + panelW > window.innerWidth - 8) {
+          left = rr.left - gap - panelW;
+        }
+        panel.style.top = Math.max(8, top) + 'px';
+        panel.style.left = Math.max(8, left) + 'px';
+      },
       // Wrapper so the template can call this via the component instance
       // (plain script functions like zfLoadTemplate are not reachable
       // from Vue templates).

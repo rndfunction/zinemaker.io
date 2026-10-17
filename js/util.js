@@ -180,6 +180,60 @@ function zfConfirm(message, onYes, opts) {
 }
 window.zfConfirm = zfConfirm;
 
+// -------- Dev dependency assertion --------
+// In dev mode (URL hash contains "zfdebug"), verify that the globals a
+// module depends on are actually present. Turns the "silent undefined is
+// undefined" failure mode into a loud, named error at load time instead
+// of a mystery crash later. No-op in production.
+function zfAssertDeps(moduleName, names) {
+  if (typeof location === "undefined" || location.hash.indexOf("zfdebug") === -1) return;
+  var missing = [];
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    // Support "window.X" style names; otherwise check window[name].
+    var target = (n.indexOf(".") !== -1) ? n.split(".")[0] : n;
+    if (n.indexOf(".") === -1) {
+      if (typeof window[n] === "undefined") missing.push(n);
+    } else {
+      var parts = n.split(".");
+      var cur = window;
+      for (var p = 0; p < parts.length; p++) {
+        if (cur == null || typeof cur[parts[p]] === "undefined") { missing.push(n); break; }
+        cur = cur[parts[p]];
+      }
+    }
+  }
+  if (missing.length) {
+    try { zfLog("DEP MISSING in " + moduleName + ": " + missing.join(", ")); } catch (e) {}
+    throw new Error("zfAssertDeps: " + moduleName + " missing [" + missing.join(", ") + "]");
+  }
+}
+
+// -------- UTF-8 base64 helpers --------
+// Modern replacements for the deprecated escape()/unescape() pair used to
+// base64-encode UTF-8 strings (share links). encodeURIComponent + escape
+// round-tripped through latin1, which broke on some characters and is
+// deprecated. TextEncoder/TextDecoder are the correct path.
+//
+// Encode builds the binary string in CHUNKS: passing a huge byte array
+// to String.fromCharCode via spread can blow the call stack on large
+// inputs (e.g. an image-heavy zine share link).
+function zfB64EncodeUtf8(str) {
+  var bytes = new TextEncoder().encode(String(str));
+  var bin = "";
+  var CHUNK = 0x8000;
+  for (var i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+function zfB64DecodeUtf8(b64) {
+  var bin = atob(String(b64));
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
 function zfClampNumber(value, min, max, fallback) {
   var n = Number(value);
   if (isNaN(n)) return fallback;
@@ -539,13 +593,24 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
 // (box.fontPt, e.g. 12 -> "12pt"); otherwise maps the legacy multiplier
 // (box.fontSize, where 1.0 = the ~10pt page base) to points. The mini-page
 // base is 10pt (see --zf-page-base-px = 13.333px at 96dpi).
+// Font size for a text box as CSS, expressed in em RELATIVE TO THE PAGE
+// BASE FONT so it scales with --zf-page-scale. This is what makes the
+// editor, reader, sheet, and PRINT all show the same text-to-page ratio:
+// an absolute pt size ignores --zf-page-scale, so the same box occupied a
+// different fraction of the page in each view (and drifted from print).
+//
+// Mapping preserves the existing print size exactly: at print
+// --zf-page-scale is 1 and the base is 10pt, so 1em = 10pt.
+//   box.fontPt (physical pt) -> fontPt/10 em  (12pt -> 1.2em)
+//   box.fontSize (legacy multiplier, 1.0 = 10pt) -> that many em
+// A bare '10pt' fallback is kept as 1em for boxes with no size field.
 function zfBoxFontCss(box) {
-  if (!box) return "10pt";
+  if (!box) return "1em";
   if (typeof box.fontPt === "number" && box.fontPt > 0) {
-    return (Math.round(box.fontPt * 10) / 10) + "pt";
+    return (Math.round((box.fontPt / 10) * 1000) / 1000) + "em";
   }
   var mult = (typeof box.fontSize === "number" ? box.fontSize : 1.0);
-  return (Math.round(mult * 10 * 10) / 10) + "pt";
+  return (Math.round(mult * 1000) / 1000) + "em";
 }
 
 // Shared style for a text box (positioned, sized, typography).

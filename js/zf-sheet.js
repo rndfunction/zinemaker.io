@@ -7,6 +7,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-sheet', ['ZF_STORE', 'ZFModels', 'ZFThemes', 'zfElementStyle', 'zfTextBoxStyle']);
+
   var store = window.ZF_STORE;
 
   // Build one sheet slot's render data: rect, page scale, safe edges, and

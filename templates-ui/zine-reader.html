@@ -1,0 +1,52 @@
+<!-- zine-reader-template -- UI template partial, fetched and injected as a -->
+<!-- <template> element by zf-boot.js before the app mounts. -->
+  <template id="zine-reader-template">
+    <div class="zf-reader">
+      <div class="zf-no-print" style="margin-bottom:1rem;">
+        <h2 style="margin:0;font-family:var(--zf-serif);">{{ store.title || 'Untitled Zine' }}</h2>
+        <div class="zf-muted" v-if="store.author">by {{ store.author }}</div>
+      </div>
+      <article class="zf-mini-page" v-if="page" :style="Object.assign({}, readerThemeStyle, readerPageStyle)">
+
+        <template v-for="img in (page.images || [])" :key="'r-blk-' + img.id">
+          <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+               class="zf-mini-image zf-block-image" :src="img.src" alt="Page illustration"
+               :style="readerBlockImageStyleFor(img)" />
+          <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+               class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
+               :style="Object.assign({}, readerBlockImageStyleFor(img), { color: img.color || 'inherit' })"></iconify-icon>
+        </template>
+        <!-- Inline page body retired (reader): text lives in text boxes. -->
+        <template v-for="img in (page.images || [])" :key="'r-free-' + img.id">
+          <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+               class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')"
+               :style="readerFreeImageStyleFor(img)" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+               class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')"
+               :style="readerFreeImageStyleFor(img)" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+               class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')"
+               :style="stickyStyle(img, readerFreeImageStyleFor(img))" aria-hidden="true"></div>
+          <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+               class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')"
+               :style="stickerStyle(img, readerFreeImageStyleFor(img))" aria-hidden="true"></div>
+          <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+               class="zf-mini-image zf-positioned" :src="img.src" alt="Page illustration"
+               :style="readerFreeImageStyleFor(img)" />
+          <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+               class="zf-mini-image zf-positioned zf-positioned-icon" :icon="img.src"
+               :style="Object.assign({}, readerFreeImageStyleFor(img), { color: img.color || 'inherit' })"></iconify-icon>
+        </template>
+        <template v-for="box in (page.textBoxes || [])" :key="'r-tb-' + box.id">
+            <div class="zf-textbox zf-textbox-readonly" :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }" :style="readerTextBoxStyleFor(box)">
+            <div class="zf-textbox-content" v-html="box.html"></div>
+          </div>
+        </template>
+      </article>
+      <div class="zf-pager zf-no-print">
+        <button class="zf-btn" style="border-color:var(--zf-border);" :disabled="currentIndex === 0" @click="prev">&larr; Previous</button>
+        <span class="zf-muted">Page {{ currentIndex + 1 }} of {{ total }}</span>
+        <button class="zf-btn" style="border-color:var(--zf-border);" :disabled="currentIndex >= total - 1" @click="next">Next &rarr;</button>
+      </div>
+    </div>
+  </template>

@@ -10,6 +10,8 @@
 (function () {
   'use strict';
 
+  if (typeof zfAssertDeps === 'function') zfAssertDeps('zf-boot', ['ZF_STORE', 'ZF_STORAGE_KEY', 'Vue', 'ZfAppShell', 'ZineEditor', 'ZineReader', 'ZineSheet', 'ZineLibrary', 'ZineIconPicker', 'ZfErrorBoundary']);
+
   var store = window.ZF_STORE;
   var STORAGE_KEY = window.ZF_STORAGE_KEY;
 
@@ -189,7 +191,7 @@
     var m = hash.match(/(?:^#|&)z=([^&]+)/);
     if (!m) return;
     try {
-      var parsed = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+      var parsed = JSON.parse(zfB64DecodeUtf8(m[1]));
       if (!parsed || !Array.isArray(parsed.p)) return;
       // BUILD FIRST, ASSIGN SECOND. Previously we mutated store.title and
       // store.author before calling zfBuildPagesFromData; if that call
@@ -324,8 +326,51 @@
       zfLog('Vue missing - aborting boot');
       return;
     }
-    zfLog('Vue found, mounting...');
-    try {
+    zfLog('Vue found, loading templates, mounting...');
+
+    // -------- UI template loading --------
+    // The large <template id=...> blocks that used to live inline in
+    // index.html are now separate partials under /templates-ui/. Fetch each
+    // and inject it as a <template> element in <head> BEFORE Vue mounts,
+    // because component templates are resolved at mount time.
+    //
+    // SKIP-IF-PRESENT: if a template with the same id already exists in the
+    // DOM (e.g. an older index.html that still has it inline, or a second
+    // call to boot()), do not inject a duplicate -- a duplicate id would
+    // shadow the real template unpredictably.
+    var UI_TEMPLATES = [
+      { id: 'zine-app-shell-template', file: 'templates-ui/zine-app-shell.html' },
+      { id: 'zine-reader-template',    file: 'templates-ui/zine-reader.html' },
+      { id: 'zine-editor-template',    file: 'templates-ui/zine-editor.html' }
+    ];
+    function loadUiTemplates() {
+      var jobs = UI_TEMPLATES.map(function (t) {
+        return function () {
+          if (document.getElementById(t.id)) return Promise.resolve(); // already inline
+          return fetch(t.file).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + t.file);
+            return r.text();
+          }).then(function (html) {
+            // The partial is a full <template id=...>...</template> block.
+            // Validate it actually contains the expected id before injecting.
+            if (html.indexOf('id="' + t.id + '"') === -1) {
+              throw new Error('template partial ' + t.file + ' missing id ' + t.id);
+            }
+            // Parse and adopt the <template> node so it registers the same
+            // way an inline <template> would.
+            var wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            var tpl = wrap.querySelector('template#' + t.id);
+            if (!tpl) throw new Error('no <template id=' + t.id + '> in ' + t.file);
+            document.head.appendChild(tpl);
+          });
+        };
+      });
+      // Sequential to keep boot deterministic and error attribution clear.
+      return jobs.reduce(function (p, job) { return p.then(job); }, Promise.resolve());
+    }
+
+    function mountApp() {
       var app = Vue.createApp({
         data: function () { return { store: store }; },
         template: '<app-shell />'
@@ -336,7 +381,7 @@
       app.component('zine-sheet', window.ZineSheet);
       app.component('zine-library', window.ZineLibrary);
       app.component('zine-icon-picker', window.ZineIconPicker);
-app.component('zf-error-boundary', window.ZfErrorBoundary);
+      app.component('zf-error-boundary', window.ZfErrorBoundary);
       app.config.errorHandler = function (err, instance, info) {
         zfLog('VUE ERROR: ' + (err && err.message ? err.message : err) + ' | info: ' + info);
       };
@@ -344,10 +389,7 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         zfLog('VUE WARN: ' + msg);
       };
       // Treat <iconify-icon> as a native custom element (web component)
-      // everywhere Vue compiles templates. Without this, Vue tries to
-      // resolve it as a component in string templates and fails silently,
-      // which is why icons were rendering in the editor (a real <template>
-      // element) but not in reader/sheet (which compile JS string templates).
+      // everywhere Vue compiles templates.
       app.config.compilerOptions.isCustomElement = function (tag) {
         return tag === 'iconify-icon';
       };
@@ -359,13 +401,16 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
       if (!window.zfLoadDraft() && window.zfLoadExample) {
         window.zfLoadExample('welcome-to-zine-forge.json');
       }
-    } catch (e) {
-      zfLog('MOUNT ERROR: ' + (e && e.message ? e.message : String(e)));
+    }
+
+    // Drive boot: load the UI template partials (they must be in the DOM
+    // before Vue resolves component templates), then mount. Any failure --
+    // a partial 404s, an id is missing, or mount throws -- surfaces in the
+    // same recovery panel the old try/catch used, rather than a blank page.
+    function showBootError(e) {
+      zfLog('BOOT ERROR: ' + (e && e.message ? e.message : String(e)));
       zfLog('STACK: ' + (e && e.stack ? e.stack : '(no stack)'));
       try {
-        // Build the message with textContent so an error string can never
-        // inject markup. (The innerHTML path would have executed any tags
-        // carried in e.message.)
         var appEl = document.getElementById('app');
         appEl.innerHTML = '';
         var box = document.createElement('div');
@@ -375,6 +420,7 @@ app.component('zf-error-boundary', window.ZfErrorBoundary);
         appEl.appendChild(box);
       } catch (e2) {}
     }
+    loadUiTemplates().then(mountApp).catch(showBootError);
     loadSharedZineFromHash();
     window.addEventListener('hashchange', loadSharedZineFromHash);
 

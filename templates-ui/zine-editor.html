@@ -1,0 +1,603 @@
+<!-- zine-editor-template -- UI template partial, fetched and injected as a -->
+<!-- <template> element by zf-boot.js before the app mounts. -->
+  <template id="zine-editor-template">
+    <div class="zf-editor" :class="{ 'zf-drawing': drawingMode }">
+      <aside>
+
+        <div class="zf-field" style="margin-bottom:0.25rem;">
+          <label class="zf-label" for="zf-sidebar-model">Model</label>
+          <select id="zf-sidebar-model" class="zf-input" :value="store.modelId" @change="store.setModel($event.target.value)">
+            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="zf-label" style="margin-top:0.75rem;">Pages</div>
+        <ul class="zf-page-list">
+          <li v-for="(p, i) in store.pages" :key="p.id"
+              :class="[{ active: p.id === store.activePageId, 'zf-draggable': true }, dragClass(i)]"
+              draggable="true"
+              @click="selectPage(p.id)"
+              @dragstart="onDragStart($event, i)"
+              @dragover="onDragOver($event, i)"
+              @dragleave="onDragLeave($event, i)"
+              @drop="onDrop($event, i)"
+              @dragend="onDragEnd">
+            <span style="display:flex;align-items:center;gap:0.25rem;min-width:0;">
+              <span class="zf-page-grip" aria-hidden="true" title="Drag to reorder">&#x2261;</span>
+              <span class="zf-page-num" :class="{ cover: i === 0, back: i === store.pages.length - 1 && store.pages.length > 1 }">{{ i + 1 }}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pageLabel(p, i) }}<span class="zf-mini" v-if="p.image"> (img)</span></span>
+            </span>
+            <span class="zf-page-tools">
+              <button class="zf-icon-btn" @click.stop="store.duplicatePage(p.id)" title="Duplicate page">+</button>
+              <button class="zf-icon-btn" @click.stop="store.deletePage(p.id)" title="Delete page">&times;</button>
+            </span>
+          </li>
+          <li class="zf-page-add" @click="store.addPageOrSheet()" role="button" tabindex="0"
+              :title="store.isCurrentSheetFull() ? 'This sheet is full. Add a new sheet.' : 'Add a new page at the end'">
+            <span class="zf-page-add-label" v-if="!store.isCurrentSheetFull()">+ Add page</span>
+            <span class="zf-page-add-label" v-else>+ Add sheet ({{ activeModel ? activeModel.pagesPerSheet : '' }} pages)</span>
+          </li>
+        </ul>
+
+
+        <div class="zf-sidebar-layers">
+          <button class="zf-sidebar-section-head" @click="layersOpen = !layersOpen" :aria-expanded="layersOpen">
+            <span>Layers <span class="zf-mini">&mdash; {{ layers.length }}</span></span>
+            <span aria-hidden="true">{{ layersOpen ? "\u25be" : "\u25b8" }}</span>
+          </button>
+          <div v-show="layersOpen" class="zf-sidebar-layers-body">
+            <div v-if="!layers.length" class="zf-muted" style="font-size:0.8rem;">No objects on this page yet.</div>
+            <ul class="zf-layers-list" v-else>
+               <li v-for="(layer, li) in layers" :key="layer.id"
+                   draggable="true"
+                   :class="[{ active: isSelected(layer.kind === 'textBox' ? 'textBox' : 'image', layer.id) }, layerDragClass(li)]"
+                   @click="selectLayer(layer, $event)"
+                  @dragstart="onLayerDragStart($event, li)"
+                  @dragover="onLayerDragOver($event, li)"
+                  @dragleave="onLayerDragLeave($event, li)"
+                  @drop="onLayerDrop($event, li)"
+                  @dragend="onLayerDragEnd">
+                <iconify-icon class="zf-layer-ico"
+                  :icon="layer.kind === 'textBox' ? 'ph:text-t' : (layer.kind === 'icon' ? 'ph:star' : 'ph:image')"
+                  aria-hidden="true"></iconify-icon>
+                 <span class="zf-layer-label">{{ layerLabel(layer) }}</span>
+                 <span class="zf-layer-tools">
+                   <button class="zf-icon-btn zf-layer-chain" :class="{ linked: isGrouped(layer.id) }"
+                           @click.stop="toggleLayerGroup(layer)"
+                           :title="isGrouped(layer.id) ? 'Unlink from group' : 'Link with selection'"
+                           :aria-label="isGrouped(layer.id) ? 'Unlink from group' : 'Link with selection'"
+                           :aria-pressed="isGrouped(layer.id)">
+                     <iconify-icon :icon="isGrouped(layer.id) ? 'ph:link-simple' : 'ph:link-simple-break'" aria-hidden="true"></iconify-icon>
+                   </button>
+                   <button class="zf-icon-btn" @click.stop="toggleLayerHidden(layer)" :title="layer.el.hidden ? 'Show layer' : 'Hide layer'" :aria-label="layer.el.hidden ? 'Show layer' : 'Hide layer'">
+                     <iconify-icon :icon="layer.el.hidden ? 'ph:eye-slash' : 'ph:eye'" aria-hidden="true"></iconify-icon>
+                   </button>
+                  <button class="zf-icon-btn" @click.stop="removeLayer(layer)" title="Delete layer" aria-label="Delete layer">&times;</button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="zf-sidebar-danger">
+          <button type="button" class="zf-sidebar-clear" @click="onClearAllEditor" title="Remove all content from every page">
+            Clear all content
+          </button>
+        </div>
+      </aside>
+
+      <div class="zf-canvas-col">
+        <div class="zf-canvas-empty-hint" v-if="isEmptyPage(active)">
+          Start your page: type a heading, then write below. Use the tools on the right to add an image, icon, or text box.
+        </div>
+        <div class="zf-canvas-wrap">
+          <div class="zf-ghost-page zf-ghost-prev" v-if="prevPage" role="button" tabindex="0"
+               @click="goToPageId(prevPage.id)" @keydown.enter="goToPageId(prevPage.id)"
+               :aria-label="'Go to previous page'"
+               :title="'Go to previous page'">
+            <span class="zf-ghost-label">Page {{ activeIndex }}</span>
+            <div class="zf-ghost-render" aria-hidden="true" :style="ghostFrameStyle(prevPage)">
+              <div class="zf-mini-page zf-ghost-mini" :style="ghostPageStyle(prevPage)">
+                <template v-for="img in (prevPage.images || [])" :key="'gpb-' + img.id">
+                  <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+                       class="zf-mini-image zf-block-image" :src="img.src" alt=""
+                       :style="ghostBlockStyle(img)" />
+                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
+                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <!-- inline body retired: text renders in text boxes below -->
+                <template v-for="img in (prevPage.images || [])" :key="'gpf-' + img.id">
+                  <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+                       class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+                       class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+                       class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, ghostFreeStyle(img))"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+                       class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
+                  <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+                       class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
+                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
+                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <template v-for="box in (prevPage.textBoxes || [])" :key="'gpt-' + box.id">
+                  <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"
+                       :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }"
+                       :style="ghostTextBoxStyle(box)">
+                    <div class="zf-textbox-content" v-html="box.html"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+          <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)" @mousedown="onBodyMouseDown">
+            <template v-for="g in safeGuides" :key="g.key">
+              <div class="zf-mini-safe-guide" :style="g.style"></div>
+            </template>
+
+            <!-- Drawing overlay: only present while drawingMode is on. Sits on
+                 top of the page content and captures pointer events so a drag
+                 draws a stroke instead of dragging an element or editing text.
+                 The toolbar floats above it. -->
+            <!-- Drawing overlay: just the canvas now. The tools live in a
+                 panel in the right rail (see .zf-draw-panel) so they do not
+                 cover the page. -->
+            <div v-if="drawingMode" class="zf-draw-layer">
+              <canvas ref="drawCanvas" class="zf-draw-canvas"
+                      @pointerdown="onDrawPointerDown"
+                      @pointermove="onDrawPointerMove"
+                      @pointerup="onDrawPointerUp"
+                      @pointerleave="onDrawPointerUp"></canvas>
+            </div>
+
+            <template v-for="img in (active.images || [])" :key="'blk-' + img.id">
+              <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+                   class="zf-mini-image zf-block-image"
+                   :src="img.src" alt="Page illustration"
+                   :style="imageBlockStyle(img)" />
+              <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                   class="zf-mini-image zf-block-image zf-block-icon"
+                   :icon="img.src"
+                   :style="Object.assign({}, imageBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+            </template>
+              <!-- Inline page body retired: text lives in text boxes only. -->
+
+            <template v-for="box in (active.textBoxes || [])" :key="'tb-' + box.id">
+              <div v-if="!box.hidden" class="zf-textbox"
+                   tabindex="0"
+                      :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-handle-owner': active.activeTextBoxId === box.id, 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
+                   :data-zf-text-id="box.id"
+                   :style="textStyle(box)"
+                     @mousedown="onTextBoxMouseDown($event, box)"
+                     @click.stop="onElementClick('textBox', box, $event)"
+                     @contextmenu.prevent.stop="openContextMenu($event, 'textBox', box.id)"
+                    @keydown="onTextBoxKeydown($event, box)">
+                <div class="zf-textbox-content"
+                     :data-zf-text-content-id="box.id"
+                     contenteditable="true"
+                     @input="onTextBoxInput($event, box)"
+                     @paste="onTextBoxPaste($event, box)"
+                     @mousedown.stop></div>
+                <span class="zf-img-handle zf-img-handle-resize"
+                      title="Drag to resize (scales text)"
+                      @mousedown.stop.prevent="onTextBoxResizeStartScaled($event, box)"></span>
+                <span class="zf-img-handle zf-img-handle-rotate"
+                      title="Drag to rotate"
+                      @mousedown.stop.prevent="onTextBoxRotateStart($event, box)"></span>
+              </div>
+            </template>
+
+            <template v-for="img in (active.images || [])" :key="'ovl-' + img.id">
+              <div v-if="(img.wrap === 'free' || !img.wrap) && !img.hidden && img.id !== editDrawingId"
+                   class="zf-img-wrap"
+                   :data-zf-img-id="img.id"
+                   tabindex="0"
+                      :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-handle-owner': active.activeImageId === img.id, 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
+                   :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
+                     @mousedown="onImageMouseDownItem($event, img)"
+                     @click.stop="onElementClick('image', img, $event)"
+                     @dblclick.stop="editDrawing(img)"
+                    @contextmenu.prevent.stop="openContextMenu($event, 'image', img.id)"
+                    @keydown.delete.prevent="deleteSelectedElement"
+                    @keydown.backspace.prevent="deleteSelectedElement">
+                 <div v-if="img.kind === 'tape'" class="zf-tape" :class="'zf-tape-' + (img.color || 'beige')" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'scrap'" class="zf-scrap" :class="'zf-scrap-' + (img.color || 'kraft')" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'sticky'" class="zf-sticky" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, {})" aria-hidden="true"></div>
+                 <div v-else-if="img.kind === 'sticker'" class="zf-sticker" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, {})" aria-hidden="true"></div>
+                 <img v-else-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
+                 <iconify-icon v-else class="zf-icon-element" :icon="img.src" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }"></iconify-icon>
+                <span class="zf-img-handle zf-img-handle-resize"
+                      title="Drag to resize"
+                      @mousedown.stop.prevent="onResizeStart($event, img)"></span>
+                <span class="zf-img-handle zf-img-handle-rotate"
+                      title="Drag to rotate"
+                      @mousedown.stop.prevent="onRotateStart($event, img)"></span>
+              </div>
+            </template>
+          </div>
+
+          <div class="zf-ghost-page zf-ghost-next" v-if="nextPage" role="button" tabindex="0"
+               @click="goToPageId(nextPage.id)" @keydown.enter="goToPageId(nextPage.id)"
+               :aria-label="'Go to next page'"
+               :title="'Go to next page'">
+            <span class="zf-ghost-label">Page {{ activeIndex + 2 }}</span>
+            <div class="zf-ghost-render" aria-hidden="true" :style="ghostFrameStyle(nextPage)">
+              <div class="zf-mini-page zf-ghost-mini" :style="ghostPageStyle(nextPage)">
+                <template v-for="img in (nextPage.images || [])" :key="'gnb-' + img.id">
+                  <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
+                       class="zf-mini-image zf-block-image" :src="img.src" alt=""
+                       :style="ghostBlockStyle(img)" />
+                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
+                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <!-- inline body retired: text renders in text boxes below -->
+                <template v-for="img in (nextPage.images || [])" :key="'gnf-' + img.id">
+                  <div v-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'tape'"
+                       class="zf-tape zf-positioned" :class="'zf-tape-' + (img.color || 'beige')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'scrap'"
+                       class="zf-scrap zf-positioned" :class="'zf-scrap-' + (img.color || 'kraft')" :style="ghostFreeStyle(img)"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticky'"
+                       class="zf-sticky zf-positioned" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, ghostFreeStyle(img))"></div>
+                  <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'sticker'"
+                       class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
+                  <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
+                       class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
+                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
+                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                </template>
+                <template v-for="box in (nextPage.textBoxes || [])" :key="'gnt-' + box.id">
+                  <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"
+                       :class="{ 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay }"
+                       :style="ghostTextBoxStyle(box)">
+                    <div class="zf-textbox-content" v-html="box.html"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Rubber-band marquee: a fixed (un-clipped) box drawn while
+             dragging on empty page space to select elements. -->
+        <div v-if="marquee.active && marquee.moved" class="zf-marquee"
+             :style="{ left: marquee.x + 'px', top: marquee.y + 'px', width: marquee.w + 'px', height: marquee.h + 'px' }"
+             aria-hidden="true"></div>
+        <!-- Overlap picker: lists the elements stacked under the cursor so a
+             specific one can be chosen by name when they overlap. -->
+        <div v-if="overlapPicker.open" class="zf-overlap-picker"
+             :style="{ top: overlapPicker.y + 'px', left: overlapPicker.x + 'px' }" role="listbox" aria-label="Overlapping elements"
+             @mouseenter="onPickerEnter" @mouseleave="onPickerLeave">
+          <button v-for="(item, oi) in overlapPicker.items" :key="'ov-' + oi"
+                  type="button" class="zf-overlap-item" role="option"
+                  @click.stop="pickOverlap(item)">
+            <iconify-icon class="zf-overlap-glyph" :icon="item.glyph" aria-hidden="true"></iconify-icon>
+            <span class="zf-overlap-name">{{ item.name }}</span>
+          </button>
+        </div>
+        <!-- Right-click context menu for any element (everything is a layer).
+             Positioned at the cursor; closes on outside click / Esc / scroll. -->
+        <div v-if="ctxMenu.open" class="zf-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
+             role="menu" @contextmenu.prevent>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('front')">Bring to Front</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('forward')">Bring Forward</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('backward')">Send Backward</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('back')">Send to Back</button>
+          <div class="zf-ctx-sep" aria-hidden="true"></div>
+          <button v-if="canGroupSelection" type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('group')">Group</button>
+          <button v-if="canUngroupSelection" type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('ungroup')">Ungroup</button>
+          <div v-if="canGroupSelection || canUngroupSelection" class="zf-ctx-sep" aria-hidden="true"></div>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('duplicate')">Duplicate</button>
+          <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('copy')">Copy</button>
+          <button type="button" class="zf-ctx-item zf-ctx-danger" role="menuitem" @click="ctxAction('delete')">Delete</button>
+        </div>
+        <zine-icon-picker
+          :open="iconPickerOpen"
+          @select="addIcon"
+          @close="closeIconPicker"></zine-icon-picker>        <div class="zf-modal-backdrop" v-if="qrModalOpen" @click.self="closeQrModal">
+          <div class="zf-modal" role="dialog" aria-label="Add a QR code">
+            <div class="zf-modal-header">
+              <h2>Add a QR code</h2>
+              <button class="zf-modal-close" @click="closeQrModal" aria-label="Close">&times;</button>
+            </div>
+            <div class="zf-field">
+              <label class="zf-label" for="zf-qr-url">Text or link</label>
+              <input id="zf-qr-url" class="zf-input" v-model="qrUrl" type="text"
+                     placeholder="https://example.com" @keydown.enter="generateQr" />
+            </div>
+            <div class="zf-muted" style="font-size:0.8rem;margin-bottom:1rem;">
+              Usually a link, but any short text works - a phone number, a note, or a password.
+              We'll make it into a scannable QR code image you can place on the page.
+            </div>
+            <div class="zf-header-actions" style="justify-content:flex-end;">
+              <button class="zf-btn" style="border-color:var(--zf-border);" @click="closeQrModal">Cancel</button>
+              <button class="zf-btn zf-btn-primary" @click="generateQr">Add QR code</button>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+
+      <aside class="zf-rail" ref="railEl" aria-label="Formatting and insert tools">
+        <div class="zf-rail-group" role="toolbar" aria-label="Text formatting">
+          <label class="zf-rail-btn zf-rail-color" title="Text or element color" aria-label="Color" @mousedown.prevent>
+            <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
+            <input type="color" value="#1b1b1b" @mousedown.prevent @input="applyColor($event.target.value)" aria-label="Choose color" />
+          </label>
+
+
+        </div>
+        <div class="zf-rail-sep" aria-hidden="true"></div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Add elements">
+          <label class="zf-rail-btn" title="Add an image" aria-label="Add image">
+            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
+            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
+          </label>
+          <label class="zf-rail-btn" title="Add a full-page photo (fills the page)" aria-label="Add full-page photo">
+            <iconify-icon icon="ph:image-square" aria-hidden="true"></iconify-icon>
+            <input :key="'fb' + fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChangeFullBleed" />
+          </label>
+          <input ref="replaceInput" type="file" accept="image/*" style="display:none;" @change="onReplaceImageChange" />
+          <button type="button" class="zf-rail-btn" @click="openQrModal" title="Add a QR code from a link" aria-label="Add QR code">
+            <iconify-icon icon="ph:qr-code" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="addTextBox" title="Add a text box" aria-label="Add text box">
+            <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="openIconPicker" title="Add an icon" aria-label="Add icon">
+            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="startDrawing" title="Draw on the page" aria-label="Draw on the page">
+            <iconify-icon icon="ph:pencil-simple" aria-hidden="true"></iconify-icon>
+          </button>
+          <div class="zf-decor-wrap">
+            <button type="button" class="zf-rail-btn" @click="decorMenuOpen = !decorMenuOpen" :aria-expanded="decorMenuOpen" title="Add a decoration" aria-label="Add decoration">
+              <iconify-icon icon="streamline-freehand:office-tape-2" aria-hidden="true"></iconify-icon>
+            </button>
+            <div class="zf-decor-menu" v-if="decorMenuOpen">
+              <button type="button" @click="addTape(); decorMenuOpen = false">Tape</button>
+              <button type="button" @click="addScrap(); decorMenuOpen = false">Paper scrap</button>
+              <button type="button" @click="addSticky(); decorMenuOpen = false">Sticky note</button>
+              <button type="button" @click="addStamp(); decorMenuOpen = false">Stamp</button>
+              <button type="button" @click="addSticker(); decorMenuOpen = false">Sticker</button>
+            </div>
+          </div>
+        </div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Selected element actions">
+          <button type="button" class="zf-rail-btn" @click="copySelected" title="Copy selected element (Ctrl+C)" aria-label="Copy selected element">
+            <iconify-icon icon="ph:copy" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="pasteElement" title="Paste element (Ctrl+V)" aria-label="Paste element">
+            <iconify-icon icon="ph:clipboard" aria-hidden="true"></iconify-icon>
+          </button>
+          <button type="button" class="zf-rail-btn" @click="duplicateSelectedElement" title="Duplicate selected element (Ctrl+D)" aria-label="Duplicate selected element">
+            <iconify-icon icon="ph:stack" aria-hidden="true"></iconify-icon>
+          </button>
+        </div>
+        <div class="zf-rail-sep" aria-hidden="true"></div>
+        <div class="zf-rail-group" role="toolbar" aria-label="Output">
+          <button type="button" class="zf-rail-btn" @click="store.setView('sheet')" title="Print this zine" aria-label="Print this zine">
+            <iconify-icon icon="ph:printer" aria-hidden="true"></iconify-icon>
+          </button>
+        </div>
+
+      </aside>
+
+      <!-- Text panel: absolutely-positioned overlay to the RIGHT of the rail,
+           shown when a text box is selected. Not a grid child, so it cannot
+           shift the canvas. Includes inline B/I/U (selected text) plus
+           box-level type controls. -->
+      <aside v-if="selectedTextBox && !drawingMode" ref="textPanelEl" class="zf-text-panel" role="region" aria-label="Text properties">
+        <div class="zf-text-panel-head">Text</div>
+
+        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} in)</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-tp-w" type="range" min="0.4" max="8" step="0.05"
+                 :value="selectedTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;" aria-label="Text box width slider" />
+          <input type="number" min="0.4" max="8" step="0.05" style="width:64px;"
+                 :value="(selectedTextBox.w || 1.8).toFixed(2)"
+                 @input="setTextBoxW($event.target.value)" @change="setTextBoxW($event.target.value)" aria-label="Text box width in inches" />
+        </div>
+
+        <label class="zf-text-panel-label" for="zf-tp-rot">Rotation ({{ selectedTextBox.rot || 0 }}&deg;)</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-tp-rot" type="range" min="-180" max="180" step="1"
+                 :value="selectedTextBox.rot || 0" @input="setTextBoxRot($event.target.value)" style="flex:1;" aria-label="Text box rotation slider" />
+          <input type="number" min="-180" max="180" step="1" style="width:64px;"
+                 :value="selectedTextBox.rot || 0"
+                 @input="setTextBoxRot($event.target.value)" @change="setTextBoxRot($event.target.value)" aria-label="Text box rotation in degrees" />
+        </div>
+
+        <span class="zf-text-panel-label">Style <span class="zf-muted" style="font-weight:400;">(selected text)</span></span>
+        <div class="zf-text-panel-row zf-text-panel-align">
+          <button type="button" class="zf-btn" :class="{ 'zf-btn-primary': boxHasFormat('b') }" title="Bold (applies to selected text, or the whole box if nothing is highlighted)" aria-label="Bold" @mousedown.prevent @click="execCmdOnActive('bold')"><b>B</b></button>
+          <button type="button" class="zf-btn" :class="{ 'zf-btn-primary': boxHasFormat('i') }" title="Italic (selected text, or whole box)" aria-label="Italic" @mousedown.prevent @click="execCmdOnActive('italic')"><i>I</i></button>
+          <button type="button" class="zf-btn" :class="{ 'zf-btn-primary': boxHasFormat('u') }" title="Underline (selected text, or whole box)" aria-label="Underline" @mousedown.prevent @click="execCmdOnActive('underline')"><u>U</u></button>
+        </div>
+
+        <label class="zf-text-panel-label" for="zf-tp-font">Font</label>
+        <select id="zf-tp-font" class="zf-input" :value="selectedTextBox.fontFamily || ''" @change="setTextBoxFontFamily($event.target.value)">
+          <option value="">Use theme default</option>
+          <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+          <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino (serif)</option>
+          <option value="'Times New Roman', Times, serif">Times (serif)</option>
+          <option value="Garamond, 'Iowan Old Style', Georgia, serif">Garamond (serif)</option>
+          <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans (sans)</option>
+          <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica (sans)</option>
+          <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System UI (sans)</option>
+          <option value="Verdana, Geneva, Tahoma, sans-serif">Verdana (sans)</option>
+          <option value="'Trebuchet MS', 'Helvetica Neue', Helvetica, Arial, sans-serif">Trebuchet MS (sans)</option>
+          <option value="Impact, 'Arial Black', sans-serif">Impact (bold)</option>
+          <option value="'Arial Black', 'Arial Bold', Gadget, sans-serif">Arial Black (bold)</option>
+          <option value="'Courier New', Courier, monospace">Courier (mono)</option>
+          <option value="ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace">Monospace (mono)</option>
+          <option value="'Comic Sans MS', cursive">Comic (casual)</option>
+        </select>
+
+        <label class="zf-text-panel-label" for="zf-tp-size">Size ({{ textBoxFontPt(selectedTextBox) }} pt)</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-tp-size" type="range" min="4" max="72" step="0.5" style="flex:1;"
+                 :value="textBoxFontPt(selectedTextBox)"
+                 @input="setTextBoxFontSize($event.target.value)" aria-label="Font size" />
+          <input type="number" min="4" max="200" step="0.5" style="width:64px;"
+                 :value="textBoxFontPt(selectedTextBox)"
+                 @input="setTextBoxFontSize($event.target.value)"
+                 @change="setTextBoxFontSize($event.target.value)" aria-label="Font size in points" />
+        </div>
+
+        <label class="zf-text-panel-label" for="zf-tp-lh">Line height ({{ (selectedTextBox.lineHeight || 1.35).toFixed(2) }})</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-tp-lh" type="range" min="0.9" max="2.2" step="0.05"
+                 :value="selectedTextBox.lineHeight || 1.35" @input="setTextBoxLineHeight($event.target.value)" style="flex:1;" aria-label="Line height slider" />
+          <input type="number" min="0.9" max="2.2" step="0.05" style="width:64px;"
+                 :value="(selectedTextBox.lineHeight || 1.35).toFixed(2)"
+                 @input="setTextBoxLineHeight($event.target.value)" @change="setTextBoxLineHeight($event.target.value)" aria-label="Line height" />
+        </div>
+
+        <span class="zf-text-panel-label">Alignment</span>
+        <div class="zf-text-panel-row zf-text-panel-align">
+          <button class="zf-btn" :class="{ 'zf-btn-primary': (selectedTextBox.align === 'left' || !selectedTextBox.align) }" @click="setTextBoxAlign('left')" title="Align left" aria-label="Align left">Left</button>
+          <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'center' }" @click="setTextBoxAlign('center')" title="Align center" aria-label="Align center">Center</button>
+          <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'right' }" @click="setTextBoxAlign('right')" title="Align right" aria-label="Align right">Right</button>
+          <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'justify' }" @click="setTextBoxAlign('justify')" title="Justify (uses a fixed width)" aria-label="Justify">Justify</button>
+        </div>
+
+        <label class="zf-text-panel-label" for="zf-tp-color">Color</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-tp-color" type="color" :value="selectedTextBox.color || '#1b1b1b'" @input="setTextBoxColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Text color" />
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setTextBoxColor('')">Theme color</button>
+        </div>
+
+        <div class="zf-text-panel-row">
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetTextBox">Reset</button>
+        </div>
+      </aside>
+
+      <!-- Image panel: mirrors the Text panel. Same floating slot/behavior,
+           shown when an image (photo/icon/tape/scrap/sticky/sticker) is
+           selected. Carries the image controls that used to live only in the
+           slide-out inspector. No layer buttons: z-order is served by the
+           right-click menu and the Layers list. -->
+      <aside v-if="selectedImage && !drawingMode" ref="imagePanelEl" class="zf-image-panel" role="region" aria-label="Image properties">
+        <div class="zf-text-panel-head">Image</div>
+
+        <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} in)</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-ip-w" type="range" min="0.5" max="8" step="0.05"
+                 :value="selectedImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" aria-label="Image width slider" />
+          <input type="number" min="0.5" max="8" step="0.05" style="width:64px;"
+                 :value="(selectedImage.w || 1.5).toFixed(2)"
+                 @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width in inches" />
+        </div>
+
+        <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ selectedImage.rot || 0 }}&deg;)</label>
+        <div class="zf-text-panel-row">
+          <input id="zf-ip-rot" type="range" min="-180" max="180" step="1"
+                 :value="selectedImage.rot || 0" @input="setImageRot($event.target.value)" style="flex:1;" aria-label="Image rotation slider" />
+          <input type="number" min="-180" max="180" step="1" style="width:64px;"
+                 :value="selectedImage.rot || 0"
+                 @input="setImageRot($event.target.value)" @change="setImageRot($event.target.value)" aria-label="Image rotation in degrees" />
+        </div>
+
+        <!-- Layout row removed: 'block' mode was a leftover from the inline-\n             body era and only shoved images to the top. Free placement is the\n             only meaningful mode now. -->
+
+        <div class="zf-text-panel-row">
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitImage">Fit width</button>
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetImage">Reset</button>
+        </div>
+
+        <template v-if="selectedImage.kind === 'icon'">
+          <label class="zf-text-panel-label" for="zf-ip-icon-color">Icon color</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-ip-icon-color" type="color" :value="selectedImage.color || '#1b1b1b'" @input="setIconColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Icon color" />
+            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setIconColor('')">Theme color</button>
+          </div>
+        </template>
+
+        <template v-if="selectedImage.kind === 'sticker'">
+          <span class="zf-text-panel-label">Shape</span>
+          <div class="zf-text-panel-row zf-text-panel-align">
+            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'circle' || !selectedImage.shape }" @click="setStickerShape('circle')">Circle</button>
+            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'oval' }" @click="setStickerShape('oval')">Oval</button>
+            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'square' }" @click="setStickerShape('square')">Square</button>
+            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'starburst' }" @click="setStickerShape('starburst')">Star</button>
+          </div>
+        </template>
+      </aside>
+
+      <!-- Drawing tools: its OWN column to the right of the rail, shown only
+           while drawing, so it neither covers the canvas nor crowds the rail.
+           The editor grid grows a 4th column via .zf-drawing. -->
+      <aside v-if="drawingMode" class="zf-draw-panel" role="toolbar" aria-label="Drawing tools">
+        <div class="zf-draw-panel-head">Draw</div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Pen (uniform round stroke)">
+            <input type="radio" name="zfdrawtool" :checked="drawTool === 'pen'" @change="drawTool = 'pen'" /> Pen
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Eraser">
+            <input type="radio" name="zfdrawtool" :checked="drawTool === 'eraser'" @change="drawTool = 'eraser'" /> Eraser
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Calligraphy (flat nib, thick/thin by direction)">
+            <input type="radio" name="zfdrawtool" :checked="drawTool === 'calligraphy'" @change="drawTool = 'calligraphy'" /> Calligraphy
+          </label>
+        </div>
+        <div class="zf-draw-row" v-if="editDrawingId">
+          <label class="zf-draw-opt" title="Click a whole stroke to remove it">
+            <input type="radio" name="zfdrawtool" :checked="drawTool === 'eraseStroke'" @change="drawTool = 'eraseStroke'" /> Erase stroke
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Color">
+            Color <input type="color" v-model="drawColor" :disabled="drawTool === 'eraser' || drawTool === 'eraseStroke'" />
+          </label>
+        </div>
+        <div class="zf-draw-row" v-if="drawTool === 'calligraphy'">
+          <label class="zf-draw-opt" title="Nib angle in degrees (the flat edge of the pen)">
+            Nib <input type="range" min="0" max="180" step="1" v-model.number="drawNibAngle" />
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Brush size">
+            Size <input type="range" min="1" max="40" step="1" v-model.number="drawSize" />
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Stroke smoothing (off keeps strokes pixel-accurate)">
+            Smooth
+            <select v-model.number="drawSmoothing">
+              <option :value="0">Off</option>
+              <option :value="1">Low</option>
+              <option :value="2">Medium</option>
+              <option :value="3">High</option>
+            </select>
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Vary width with drawing speed (pen-like)">
+            <input type="checkbox" v-model="drawVelocity" /> Speed width
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <label class="zf-draw-opt" title="Stroke opacity">
+            Opacity <input type="range" min="0.1" max="1" step="0.05" v-model.number="drawOpacity" />
+          </label>
+        </div>
+        <div class="zf-draw-row">
+          <button type="button" class="zf-draw-btn" @click="drawUndo" title="Undo (Ctrl+Z)">Undo</button>
+          <button type="button" class="zf-draw-btn" @click="drawClear" title="Clear drawing">Clear</button>
+        </div>
+        <div class="zf-draw-row">
+          <button type="button" class="zf-draw-btn zf-draw-done" @click="stopDrawing" title="Finish drawing">Done</button>
+        </div>
+        <div class="zf-draw-row" style="font-size:0.7rem;color:var(--zf-gray-mid);">
+          Done, or click away, to finish. Esc to discard.
+        </div>
+      </aside>
+
+    </div>
+  </template>
