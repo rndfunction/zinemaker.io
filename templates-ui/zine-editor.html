@@ -88,7 +88,7 @@
         <div class="zf-canvas-empty-hint" v-if="isEmptyPage(active)">
           Start your page: type a heading, then write below. Use the tools on the right to add an image, icon, or text box.
         </div>
-        <div class="zf-canvas-wrap">
+        <div class="zf-canvas-wrap" @mousedown.self="onCanvasDeskMouseDown">
           <div class="zf-ghost-page zf-ghost-prev" v-if="prevPage" role="button" tabindex="0"
                @click="goToPageId(prevPage.id)" @keydown.enter="goToPageId(prevPage.id)"
                :aria-label="'Go to previous page'"
@@ -262,8 +262,7 @@
                Rendered OUTSIDE the mini-page (which clips content) so it can
                extend past the page into the workspace and stay reachable.
                Positioned by JS (updateGroupBox). -->
-          <div v-if="isMultiSelected" ref="groupBoxEl" class="zf-group-select-box"
-               @mousedown.stop.prevent="onGroupMoveStart($event)">
+          <div v-if="isMultiSelected" ref="groupBoxEl" class="zf-group-select-box">
             <span class="zf-group-handle zf-group-handle-rotate" title="Rotate selection"
                   style="right:-8px;top:-8px;left:auto;margin-left:0;"
                   @mousedown.stop.prevent="onGroupRotateStart($event)"></span>
@@ -404,11 +403,11 @@
       <aside v-if="panelMode === 'text' && !drawingMode" ref="textPanelEl" class="zf-text-panel" role="region" aria-label="Text properties">
         <div class="zf-text-panel-head">Text</div>
 
-        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} in)</label>
+        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} {{ pageUnitLabel() }})</label>
         <div class="zf-text-panel-row">
-          <input id="zf-tp-w" type="range" min="0.4" max="8" step="0.05"
+          <input id="zf-tp-w" type="range" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step"
                  :value="selectedTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;" aria-label="Text box width slider" />
-          <input type="number" min="0.4" max="8" step="0.05" style="width:64px;"
+          <input type="number" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step" style="width:64px;"
                  :value="(selectedTextBox.w || 1.8).toFixed(2)"
                  @input="setTextBoxW($event.target.value)" @change="setTextBoxW($event.target.value)" aria-label="Text box width in inches" />
         </div>
@@ -495,11 +494,11 @@
       <aside v-if="panelMode === 'image' && !drawingMode" ref="imagePanelEl" class="zf-image-panel" role="region" aria-label="Image properties">
         <div class="zf-text-panel-head">Image</div>
 
-        <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} in)</label>
+        <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} {{ pageUnitLabel() }})</label>
         <div class="zf-text-panel-row">
-          <input id="zf-ip-w" type="range" min="0.5" max="8" step="0.05"
+          <input id="zf-ip-w" type="range" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step"
                  :value="selectedImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" aria-label="Image width slider" />
-          <input type="number" min="0.5" max="8" step="0.05" style="width:64px;"
+          <input type="number" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step" style="width:64px;"
                  :value="(selectedImage.w || 1.5).toFixed(2)"
                  @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width in inches" />
         </div>

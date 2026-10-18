@@ -384,6 +384,7 @@
       app.component('zf-error-boundary', window.ZfErrorBoundary);
       app.config.errorHandler = function (err, instance, info) {
         zfLog('VUE ERROR: ' + (err && err.message ? err.message : err) + ' | info: ' + info);
+        if (err && err.stack) zfLog('VUE ERROR STACK: ' + err.stack);
       };
       app.config.warnHandler = function (msg, instance, trace) {
         zfLog('VUE WARN: ' + msg);

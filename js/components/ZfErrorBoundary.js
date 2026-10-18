@@ -12,6 +12,7 @@ window.ZfErrorBoundary = {
   errorCaptured: function (err) {
     this.hasError = true;
     try { zfLog('View error captured: ' + (err && err.message ? err.message : err)); } catch (e) {}
+    try { if (err && err.stack) zfLog('View error stack: ' + err.stack); } catch (e) {}
     return false;
   },
   methods: {

@@ -1012,12 +1012,12 @@
     .zf-group-select-box {
       position: absolute;
       box-sizing: border-box;
-      /* EXACTLY the individual-selection look (2px solid blue ring).
-         pointer-events: auto so the box itself is a drag-to-move surface for
-         the whole group (matches "grab the box to move"). */
+      /* 2px solid blue ring (matches individual selection). pointer-events:none
+         so clicks pass THROUGH the box to the elements beneath (shift-add) and
+         to the page/desk (empty-click deselect). Group move is by grabbing an
+         element, which moves the whole selection. */
       box-shadow: 0 0 0 2px var(--zf-blue);
-      pointer-events: auto;
-      cursor: move;
+      pointer-events: none;
       z-index: 400;
     }
     /* corner dots removed to match the individual selection ring */

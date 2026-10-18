@@ -68,6 +68,13 @@
       this.selSet = [];
       this.hoveredEl = { kind: '', id: '' };
     },
+    // Click on the gray desk AROUND the page deselects (natural 'click off
+    // the page to stop interacting'). Only fires for the wrap background
+    // itself (.self modifier), not the page, ghosts, or panels.
+    onCanvasDeskMouseDown: function (evt) {
+      if (evt && evt.button !== undefined && evt.button !== 0) return;
+      this.clearElementSelection();
+    },
 
     // Mousedown on the page body (empty space). Starts a potential marquee;
     // whether it becomes a marquee or a plain text-click is decided by
@@ -168,10 +175,10 @@
         id: zfNewImageId(),
         kind: 'tape',
         src: '',
-        x: 0.5,
-        y: 0.5,
-        w: 0.9,
-        h: 0.34,
+        x: 0.5 * this._unitScale(),
+        y: 0.5 * this._unitScale(),
+        w: 0.9 * this._unitScale(),
+        h: 0.34 * this._unitScale(),
         rot: -4,
         wrap: 'free',
         // Place new tape on top of everything already on the page so it
@@ -200,10 +207,10 @@
         kind: 'sticker',
         src: '',
         shape: 'circle',
-        x: 0.6,
-        y: 0.6,
-        w: 0.9,
-        h: 0.9,
+        x: 0.6 * this._unitScale(),
+        y: 0.6 * this._unitScale(),
+        w: 0.9 * this._unitScale(),
+        h: 0.9 * this._unitScale(),
         rot: 0,
         wrap: 'free',
         color: '#e94f4f'
@@ -319,9 +326,9 @@
         id: zfNewTextBoxId(),
         kind: 'stamp',
         html: 'APPROVED',
-        x: 0.4,
-        y: 1.0,
-        w: 1.6,
+        x: 0.4 * this._unitScale(),
+        y: 1.0 * this._unitScale(),
+        w: 1.6 * this._unitScale(),
         rot: -8,
         fontSize: 1.0,
         // Same convention as addTape: new stamp sits on top of the page's
@@ -352,10 +359,10 @@
         id: zfNewImageId(),
         kind: 'sticky',
         src: '',
-        x: 0.6,
-        y: 0.6,
-        w: 1.1,
-        h: 1.1,
+        x: 0.6 * this._unitScale(),
+        y: 0.6 * this._unitScale(),
+        w: 1.1 * this._unitScale(),
+        h: 1.1 * this._unitScale(),
         rot: -3,
         wrap: 'free',
         color: 'yellow'
@@ -372,10 +379,10 @@
         id: zfNewImageId(),
         kind: 'scrap',
         src: '',
-        x: 0.4,
-        y: 0.6,
-        w: 1.4,
-        h: 1.0,
+        x: 0.4 * this._unitScale(),
+        y: 0.6 * this._unitScale(),
+        w: 1.4 * this._unitScale(),
+        h: 1.0 * this._unitScale(),
         rot: 5,
         wrap: 'free',
         color: 'kraft'
@@ -848,7 +855,7 @@
         var m = self.activeModel;
         var pw = (m && m.page && m.page.width) ? m.page.width : 2.75;
         var ph = (m && m.page && m.page.height) ? m.page.height : 4.25;
-        var bleed = 0.25;
+        var bleed = 0.25 * self._unitScale();
         var coverW = pw + bleed * 2;
         var coverH = ph + bleed * 2;
         var img = {
@@ -907,7 +914,7 @@
           kind: 'photo',
           x: 0,
           y: 0,
-          w: 1.5,
+          w: 1.5 * self._unitScale(),
           rot: 0,
           wrap: "free"
         };
@@ -993,17 +1000,32 @@
       if (!img) return;
       evt.stopPropagation();
       evt.preventDefault();
-      var px = 96 * this.imageScale;
       var m = this.activeModel;
       if (!m) return;
       var pageEl = this.$refs.miniPage;
       if (!pageEl) return;
       var pr = pageEl.getBoundingClientRect();
-      var margin = store.modelMarginIn();
-      var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
-      var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
-      var cx = pr.left + cxIn * px;
-      var cy = pr.top + cyIn * px;
+      // px per PAGE-UNIT (in or mm) -- equals px-per-inch on inch models,
+      // correct on mm models. Using 96*imageScale (px-per-inch) mis-placed the
+      // pivot on A4 so resize scaled the wrong way.
+      // Pivot = the element's ACTUAL rendered center (DOM rect), not a
+      // w*0.75 height guess. Correct regardless of unit (in/mm), real height,
+      // or rotation, and avoids the A4 mis-pivot that made resize feel
+      // inverted / never-grow.
+      var cx, cy;
+      var _node = this.$el ? this.$el.querySelector('[data-zf-img-id="' + img.id + '"]') : null;
+      if (_node) {
+        var _nr = _node.getBoundingClientRect();
+        cx = _nr.left + _nr.width / 2;
+        cy = _nr.top + _nr.height / 2;
+      } else {
+        var px = pr.width / m.page.width;
+        var margin = store.modelMarginIn() * this._unitScale();
+        var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
+        var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
+        cx = pr.left + cxIn * px;
+        cy = pr.top + cyIn * px;
+      }
       var dx = evt.clientX - cx;
       var dy = evt.clientY - cy;
       var startDist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1044,11 +1066,12 @@
       // Manual resize takes the box out of auto-width mode: from here it has
       // a fixed width and wraps within it.
       box.autoWidth = false;
-      var px = 96 * this.imageScale;
       var pageEl = this.$refs.miniPage;
       if (!pageEl) return;
       var pr = pageEl.getBoundingClientRect();
-      var margin = store.modelMarginIn();
+      var _m = this.activeModel;
+      var px = (_m && _m.page.width) ? pr.width / _m.page.width : 96 * this.imageScale;
+      var margin = store.modelMarginIn() * this._unitScale();
       // Capture the box's CURRENT rendered width as the base for resizing, so
       // the first drag starts from where it visually is (not the stored w).
       var w = (typeof box.w === 'number') ? box.w : 1.8;
@@ -1101,17 +1124,26 @@
       if (!img) return;
       evt.stopPropagation();
       evt.preventDefault();
-      var px = 96 * this.imageScale;
       var m = this.activeModel;
       if (!m) return;
       var pageEl = this.$refs.miniPage;
       if (!pageEl) return;
       var pr = pageEl.getBoundingClientRect();
-      var margin = store.modelMarginIn();
-      var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
-      var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
-      var cx = pr.left + cxIn * px;
-      var cy = pr.top + cyIn * px;
+      var px = pr.width / m.page.width; // px per page-unit (in or mm)
+      // Pivot = element's real DOM center (see onResizeStart).
+      var cx, cy;
+      var _nodeR = this.$el ? this.$el.querySelector('[data-zf-img-id="' + img.id + '"]') : null;
+      if (_nodeR) {
+        var _nrR = _nodeR.getBoundingClientRect();
+        cx = _nrR.left + _nrR.width / 2;
+        cy = _nrR.top + _nrR.height / 2;
+      } else {
+        var margin = store.modelMarginIn() * this._unitScale();
+        var cxIn = (typeof img.x === "number" ? img.x : 0) + margin + (img.w / 2);
+        var cyIn = (typeof img.y === "number" ? img.y : 0) + margin + (img.w * 0.75 / 2);
+        cx = pr.left + cxIn * px;
+        cy = pr.top + cyIn * px;
+      }
       var dx = evt.clientX - cx;
       var dy = evt.clientY - cy;
       var startAngle = Math.atan2(dy, dx) * 180 / Math.PI;
@@ -1178,14 +1210,23 @@
       // the early group branch (just below) can transform the whole selection.
       var isGroupBoxDrag = this.imageDrag && this.imageDrag.group && !this.imageDrag.imgId;
       if (!img && !isGroupBoxDrag) return;
-      var pxPerInch = 96 * this.imageScale;
+      // Units-aware: pointer px -> PAGE UNITS (inches OR mm).
+      // element x/y/w/h are in page units; on an A4 (mm) model a delta in
+      // INCHES was ~25x too small, so dragging barely moved the element
+      // ("sluggish / stuck"). Derive page-units-per-px from the rendered page
+      // width so it is correct for both in and mm models.
+      var _pgEl = this.$refs.miniPage;
+      var _pgW = (_pgEl && m.page.width) ? m.page.width : 1;
+      var _pgRenderedW = _pgEl ? _pgEl.getBoundingClientRect().width : (_pgW * 96);
+      var pageUnitsPerPx = (_pgRenderedW > 0) ? (_pgW / _pgRenderedW) : 1;
+      var pxPerInch = 96 * this.imageScale; // kept for inch-specific uses
       var mode = this.imageDrag.mode || "move";
       // GROUP-BOX drags have no imgId; handle resize/rotate straight from
       // the group pivot here, before the per-element `if (!img) return`.
       if (this.imageDrag.group && !this.imageDrag.imgId) {
         if (mode === "move") {
-          var gmDx = (evt.clientX - this.imageDrag.startX) / pxPerInch;
-          var gmDy = (evt.clientY - this.imageDrag.startY) / pxPerInch;
+          var gmDx = (evt.clientX - this.imageDrag.startX) * pageUnitsPerPx;
+          var gmDy = (evt.clientY - this.imageDrag.startY) * pageUnitsPerPx;
           var gmBases = this.imageDrag.bases || [];
           for (var gbi = 0; gbi < gmBases.length; gbi++) {
             var gb = gmBases[gbi];
@@ -1232,8 +1273,8 @@
         var mvx = evt.clientX - this.imageDrag.startX;
         var mvy = evt.clientY - this.imageDrag.startY;
         if ((mvx * mvx + mvy * mvy) > 9) this.imageDrag.moved = true;
-        var dxIn = (evt.clientX - this.imageDrag.startX) / pxPerInch;
-        var dyIn = (evt.clientY - this.imageDrag.startY) / pxPerInch;
+        var dxIn = (evt.clientX - this.imageDrag.startX) * pageUnitsPerPx;
+        var dyIn = (evt.clientY - this.imageDrag.startY) * pageUnitsPerPx;
         // Multi-move: if several elements are selected, move them all by the
         // same delta (their positions captured at drag start).
         if (this.selSet && this.selSet.length > 1 && this.imageDrag.bases) {
@@ -1261,14 +1302,15 @@
         // drag changes h. Uses a projection so the element grows with the
         // cursor rather than as a distance ratio.
         var px = 96 * this.imageScale;
-        var fdx = (evt.clientX - this.imageDrag.startX) / px;
-        var fdy = (evt.clientY - this.imageDrag.startY) / px;
+        var fdx = (evt.clientX - this.imageDrag.startX) * pageUnitsPerPx;
+        var fdy = (evt.clientY - this.imageDrag.startY) * pageUnitsPerPx;
         var fw = this.imageDrag.baseW + fdx;
         var fh = this.imageDrag.baseH + fdy;
-        if (fw < 0.15) fw = 0.15;
-        if (fw > 24) fw = 24;
-        if (fh < 0.1) fh = 0.1;
-        if (fh > 24) fh = 24;
+        var _s = this._unitScale();
+        if (fw < 0.15 * _s) fw = 0.15 * _s;
+        if (fw > 24 * _s) fw = 24 * _s;
+        if (fh < 0.1 * _s) fh = 0.1 * _s;
+        if (fh > 24 * _s) fh = 24 * _s;
         img.w = Math.round(fw * 100) / 100;
         img.h = Math.round(fh * 100) / 100;
       } else if (mode === "resize") {
@@ -1287,12 +1329,13 @@
         var dy = evt.clientY - this.imageDrag.cy;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
         var ratio = dist / this.imageDrag.startDist;
+        var _s2 = this._unitScale();
         var newW = this.imageDrag.baseW * ratio;
-        if (newW < 0.25) newW = 0.25;
+        if (newW < 0.25 * _s2) newW = 0.25 * _s2;
         // Generous upper bound so tape (and images) can span past the page
         // edge, the way real zine tape runs off the paper. The mini-page's
         // overflow:hidden trims anything outside the page for print.
-        if (newW > 24) newW = 24;
+        if (newW > 24 * _s2) newW = 24 * _s2;
         img.w = Math.round(newW * 100) / 100;
       } else if (mode === "resize-scaled") {
         // Group resize driven from a TEXT BOX handle: scale ALL selected
@@ -1314,10 +1357,11 @@
         var sdy = evt.clientY - this.imageDrag.cy;
         var sdist = Math.sqrt(sdx * sdx + sdy * sdy) || 1;
         var sratio = sdist / this.imageDrag.startDist;
+        var _s3 = this._unitScale();
         var nw = this.imageDrag.baseW * sratio;
         var nfPt = (this.imageDrag.baseFontPt || 12) * sratio;
-        if (nw < 0.4) nw = 0.4;
-        if (nw > 8) nw = 8;
+        if (nw < 0.4 * _s3) nw = 0.4 * _s3;
+        if (nw > 8 * _s3) nw = 8 * _s3;
         if (nfPt < 4) nfPt = 4;
         if (nfPt > 200) nfPt = 200;
         img.w = Math.round(nw * 100) / 100;
@@ -1387,7 +1431,8 @@
     setImageW: function (v) {
       var img = this.activeImage;
       if (!img) return;
-      img.w = Math.max(0.25, Math.min(8, Number(v)));
+      var s = this._unitScale();
+      img.w = Math.max(0.25 * s, Math.min(8 * s, Number(v)));
     },
     setIconColor: function (c) {
       var img = this.activeImage;
@@ -1433,6 +1478,28 @@
     // -------- Multi-selection helpers --------
     // The selection set is the source of truth for "what is selected"; the
     // single active ids mirror the primary (last-selected) member.
+    // Page units per inch: 25.4 on a mm model, 1 on an inch model. Used to
+    // scale inch-tuned defaults/clamps for image + text sizing so A4 (mm)
+    // behaves like the inch models.
+    _unitScale: function () {
+      var m = this.activeModel;
+      if (m && m.page && m.page.unit === 'mm') return 25.4;
+      return 1;
+    },
+    // Unit-aware range for the image-width slider + number input.
+    imageWidthRange: function () {
+      var s = this._unitScale();
+      return { min: (0.5 * s).toFixed(2), max: (8 * s).toFixed(2), step: (0.05 * s).toFixed(2) };
+    },
+    textWidthRange: function () {
+      var s = this._unitScale();
+      return { min: (0.4 * s).toFixed(2), max: (8 * s).toFixed(2), step: (0.05 * s).toFixed(2) };
+    },
+    // The measurement unit label for display.
+    pageUnitLabel: function () {
+      var m = this.activeModel;
+      return (m && m.page && m.page.unit === 'mm') ? 'mm' : 'in';
+    },
     _selKey: function (kind, id) { return kind + ':' + id; },
 
     // Is this element in the selection set?
@@ -2156,9 +2223,9 @@
         id: zfNewImageId(),
         kind: 'icon',
         src: iconName,
-        x: 0.3,
-        y: 0.3,
-        w: 0.6,
+        x: 0.3 * this._unitScale(),
+        y: 0.3 * this._unitScale(),
+        w: 0.6 * this._unitScale(),
         rot: 0,
         wrap: 'free',
         z: 0
@@ -2241,12 +2308,12 @@
       var box = {
         id: zfNewTextBoxId(),
         html: 'New text',
-        x: 0.3,
-        y: 0.3,
+        x: 0.3 * this._unitScale(),
+        y: 0.3 * this._unitScale(),
         // Small starting width; the box hugs its text while autoWidth is true
         // (grows with what you type, wrapping at the page edge). A manual
         // resize turns autoWidth off and commits a fixed width.
-        w: 1.0,
+        w: 1.0 * this._unitScale(),
         rot: 0,
         autoWidth: true,
         // Explicit point size (12pt). Resizing the box scales this and
@@ -2274,7 +2341,8 @@
     setTextBoxW: function (v) {
       var box = this.activeTextBox;
       if (!box) return;
-      box.w = Math.max(0.4, Math.min(8, Number(v)));
+      var s = this._unitScale();
+      box.w = Math.max(0.4 * s, Math.min(8 * s, Number(v)));
     },
     setTextBoxRot: function (v) {
       var box = this.activeTextBox;
@@ -2305,9 +2373,9 @@
     resetTextBox: function () {
       var box = this.activeTextBox;
       if (!box) return;
-      box.x = 0.3;
-      box.y = 0.3;
-      box.w = 1.8;
+      box.x = 0.3 * this._unitScale();
+      box.y = 0.3 * this._unitScale();
+      box.w = 1.8 * this._unitScale();
       box.rot = 0;
       box.fontPt = 12;
       delete box.fontSize;
@@ -2685,11 +2753,12 @@
       if (!box) return;
       evt.stopPropagation();
       evt.preventDefault();
-      var px = 96 * this.imageScale;
       var pageEl = this.$refs.miniPage;
       if (!pageEl) return;
       var pr = pageEl.getBoundingClientRect();
-      var margin = store.modelMarginIn();
+      var _mR = this.activeModel;
+      var px = (_mR && _mR.page.width) ? pr.width / _mR.page.width : 96 * this.imageScale;
+      var margin = store.modelMarginIn() * this._unitScale();
       var w = (typeof box.w === 'number') ? box.w : 1.8;
       var cxIn = (typeof box.x === 'number' ? box.x : 0) + margin + w / 2;
       var cyIn = (typeof box.y === 'number' ? box.y : 0) + margin + 0.4;
@@ -3075,15 +3144,20 @@
       // templates or the selection logic.
       panelMode: function () {
         var s = this.selSet || [];
-        if (!s.length) return 'none';
         var hasImg = false, hasText = false;
         for (var i = 0; i < s.length; i++) {
           if (s[i].kind === 'image') hasImg = true;
           else if (s[i].kind === 'textBox') hasText = true;
         }
         if (hasImg && hasText) return 'mixed';
-        if (hasImg) return 'image';
-        if (hasText) return 'text';
+        // Only report text/image when the PRIMARY selected object actually
+        // resolves (non-null). During a resize the selection set and the
+        // active id can disagree for a frame; if we said 'text'/'image' then,
+        // the panel would render while selectedTextBox/selectedImage is null
+        // and the template read .w on null (render crash). Gating on the
+        // object keeps the gate and the bindings in lockstep.
+        if (hasImg) return this.selectedImage ? 'image' : 'none';
+        if (hasText) return this.selectedTextBox ? 'text' : 'none';
         return 'none';
       },
       // True when more than one element is selected (multi-select).
