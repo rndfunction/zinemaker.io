@@ -15,6 +15,43 @@
 
   var ZF_EDITOR_METHODS = {
     selectPage: function (id) { store.activePageId = id; },
+    // Keep the Pages list a 4-row viewport with the ACTIVE page in the
+    // second visible slot (one before, two after) so context is stable and
+    // a scrollbar is always present once there are >4 pages. Clamped at the
+    // ends (page 1 shows active in row 1; last page scrolls to bottom).
+    scrollActivePageToList: function () {
+      var self = this;
+      this.$nextTick(function () {
+        var ul = self.$refs.pageListEl;
+        if (!ul) return;
+        var firstLi = ul.querySelector('li');
+        if (!firstLi) return;
+        var rowH = firstLi.offsetHeight || 0;
+        if (!rowH) return;
+        // Cap to exactly 4 rows (override the CSS 38vh).
+        ul.style.maxHeight = (rowH * 4) + 'px';
+        var lis = ul.querySelectorAll('li');
+        var activeIdx = -1;
+        for (var i = 0; i < lis.length; i++) {
+          if (lis[i].classList.contains('active')) { activeIdx = i; break; }
+        }
+        if (activeIdx < 0) return;
+        // Target: active at the 2nd visible row => scrollTop ~ (idx-1)*rowH.
+        var target = (activeIdx - 1) * rowH;
+        var maxScroll = Math.max(0, ul.scrollHeight - ul.clientHeight);
+        if (target < 0) target = 0;
+        if (target > maxScroll) target = maxScroll;
+        // Animate the programmatic snap so the user SEES the list scroll
+        // to reveal the active page (manual wheel-scroll stays immediate).
+        var reduceMotion = false;
+        try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+        if (reduceMotion || typeof ul.scrollTo !== 'function') {
+          ul.scrollTop = target;
+        } else {
+          ul.scrollTo({ top: target, behavior: 'smooth' });
+        }
+      });
+    },
     onClearAllEditor: function () { if (window.ZFClearAll) window.ZFClearAll(); },
     pageLabel: function (page, i) {
       var h = (page.heading || "").trim();
@@ -2435,6 +2472,22 @@
       box.fontPt = 12;
       delete box.fontSize;
     },
+    // Fit a text box to the content width: widen it to the page's content
+    // area and left-align at the content edge. Keeps the box's vertical
+    // position and rotation (unlike fitImage, we do not send it to the top).
+    // Turns off autoWidth so the widened box holds its width and wraps.
+    fitTextBox: function () {
+      var box = this.activeTextBox;
+      var m = this.activeModel;
+      if (!box || !m) return;
+      var margin = store.modelMarginIn();
+      var contentW = Math.max(0.5, m.page.width - margin * 2);
+      box.autoWidth = false;
+      box.x = 0;
+      box.w = contentW;
+      var self = this;
+      this.$nextTick(function () { self.syncTextBoxDom(); });
+    },
     textStyle: function (box) {
       if (!box) return {};
       var m = this.activeModel;
@@ -3284,6 +3337,9 @@
       // panel is added, 'mixed' can map to it here without touching the
       // templates or the selection logic.
       panelMode: function () {
+        // Drawing takes priority: while in drawing mode, the panel shows the
+        // pen tools regardless of selection.
+        if (this.drawingMode) return 'draw';
         var s = this.selSet || [];
         var hasImg = false, hasText = false;
         for (var i = 0; i < s.length; i++) {
@@ -3587,7 +3643,7 @@
       this._onPanelReflow = function () { self.positionTextPanel(); };
       window.addEventListener("resize", this._onPanelReflow);
       window.addEventListener("scroll", this._onPanelReflow, true);
-      this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
+      this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); self.scrollActivePageToList(); });
 
       // Auto-commit the drawing when the user clicks outside the canvas and
       // the draw panel, so wandering off never loses a drawing.
@@ -3663,6 +3719,9 @@
         var self = this;
         this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
       },
+      'store.activePageId': function () {
+        this.scrollActivePageToList();
+      },
       panelMode: function (m) {
         var self = this;
         // New selection -> reset group scale/rotate bases so each fresh group
@@ -3719,6 +3778,7 @@
     },
     updated: function () {
       this.syncTextBoxDom();
+      this.scrollActivePageToList();
       this.positionTextPanel();
     },
     methods: Object.assign({}, ZF_EDITOR_METHODS, {
@@ -3875,86 +3935,8 @@
 
   window.ZineEditor = ZineEditor;
 
-  // TEMP DEBUG: ZFDebugTB() logs the selected text box geometry + DOM rect.
-  window.ZFDebugTB = function () {
-    var app = document.querySelector("#app");
-    var s = window.ZF_STORE;
-    if (!s) return "no store";
-    var p = s.activePage();
-    if (!p || !p.activeTextBoxId) return "no active text box";
-    var box = null;
-    (p.textBoxes||[]).forEach(function(t){ if(t.id===p.activeTextBoxId) box=t; });
-    if (!box) return "box not found";
-    var domEl = document.querySelector('[data-zf-text-id="' + box.id + '"]');
-    var pageEl = document.querySelector(".zf-page.zf-mini-page");
-    var pr = pageEl ? pageEl.getBoundingClientRect() : null;
-    var dr = domEl ? domEl.getBoundingClientRect() : null;
-    return {
-      stored: { x: box.x, y: box.y, w: box.w, h: box.h, autoWidth: box.autoWidth, fontPt: box.fontPt, fontSize: box.fontSize, rot: box.rot },
-      pageRect: pr ? { left: Math.round(pr.left), top: Math.round(pr.top), w: Math.round(pr.width), h: Math.round(pr.height) } : null,
-      domRect: dr ? { left: Math.round(dr.left), top: Math.round(dr.top), w: Math.round(dr.width), h: Math.round(dr.height) } : null,
-      relToPage: (pr && dr) ? { left: Math.round(dr.left - pr.left), top: Math.round(dr.top - pr.top), w: Math.round(dr.width), h: Math.round(dr.height) } : null
-    };
-  };
 
 
-  // TEMP DEBUG: ZFDebugImages() dumps every image/icon on the active page.
-  window.ZFDebugImages = function () {
-    var s = window.ZF_STORE;
-    if (!s) return "no store";
-    var p = s.activePage();
-    if (!p) return "no page";
-    return (p.images || []).map(function (im) {
-      return { id: im.id, kind: im.kind, src: (im.src||"").slice(0,20), x: im.x, y: im.y, w: im.w, h: im.h, z: im.z, hidden: !!im.hidden, wrap: im.wrap, placeholder: !!im.placeholder };
-    });
-  };
 
-
-  // TEMP DEBUG: compact one-line-per-image summary (no truncation).
-  window.ZFDebugImages = function () {
-    var s = window.ZF_STORE; if (!s) return "no store";
-    var p = s.activePage(); if (!p) return "no page";
-    return (p.images || []).map(function (im) {
-      return [im.kind, (im.src||"").slice(0,22), "x=" + Math.round(im.x||0), "y=" + Math.round(im.y||0), "w=" + (im.w), "h=" + (im.h), "z=" + (im.z), "hid=" + (!!im.hidden), "wrap=" + (im.wrap||"")].join(" | ");
-    }).join("\n");
-  };
-
-
-  // TEMP DEBUG: all elements on the active page with geometry + z.
-  window.ZFDebugElements = function () {
-    var s = window.ZF_STORE; if (!s) return "no store";
-    var p = s.activePage(); if (!p) return "no page";
-    var lines = [];
-    (p.images || []).forEach(function (im) {
-      lines.push("IMG " + im.kind + " id=" + im.id + " x=" + Math.round(im.x||0) + " y=" + Math.round(im.y||0) + " w=" + im.w + " h=" + im.h + " z=" + im.z + " hid=" + (!!im.hidden));
-    });
-    (p.textBoxes || []).forEach(function (tb) {
-      lines.push("TB  id=" + tb.id + " x=" + Math.round(tb.x||0) + " y=" + Math.round(tb.y||0) + " w=" + tb.w + " h=" + tb.h + " z=" + tb.z + " auto=" + (!!tb.autoWidth) + " hid=" + (!!tb.hidden));
-    });
-    return lines.join("\n");
-  };
-
-
-  // TEMP DEBUG: live DOM rects of the active page text boxes + icons,
-  // relative to the page, so we see what actually covers what.
-  window.ZFDebugRects = function () {
-    var s = window.ZF_STORE; if (!s) return "no store";
-    var p = s.activePage(); if (!p) return "no page";
-    var pageEl = document.querySelector(".zf-page.zf-mini-page");
-    if (!pageEl) return "no page el";
-    var pr = pageEl.getBoundingClientRect();
-    function rel(el) { var r = el.getBoundingClientRect(); return { l: Math.round(r.left-pr.left), t: Math.round(r.top-pr.top), w: Math.round(r.width), h: Math.round(r.height) }; }
-    var out = [];
-    (p.textBoxes||[]).forEach(function(tb){
-      var d = document.querySelector('[data-zf-text-id="' + tb.id + '"]');
-      out.push("TB z=" + tb.z + " " + (d ? JSON.stringify(rel(d)) : "NO-DOM"));
-    });
-    (p.images||[]).forEach(function(im){
-      var d = document.querySelector('[data-zf-img-id="' + im.id + '"]');
-      out.push("IMG " + im.kind + " z=" + im.z + " " + (d ? JSON.stringify(rel(d)) : "NO-DOM"));
-    });
-    out.push("PAGE w=" + Math.round(pr.width) + " h=" + Math.round(pr.height));
-    return out.join("\n");
-  };
 
 })();

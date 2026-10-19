@@ -38,7 +38,7 @@
         y: (y / cssH) * m.page.height
       };
     },
-    _drawRecordPoint: function (p) {
+    _drawRecordPoint: function (p, wIn) {
       var st = this._currentStroke;
       if (!st) return;
       var ip = this._drawToInches(p);
@@ -49,6 +49,8 @@
         // Skip points closer than ~0.3 device px (converted): tiny threshold.
         if ((dx * dx + dy * dy) < 1e-6) return;
       }
+      // Optional per-point width in INCHES (for speed-variable strokes).
+      if (typeof wIn === 'number' && wIn > 0) ip.w = wIn;
       pts.push(ip);
     },
     startDrawing: function () {
@@ -144,7 +146,10 @@
         smoothing: (typeof this.drawSmoothing === 'number') ? this.drawSmoothing : 0,
         pts: []
       };
-      this._drawRecordPoint(p);
+      // Record the first point's width in the SAME unit as st.size (page
+      // units), so the commit renderer's (pt.w * scale) is in px. At down,
+      // width == drawSize, so pt.w == st.size exactly.
+      this._drawRecordPoint(p, this._currentStroke.size);
 
       if (this.drawTool === 'calligraphy') {
         // A tap should leave a small mark; draw a tiny quad now.
@@ -195,12 +200,10 @@
       var p = this._drawPos(evt);
       var last = this._drawLast || p;
 
-      // Record this point into the vector stroke (page-inch space).
-      this._drawRecordPoint(p);
-
       // Calligraphy tool: fill a nib-shaped quad for this segment and return.
       // (Velocity/smoothing do not apply -- width comes from direction.)
       if (this.drawTool === 'calligraphy') {
+        this._drawRecordPoint(p);
         this._calliSegment(ctx, last, p);
         this._drawLast = p;
         return;
@@ -219,6 +222,12 @@
         width = Math.max(0.5, this.drawSize * f);
         this._drawLastTime = now;
       }
+
+      // Record this point, capturing per-point width in PAGE UNITS (same as
+      // st.size) via the ratio width/drawSize, so (pt.w * scale) is px at
+      // any unit. (Storing inches here made A4 strokes ~25x too thin.)
+      var _szUnit = (this._currentStroke && this._currentStroke.size) || this.drawSize;
+      this._drawRecordPoint(p, _szUnit * (this.drawSize ? (width / this.drawSize) : 1));
 
       if (this.drawSmoothing > 0) {
         // Quadratic smoothing: keep the last two points and draw a curve
@@ -293,40 +302,17 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     },
     drawUndo: function () {
-      var self = this;
       var snap = this.drawUndoStack.pop();
       if (!snap) return;
       var canvas = this.$refs.drawCanvas;
       if (!canvas) return;
-      // Restore the stroke data (so commit reflects the undo).
-      if (snap.strokes) {
-        this._strokes = JSON.parse(JSON.stringify(snap.strokes));
-        this._currentStroke = null;
-      }
-      var data = (typeof snap === 'string') ? snap : snap.img;
-      var img = new Image();
-      img.onload = function () {
-        var ctx = canvas.getContext('2d');
-        var dpr = window.devicePixelRatio || 1;
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        // Re-render from the restored strokes (keeps any rotation view).
-        if (self._editRot && self._editCenter) {
-          ctx.save();
-          ctx.translate(self._editCenter.x, self._editCenter.y);
-          ctx.rotate(self._editRot);
-          ctx.translate(-self._editCenter.x, -self._editCenter.y);
-          var pxp = (canvas.width / dpr) / (self.activeModel ? self.activeModel.page.width : 1);
-          zfRenderStrokes(ctx, self._strokes || [], pxp);
-          ctx.restore();
-        } else {
-          ctx.drawImage(img, 0, 0);
-        }
-      };
-      img.src = data;
+      // Restore the stroke DATA (always present + correct) and re-render
+      // from it. Do NOT draw the raster snap.img -- a toDataURL of a
+      // transparent canvas can be blank/stale, which made undo blank the
+      // whole drawing even though the stroke data was intact.
+      this._strokes = (snap && snap.strokes) ? JSON.parse(JSON.stringify(snap.strokes)) : [];
+      this._currentStroke = null;
+      this._redrawCanvasFromStrokes();
     },
     _deleteStrokeAtPoint: function (canvasPt) {
       var strokes = this._strokes || [];
@@ -381,6 +367,13 @@
     drawClear: function () {
       var canvas = this.$refs.drawCanvas;
       if (!canvas) return;
+      // Snapshot before clearing so Clear is undoable.
+      try {
+        this.drawUndoStack.push({
+          img: canvas.toDataURL(),
+          strokes: JSON.parse(JSON.stringify(this._strokes || []))
+        });
+      } catch (e) {}
       var ctx = canvas.getContext('2d');
       var dpr = window.devicePixelRatio || 1;
       ctx.save();
@@ -669,9 +662,14 @@
       if (!this.drawingMode) return;
       var t = evt.target;
       var canvas = this.$refs.drawCanvas;
-      var panel = this.$el ? this.$el.querySelector('.zf-draw-panel') : null;
       if (canvas && canvas.contains(t)) return;
-      if (panel && panel.contains(t)) return;
+      // The tools live in the floating panel now (and the legacy draw panel
+      // may still exist during migration). Clicking EITHER keeps the session
+      // open; only a click truly outside both (and the canvas) commits.
+      var floatPanel = this.$refs.floatPanelEl;
+      if (floatPanel && floatPanel.contains(t)) return;
+      var oldPanel = this.$el ? this.$el.querySelector('.zf-draw-panel') : null;
+      if (oldPanel && oldPanel.contains(t)) return;
       // Clicked elsewhere -> commit and exit.
       this.stopDrawing();
     }

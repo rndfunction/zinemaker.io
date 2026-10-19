@@ -1,17 +1,11 @@
 <!-- zine-editor-template -- UI template partial, fetched and injected as a -->
 <!-- <template> element by zf-boot.js before the app mounts. -->
   <template id="zine-editor-template">
-    <div class="zf-editor" :class="{ 'zf-drawing': drawingMode }">
-      <aside>
+    <div class="zf-editor" >
+      <aside class="zf-sidebar">
 
-        <div class="zf-field" style="margin-bottom:0.25rem;">
-          <label class="zf-label" for="zf-sidebar-model">Model</label>
-          <select id="zf-sidebar-model" class="zf-input" :value="store.modelId" @change="store.setModel($event.target.value)">
-            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
-          </select>
-        </div>
         <div class="zf-label" style="margin-top:0.75rem;">Pages</div>
-        <ul class="zf-page-list">
+        <ul class="zf-page-list" ref="pageListEl">
           <li v-for="(p, i) in store.pages" :key="p.id"
               :class="[{ active: p.id === store.activePageId, 'zf-draggable': true }, dragClass(i)]"
               draggable="true"
@@ -139,9 +133,9 @@
                  top of the page content and captures pointer events so a drag
                  draws a stroke instead of dragging an element or editing text.
                  The toolbar floats above it. -->
-            <!-- Drawing overlay: just the canvas now. The tools live in a
-                 panel in the right rail (see .zf-draw-panel) so they do not
-                 cover the page. -->
+            <!-- Drawing overlay: just the canvas now. The pen tools live in
+                 the floating properties panel (panelMode === 'draw') beside
+                 the rail, so they do not cover the page. -->
             <div v-if="drawingMode" class="zf-draw-layer">
               <canvas ref="drawCanvas" class="zf-draw-canvas"
                       @pointerdown="onDrawPointerDown"
@@ -336,29 +330,22 @@
 
         <div class="zf-rail-sep" aria-hidden="true"></div>
         <div class="zf-rail-group" role="toolbar" aria-label="Add elements">
-          <label class="zf-rail-btn" title="Add an image" aria-label="Add image">
-            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
-            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
-          </label>
-          <label class="zf-rail-btn" title="Add a full-page photo (fills the page)" aria-label="Add full-page photo">
-            <iconify-icon icon="ph:image-square" aria-hidden="true"></iconify-icon>
-            <input :key="'fb' + fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChangeFullBleed" />
-          </label>
-          <input ref="replaceInput" type="file" accept="image/*" style="display:none;" @change="onReplaceImageChange" />
-          <button type="button" class="zf-rail-btn" @click="openQrModal" title="Add a QR code from a link" aria-label="Add QR code">
-            <iconify-icon icon="ph:qr-code" aria-hidden="true"></iconify-icon>
-          </button>
+          <!-- Order: Text, Pen, Image, Icon, Tape (decorations), QR, Background image -->
           <button type="button" class="zf-rail-btn" @click="addTextBox" title="Add a text box" aria-label="Add text box">
             <iconify-icon icon="ph:text-t" aria-hidden="true"></iconify-icon>
-          </button>
-          <button type="button" class="zf-rail-btn" @click="openIconPicker" title="Add an icon" aria-label="Add icon">
-            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
           </button>
           <button type="button" class="zf-rail-btn" @click="startDrawing" title="Draw on the page" aria-label="Draw on the page">
             <iconify-icon icon="ph:pencil-simple" aria-hidden="true"></iconify-icon>
           </button>
+          <label class="zf-rail-btn" title="Add an image" aria-label="Add image">
+            <iconify-icon icon="ph:image" aria-hidden="true"></iconify-icon>
+            <input :key="fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChange" />
+          </label>
+          <button type="button" class="zf-rail-btn" @click="openIconPicker" title="Add an icon" aria-label="Add icon">
+            <iconify-icon icon="ph:star" aria-hidden="true"></iconify-icon>
+          </button>
           <div class="zf-decor-wrap">
-            <button type="button" class="zf-rail-btn" @click="decorMenuOpen = !decorMenuOpen" :aria-expanded="decorMenuOpen" title="Add a decoration" aria-label="Add decoration">
+            <button type="button" class="zf-rail-btn" @click="decorMenuOpen = !decorMenuOpen" :aria-expanded="decorMenuOpen" title="Add tape / decoration" aria-label="Add decoration">
               <iconify-icon icon="streamline-freehand:office-tape-2" aria-hidden="true"></iconify-icon>
             </button>
             <div class="zf-decor-menu" v-if="decorMenuOpen">
@@ -369,6 +356,14 @@
               <button type="button" @click="addSticker(); decorMenuOpen = false">Sticker</button>
             </div>
           </div>
+          <button type="button" class="zf-rail-btn" @click="openQrModal" title="Add a QR code from a link" aria-label="Add QR code">
+            <iconify-icon icon="ph:qr-code" aria-hidden="true"></iconify-icon>
+          </button>
+          <label class="zf-rail-btn" title="Add a full-page background photo (fills the page)" aria-label="Add full-page background photo">
+            <iconify-icon icon="ph:image-square" aria-hidden="true"></iconify-icon>
+            <input :key="'fb' + fileInputKey" type="file" accept="image/*" style="display:none;" @change="onImageChangeFullBleed" />
+          </label>
+          <input ref="replaceInput" type="file" accept="image/*" style="display:none;" @change="onReplaceImageChange" />
         </div>
         <div class="zf-rail-group" role="toolbar" aria-label="Selected element actions">
           <button type="button" class="zf-rail-btn" @click="copySelected" title="Copy selected element (Ctrl+C)" aria-label="Copy selected element">
@@ -398,11 +393,61 @@
            selection: a MULTI-selection shows group Scale/Rotation (applies to
            ALL selected elements of any kind); a single text box shows text
            controls; a single image shows image controls. Positioned by JS. -->
-      <aside v-if="panelMode !== 'none' && !drawingMode" ref="floatPanelEl" class="zf-float-panel" role="region" aria-label="Element properties">
-        <div class="zf-text-panel-head">{{ isMultiSelected ? 'Selection' : (panelMode === 'image' ? 'Image' : 'Text') }}</div>
+      <aside v-if="panelMode !== 'none'" ref="floatPanelEl" class="zf-float-panel" role="region" aria-label="Element properties">
+        <div class="zf-text-panel-head">{{ panelMode === 'draw' ? 'Draw' : (isMultiSelected ? 'Selection' : (panelMode === 'image' ? 'Image' : 'Text')) }}</div>
+
+        <!-- ======== DRAWING: pen tools ======== -->
+        <template v-if="panelMode === 'draw'">
+          <span class="zf-text-panel-label">Tool</span>
+          <div class="zf-text-panel-row zf-text-panel-align">
+            <button class="zf-btn" :class="{ 'zf-btn-primary': drawTool === 'pen' }" @click="drawTool = 'pen'" title="Pen (uniform round stroke)">Pen</button>
+            <button class="zf-btn" :class="{ 'zf-btn-primary': drawTool === 'eraser' }" @click="drawTool = 'eraser'" title="Eraser">Eraser</button>
+            <button class="zf-btn" :class="{ 'zf-btn-primary': drawTool === 'calligraphy' }" @click="drawTool = 'calligraphy'" title="Calligraphy (flat nib)">Callig.</button>
+          </div>
+          <div class="zf-text-panel-row zf-text-panel-align" v-if="editDrawingId">
+            <button class="zf-btn" :class="{ 'zf-btn-primary': drawTool === 'eraseStroke' }" @click="drawTool = 'eraseStroke'" title="Click a whole stroke to remove it">Erase stroke</button>
+          </div>
+
+          <label class="zf-text-panel-label">Color</label>
+          <div class="zf-text-panel-row">
+            <input type="color" v-model="drawColor" :disabled="drawTool === 'eraser' || drawTool === 'eraseStroke'" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Stroke color" />
+          </div>
+
+          <label class="zf-text-panel-label">Size ({{ drawSize }})</label>
+          <input type="range" min="1" max="40" step="1" v-model.number="drawSize" style="width:100%;" aria-label="Brush size" />
+
+          <label class="zf-text-panel-label">Opacity ({{ drawOpacity }})</label>
+          <input type="range" min="0.1" max="1" step="0.05" v-model.number="drawOpacity" style="width:100%;" aria-label="Stroke opacity" />
+
+          <div v-if="drawTool === 'calligraphy'">
+            <label class="zf-text-panel-label">Nib angle ({{ drawNibAngle }}&deg;)</label>
+            <input type="range" min="0" max="180" step="1" v-model.number="drawNibAngle" style="width:100%;" aria-label="Nib angle" />
+          </div>
+
+          <label class="zf-text-panel-label">Smoothing</label>
+          <select class="zf-input" v-model.number="drawSmoothing">
+            <option :value="0">Off</option>
+            <option :value="1">Low</option>
+            <option :value="2">Medium</option>
+            <option :value="3">High</option>
+          </select>
+
+          <div class="zf-text-panel-row" style="margin-top:0.4rem;">
+            <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;"><input type="checkbox" v-model="drawVelocity" /> Speed width</label>
+          </div>
+
+          <div class="zf-text-panel-row">
+            <button class="zf-btn" @click="drawUndo" title="Undo">Undo</button>
+            <button class="zf-btn" @click="drawClear" title="Clear drawing">Clear</button>
+          </div>
+          <div class="zf-text-panel-row">
+            <button class="zf-btn zf-btn-primary" @click="stopDrawing" title="Finish drawing">Done</button>
+          </div>
+          <div class="zf-muted" style="font-size:0.72rem;">Done or click away to finish. Esc to discard.</div>
+        </template>
 
         <!-- ======== MULTI-SELECTION: group scale + rotation ======== -->
-        <template v-if="isMultiSelected">
+        <template v-else-if="isMultiSelected">
           <label class="zf-text-panel-label" for="zf-grp-scale">Scale ({{ groupScalePct }}%)</label>
           <div class="zf-text-panel-row">
             <input id="zf-grp-scale" type="range" min="10" max="400" step="1"
@@ -574,6 +619,7 @@
         </div>
 
         <div class="zf-text-panel-row">
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitTextBox" title="Widen this text box to the content area">Fit width</button>
           <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetTextBox">Reset</button>
         </div>
         </template>
@@ -630,76 +676,6 @@
 
       <!-- Drawing tools: its OWN column to the right of the rail, shown only
            while drawing, so it neither covers the canvas nor crowds the rail.
-           The editor grid grows a 4th column via .zf-drawing. -->
-      <aside v-if="drawingMode" class="zf-draw-panel" role="toolbar" aria-label="Drawing tools">
-        <div class="zf-draw-panel-head">Draw</div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Pen (uniform round stroke)">
-            <input type="radio" name="zfdrawtool" :checked="drawTool === 'pen'" @change="drawTool = 'pen'" /> Pen
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Eraser">
-            <input type="radio" name="zfdrawtool" :checked="drawTool === 'eraser'" @change="drawTool = 'eraser'" /> Eraser
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Calligraphy (flat nib, thick/thin by direction)">
-            <input type="radio" name="zfdrawtool" :checked="drawTool === 'calligraphy'" @change="drawTool = 'calligraphy'" /> Calligraphy
-          </label>
-        </div>
-        <div class="zf-draw-row" v-if="editDrawingId">
-          <label class="zf-draw-opt" title="Click a whole stroke to remove it">
-            <input type="radio" name="zfdrawtool" :checked="drawTool === 'eraseStroke'" @change="drawTool = 'eraseStroke'" /> Erase stroke
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Color">
-            Color <input type="color" v-model="drawColor" :disabled="drawTool === 'eraser' || drawTool === 'eraseStroke'" />
-          </label>
-        </div>
-        <div class="zf-draw-row" v-if="drawTool === 'calligraphy'">
-          <label class="zf-draw-opt" title="Nib angle in degrees (the flat edge of the pen)">
-            Nib <input type="range" min="0" max="180" step="1" v-model.number="drawNibAngle" />
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Brush size">
-            Size <input type="range" min="1" max="40" step="1" v-model.number="drawSize" />
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Stroke smoothing (off keeps strokes pixel-accurate)">
-            Smooth
-            <select v-model.number="drawSmoothing">
-              <option :value="0">Off</option>
-              <option :value="1">Low</option>
-              <option :value="2">Medium</option>
-              <option :value="3">High</option>
-            </select>
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Vary width with drawing speed (pen-like)">
-            <input type="checkbox" v-model="drawVelocity" /> Speed width
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <label class="zf-draw-opt" title="Stroke opacity">
-            Opacity <input type="range" min="0.1" max="1" step="0.05" v-model.number="drawOpacity" />
-          </label>
-        </div>
-        <div class="zf-draw-row">
-          <button type="button" class="zf-draw-btn" @click="drawUndo" title="Undo (Ctrl+Z)">Undo</button>
-          <button type="button" class="zf-draw-btn" @click="drawClear" title="Clear drawing">Clear</button>
-        </div>
-        <div class="zf-draw-row">
-          <button type="button" class="zf-draw-btn zf-draw-done" @click="stopDrawing" title="Finish drawing">Done</button>
-        </div>
-        <div class="zf-draw-row" style="font-size:0.7rem;color:var(--zf-gray-mid);">
-          Done, or click away, to finish. Esc to discard.
-        </div>
-      </aside>
 
     </div>
   </template>

@@ -20,6 +20,13 @@
           </div>
         </div>
         <div class="zf2-masthead-actions">
+          <label class="zf2-masthead-model-wrap" title="Zine format (page size)">
+            <iconify-icon icon="ph:frame-corners" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
+            <select class="zf2-masthead-model" :value="store.modelId" @change="store.setModel($event.target.value)" aria-label="Zine format">
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.label }}</option>
+            </select>
+          </label>
+          <span class="zf2-masthead-sep" aria-hidden="true"></span>
           <button class="zf2-ghost" @click="goLibrary" :aria-current="store.view === 'library'" title="Browse your saved zines">
             <iconify-icon icon="ph:books" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
             Library

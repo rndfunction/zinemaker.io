@@ -87,6 +87,23 @@
     }
     .zf2-meta .zf-save-indicator { color: var(--zf2-muted); }
     .zf2-masthead-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; flex: 0 0 auto; align-items: center; }
+
+    .zf2-masthead-model-wrap {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      color: var(--zf-ink, #1b1b1b);
+    }
+    .zf2-masthead-model {
+      border: 1px solid var(--zf-border, #d0d0d0);
+      border-radius: 4px;
+      background: #ffffff;
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 0.2rem 0.3rem;
+      max-width: 220px;
+      cursor: pointer;
+    }
+    .zf2-masthead-model:focus-visible { outline: 3px solid #ffbe2e; outline-offset: 2px; }
+
     /* Divider between the Library navigation action and the document
        commands (Undo/Redo/Export/...). */
     .zf2-masthead-sep {
@@ -273,6 +290,10 @@
     .zf-empty { border: 2px dashed var(--zf-border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--zf-gray-mid); }
     .zf-editor { display: grid; grid-template-columns: 240px 1fr auto; gap: 1.25rem; align-items: start; position: relative; }
     .zf-canvas-col { min-width: 0; }
+    /* Left sidebar: bounded like the rail so its options never run past
+       the editor area. Scrolls internally when taller than the viewport. */
+        /* .zf-sidebar: no whole-column cap -- the Pages and Layers lists each
+       scroll internally, so the sidebar sizes naturally (no 3rd scrollbar). */
     /* Vertical right rail: formatting + insert controls. Sits in the open
        space to the right of the tall canvas. Buttons match the "+ Add sheet"
        button style (white, blue text, soft border). */
@@ -280,6 +301,7 @@
       display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem;
       width: max-content;
       position: sticky; top: 0.75rem;
+      align-self: start;
     }
     .zf-rail-group {
       display: flex; flex-direction: column; gap: 0.4rem;
@@ -1164,72 +1186,6 @@
     @media (max-width: 1200px) { .zf-text-panel, .zf-image-panel, .zf-float-panel { display: none !important; } }
     @media print { .zf-text-panel, .zf-image-panel, .zf-float-panel { display: none !important; } }
 
-    .zf-draw-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 0.6rem;
-      border: 1px solid var(--zf-border);
-      border-radius: 6px;
-      background: var(--zf-gray-light, #f2f2f2);
-      position: fixed;
-      top: 5rem;
-      right: 1rem;
-      width: 168px;
-      max-height: calc(100vh - 6rem);
-      overflow-y: auto;
-      z-index: 40;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    }
-    /* Hide the floating panel when the viewport is too narrow to have free
-       space beside the 1100px editor + rail (it would overlap content). */
-    @media (max-width: 1400px) {
-      .zf-draw-panel { display: none; }
-    }
-    .zf-draw-panel-head {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 700;
-      color: var(--zf-gray-mid);
-    }
-    .zf-draw-row {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      flex-wrap: wrap;
-      font-size: 0.75rem;
-    }
-    .zf-draw-opt {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: 0.75rem;
-      color: var(--zf-ink);
-    }
-    .zf-draw-opt input[type="range"] { width: 100%; max-width: 120px; }
-    .zf-draw-opt input[type="color"] {
-      width: 28px; height: 22px; padding: 0; border: 1px solid var(--zf-border); border-radius: 4px; background: #ffffff; cursor: pointer;
-    }
-    .zf-draw-opt select {
-      border: 1px solid var(--zf-border);
-      border-radius: 4px;
-      font-size: 0.75rem;
-      padding: 0.1rem 0.2rem;
-      background: #ffffff;
-    }
-    .zf-draw-btn {
-      flex: 1 1 auto;
-      border: 1px solid var(--zf-border);
-      border-radius: 4px;
-      background: #ffffff;
-      color: var(--zf-blue-dark, #005ea2);
-      font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-      cursor: pointer;
-    }
-    .zf-draw-btn:hover { border-color: var(--zf-blue, #005ea2); }
-    .zf-draw-done { background: var(--zf-blue, #005ea2); color: #ffffff; border-color: var(--zf-blue, #005ea2); }
     .zf-textbox.zf-handle-owner .zf-img-handle {
       display: block;
     }

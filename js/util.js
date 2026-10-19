@@ -807,9 +807,45 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
         zfRenderCalliSegment(ctx, pts[0], { x: pts[0].x + 0.004, y: pts[0].y + 0.004 }, st, scale, null);
       }
     } else {
-      // Pen / eraser: a rounded polyline. If the stroke has a smoothing
-      // level, draw quadratic curves through the midpoints (matching the
-      // live editor) so the committed render looks like what was drawn.
+      // Variable-width pen (speed-variable ink): if points carry per-point
+      // width (pt.w, inches), draw tapered filled quads between them so the
+      // committed image reproduces the live speed-varied look. Falls back to
+      // the uniform polyline below when no point has w.
+      var hasW = false;
+      for (var wi = 0; wi < pts.length; wi++) { if (typeof pts[wi].w === 'number') { hasW = true; break; } }
+      if (hasW && st.tool !== 'eraser') {
+        var wOf = function (pt) { return (typeof pt.w === 'number' ? pt.w : st.size) * scale; };
+        if (pts.length === 1) {
+          var r1 = Math.max(0.5, wOf(pts[0]) / 2);
+          ctx.beginPath();
+          ctx.arc(pts[0].x * scale, pts[0].y * scale, r1, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          for (var c2 = 1; c2 < pts.length; c2++) {
+            var A = pts[c2 - 1], B = pts[c2];
+            var ax2 = A.x * scale, ay2 = A.y * scale, bx2 = B.x * scale, by2 = B.y * scale;
+            var vx2 = bx2 - ax2, vy2 = by2 - ay2;
+            var len2 = Math.sqrt(vx2 * vx2 + vy2 * vy2);
+            if (len2 < 1e-6) continue;
+            var nx2 = -vy2 / len2, ny2 = vx2 / len2;
+            var ha = Math.max(0.5, wOf(A) / 2), hb = Math.max(0.5, wOf(B) / 2);
+            ctx.beginPath();
+            ctx.moveTo(ax2 + nx2 * ha, ay2 + ny2 * ha);
+            ctx.lineTo(bx2 + nx2 * hb, by2 + ny2 * hb);
+            ctx.lineTo(bx2 - nx2 * hb, by2 - ny2 * hb);
+            ctx.lineTo(ax2 - nx2 * ha, ay2 - ny2 * ha);
+            ctx.closePath();
+            ctx.fill();
+            // Round join: small dot at each interior vertex sized to avg width.
+            if (c2 < pts.length - 1) {
+              var rr = Math.max(0.5, ((ha + hb) / 2));
+              ctx.beginPath();
+              ctx.arc(bx2, by2, rr, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+      } else {
       ctx.lineWidth = st.size * scale;
       var sm = (typeof st.smoothing === 'number') ? st.smoothing : 0;
       if (pts.length === 1) {
@@ -842,6 +878,7 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
         }
         ctx.stroke();
       }
+      } // end else (uniform pen fallback)
     }
   }
   ctx.restore();
