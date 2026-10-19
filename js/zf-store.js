@@ -499,8 +499,8 @@
         // no-op -- no early-return semantics to reason about.
         zfConfirm(
           'Switch zine format to "' + label + '"?\n\n' +
-          'Your pages are kept, but the page size changes. Existing content is ' +
-          'NOT resized, so it may need adjusting for the new format.',
+          'Your pages are kept and refit proportionally to the new page size. ' +
+          'Review the layout afterward -- text may reflow differently.',
           function () { self._applyModel(id); },
           { title: 'Switch zine format?', confirmLabel: 'Switch' }
         );
@@ -509,7 +509,24 @@
       this._applyModel(id);
     },
     _applyModel: function (id) {
+      // Capture the OLD page size BEFORE switching, then refit every element
+      // from the old page box to the new one. The refit ratio (toW/fromW)
+      // also performs unit conversion (in -> mm), so a Letter layout mapped
+      // onto A4 keeps its relative placement instead of crushing into the
+      // corner. Same-size switches (e.g. mini-8 -> mini-16, both 2.75x4.25)
+      // are a no-op refit.
+      var oldModel = window.ZFModels ? window.ZFModels.getModel(this.modelId) : null;
+      var newModel = window.ZFModels ? window.ZFModels.getModel(id) : null;
+      var oldPage = oldModel && oldModel.page;
+      var newPage = newModel && newModel.page;
       this.modelId = id;
+      if (oldPage && newPage && typeof window.zfRefitPagesToSize === 'function') {
+        var changed = (oldPage.width !== newPage.width) || (oldPage.height !== newPage.height) ||
+                      (oldPage.unit !== newPage.unit);
+        if (changed && Array.isArray(this.pages) && this.pages.length) {
+          this.pages = window.zfRefitPagesToSize(this.pages, oldPage.width, oldPage.height, newPage.width, newPage.height);
+        }
+      }
       // A model change can raise the pages-per-sheet (e.g. 8 -> 16 for a
       // 2-sided W-fold). Pad the page array so the imposition has a full
       // sheet to render instead of half-empty back cells.

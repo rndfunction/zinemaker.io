@@ -871,8 +871,8 @@ function zfRefitPagesToSize(pages, fromW, fromH, toW, toH) {
   // letter per line, images tiny). The raw ratio is the correct formula.
   var sx = toW / fromW;
   var sy = toH / fromH;
-  // Use a single scale for fonts and image widths (widths are horizontal),
-  // but allow vertical positions to scale independently.
+  // Horizontal and vertical page-unit scales (widths horizontal, positions
+  // scale per axis). Typography is NOT scaled -- see scaleBox.
   function scaleImg(im) {
     var out = Object.assign({}, im);
     if (typeof im.w === 'number') {
@@ -894,9 +894,11 @@ function zfRefitPagesToSize(pages, fromW, fromH, toW, toH) {
     if (typeof tb.y === 'number') out.y = tb.y * sy;
     if (typeof tb.w === 'number') out.w = tb.w * sx;
     if (typeof tb.h === 'number') out.h = tb.h * sy;
-    // Font size is authored in em relative to the page base; scale by the
-    // smaller axis ratio so text fits both dimensions.
-    if (typeof tb.fontSize === 'number') out.fontSize = tb.fontSize * Math.min(sx, sy);
+    // Do NOT scale font size here. fontSize is a unitless multiplier on the
+    // page base (1.0 = 10pt of --zf-page-base-px, which itself scales with the
+    // page), and fontPt is physical points -- both are already page-relative/
+    // physical and must stay put. Scaling them by sx (~27 on in->mm) made text
+    // ~25x too large after a Letter->A4 switch. Only page-unit geometry scales.
     return out;
   }
   return pages.map(function (p) {

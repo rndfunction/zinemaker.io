@@ -46,6 +46,20 @@
       }
       return base;
     },
+    // Icon on-screen font-size in px, unit-agnostic. img.w is in PAGE units
+    // (in or mm); divide by page width (same units) for a fraction, then
+    // multiply by the page's rendered px width. x0.85 keeps the glyph-padding
+    // factor. Replaces the old (img.w*96*imageScale) which assumed inches and
+    // blew up ~25x on A4 (mm).
+    iconFontPx: function (img) {
+      var m = this.activeModel;
+      var pageEl = this.$refs.miniPage;
+      if (!m || !m.page || !pageEl) return 16;
+      var w = (img && typeof img.w === 'number') ? img.w : 0.6;
+      var pw = m.page.width || 1;
+      var renderedW = pageEl.getBoundingClientRect().width || (pw * 96);
+      return (w / pw) * renderedW * 0.85;
+    },
     imageBlockStyle: function (img) {
       if (!img) return {};
       var m = this.activeModel;
@@ -1486,6 +1500,47 @@
       if (m && m.page && m.page.unit === 'mm') return 25.4;
       return 1;
     },
+    // -------- Group scale / rotate (from the floating panel) --------
+    // When a multi-selection is active, the Width/Rotation controls become
+    // Scale (%) and Rotation (deg) that transform ALL selected elements.
+    // We capture a base snapshot the first time the control is used after a
+    // selection change, then apply ABSOLUTE-from-base each input (no
+    // compounding). Reset on selection change.
+    _ensureGroupScaleBase: function () {
+      if (!this._groupScaleBase) {
+        this._groupScaleBase = this._groupTransformSnapshot();
+        this.groupScalePct = 100;
+      }
+      return this._groupScaleBase;
+    },
+    _ensureGroupRotateBase: function () {
+      if (!this._groupRotateBase) {
+        this._groupRotateBase = this._groupTransformSnapshot();
+        this.groupRotateDeg = 0;
+      }
+      return this._groupRotateBase;
+    },
+    // Scale the whole selection to pct% of its size at base time.
+    setGroupScale: function (pct) {
+      var g = this._ensureGroupScaleBase();
+      if (!g) return;
+      var n = Number(pct);
+      if (isNaN(n) || n <= 0) return;
+      this.groupScalePct = n;
+      this._applyGroupTransform(g, n / 100, 0);
+      this.updateGroupBox();
+    },
+    // Rotate the whole selection by deg relative to its base orientation.
+    setGroupRotation: function (deg) {
+      var g = this._ensureGroupRotateBase();
+      if (!g) return;
+      var n = Number(deg);
+      if (isNaN(n)) return;
+      this.groupRotateDeg = n;
+      this._applyGroupTransform(g, 1, n);
+      var boxEl = this.$refs.groupBoxEl;
+      if (boxEl) { boxEl.style.transformOrigin = 'center center'; boxEl.style.transform = 'rotate(' + n + 'deg)'; }
+    },
     // Unit-aware range for the image-width slider + number input.
     imageWidthRange: function () {
       var s = this._unitScale();
@@ -2420,6 +2475,71 @@
       if (!box) return;
       box.color = c;
     },
+    // Apply one color to EVERY selected element (mixed selection included).
+    // Text boxes use .color as text color; images/icons/stickers/stickies use
+    // .color as tint/variant. Empty string clears to theme/default.
+    setSelectionColor: function (c) {
+      var page = this.active;
+      if (!page) return;
+      var sel = this.selSet || [];
+      for (var i = 0; i < sel.length; i++) {
+        var s = sel[i];
+        var el = null;
+        if (s.kind === 'textBox') {
+          var tb = page.textBoxes || [];
+          for (var a = 0; a < tb.length; a++) { if (tb[a].id === s.id) { el = tb[a]; break; } }
+        } else {
+          var im = page.images || [];
+          for (var b = 0; b < im.length; b++) { if (im[b].id === s.id) { el = im[b]; break; } }
+        }
+        if (el) el.color = c;
+      }
+    },
+    // -------- Multi-selection: apply a value to EVERY selected text box --------
+    // (Absolute-same-value, per policy: 'all these boxes are now X'.)
+    _eachSelectedTextBox: function (fn) {
+      var page = this.active;
+      if (!page || !Array.isArray(page.textBoxes)) return;
+      var sel = this.selSet || [];
+      for (var i = 0; i < sel.length; i++) {
+        if (sel[i].kind !== 'textBox') continue;
+        for (var j = 0; j < page.textBoxes.length; j++) {
+          if (page.textBoxes[j].id === sel[i].id) { fn(page.textBoxes[j]); break; }
+        }
+      }
+    },
+    _eachSelectedImage: function (fn) {
+      var page = this.active;
+      if (!page || !Array.isArray(page.images)) return;
+      var sel = this.selSet || [];
+      for (var i = 0; i < sel.length; i++) {
+        if (sel[i].kind !== 'image') continue;
+        for (var j = 0; j < page.images.length; j++) {
+          if (page.images[j].id === sel[i].id) { fn(page.images[j]); break; }
+        }
+      }
+    },
+    setTextBoxFontSizeAll: function (v) {
+      var pt = Number(v); if (isNaN(pt)) return;
+      pt = Math.max(4, Math.min(200, Math.round(pt * 2) / 2));
+      this._eachSelectedTextBox(function (b) { b.fontPt = pt; delete b.fontSize; });
+    },
+    setTextBoxFontFamilyAll: function (fam) {
+      this._eachSelectedTextBox(function (b) { b.fontFamily = fam; });
+    },
+    setTextBoxLineHeightAll: function (v) {
+      var lh = Number(v); if (isNaN(lh)) return;
+      this._eachSelectedTextBox(function (b) { b.lineHeight = Math.max(0.9, Math.min(2.2, lh)); });
+    },
+    setTextBoxAlignAll: function (align) {
+      this._eachSelectedTextBox(function (b) { b.align = align; if (align === 'justify' && b.autoWidth) { b.autoWidth = false; if (typeof b.w !== 'number' || b.w < 0.5) b.w = 1.8; } });
+    },
+    setIconColorAll: function (c) {
+      this._eachSelectedImage(function (im) { if (im.kind === 'icon') im.color = c; });
+    },
+    setStickerShapeAll: function (shape) {
+      this._eachSelectedImage(function (im) { if (im.kind === 'sticker') im.shape = shape; });
+    },
     setTextBoxFontFamily: function (fam) {
       var box = this.activeTextBox;
       if (!box) return;
@@ -2986,7 +3106,24 @@
           store.status = "Could not load example: " + e.message;
         });
     },
-    toggleDebugFlow: function () { this.debugFlow = !this.debugFlow; }
+    toggleDebugFlow: function () { this.debugFlow = !this.debugFlow; },
+    // Map a stored color (hex OR named variant) to a hex the color input
+    // can display. Named variants render via CSS classes; their hex here is
+    // only for reflecting a representative swatch in the picker.
+    namedColorToHex: function (c) {
+      if (typeof c !== 'string' || !c) return '';
+      if (c.charAt(0) === '#') return c;
+      var map = {
+        yellow: '#f4e08a', pink: '#f2a9b8', blue: '#a2d2ec', green: '#a9df94', orange: '#f3c184',
+        kraft: '#cdb48c', white: '#f3efe6', news: '#e8e4d8', beige: '#e8dcc0', red: '#d7263d', black: '#1b1b1b'
+      };
+      return map[c] || '#1b1b1b';
+    },
+    // The color of the single active element as a display hex.
+    activeColorHex: function () {
+      var one = this.selectedTextBox || this.selectedImage;
+      return this.namedColorToHex(one && one.color ? one.color : '') || '#1b1b1b';
+    },
   };
 
   // Merge the extracted method groups (drawing, layers) into the main
@@ -2998,6 +3135,10 @@
   var ZineEditor = {
     data: function () {
       return {
+        _groupScaleBase: null,
+        _groupRotateBase: null,
+        groupScalePct: 100,
+        groupRotateDeg: 0,
         store: store,
         fileInputKey: 0,
         dragIndex: -1,
@@ -3163,6 +3304,61 @@
       // True when more than one element is selected (multi-select).
       isMultiSelected: function () {
         return (this.selSet || []).length > 1;
+      },
+      // The color shared by ALL selected elements, or '' if they differ
+      // (or none set). Used to reflect the active color in the panel.
+      sharedSelectionColor: function () {
+        var page = this.active;
+        if (!page) return '';
+        var sel = this.selSet || [];
+        if (!sel.length) {
+          var one = this.selectedTextBox || this.selectedImage;
+          return (one && one.color) ? one.color : '';
+        }
+        var seen = null, first = true;
+        for (var i = 0; i < sel.length; i++) {
+          var el = null;
+          if (sel[i].kind === 'textBox') { var tb = page.textBoxes||[]; for (var a=0;a<tb.length;a++){ if(tb[a].id===sel[i].id){el=tb[a];break;} } }
+          else { var im2 = page.images||[]; for (var b=0;b<im2.length;b++){ if(im2[b].id===sel[i].id){el=im2[b];break;} } }
+          if (!el) continue;
+          var c = el.color || '';
+          if (first) { seen = c; first = false; }
+          else if (c !== seen) { return ''; }
+        }
+        return seen || '';
+      },
+      // The font-family shared by ALL selected text boxes, or '' if mixed.
+      sharedFontFamily: function () {
+        var page = this.active;
+        if (!page) return '';
+        var sel = this.selSet || [];
+        if (sel.length < 2) { return this.selectedTextBox ? (this.selectedTextBox.fontFamily || '') : ''; }
+        var seen = null, first = true, n = 0;
+        for (var i = 0; i < sel.length; i++) {
+          if (sel[i].kind !== 'textBox') continue;
+          var tb = page.textBoxes || [], el = null;
+          for (var a = 0; a < tb.length; a++) { if (tb[a].id === sel[i].id) { el = tb[a]; break; } }
+          if (!el) continue;
+          n++;
+          var f = el.fontFamily || '';
+          if (first) { seen = f; first = false; } else if (f !== seen) { return ''; }
+        }
+        return (n > 1) ? (seen || '') : (seen || '');
+      },
+      // The font to SHOW in the select: the shared/selected explicit font if
+      // any, else the closest option matching the theme's actual body font,
+      // so a freshly loaded box shows the font it renders in (not "theme
+      // default").
+      effectiveFontFamily: function () {
+        var explicit = this.sharedFontFamily;
+        if (explicit) return explicit;
+        var t = (window.ZFThemes && store.theme()) ? store.theme() : null;
+        var body = (t && t.bodyFont) ? t.bodyFont.toLowerCase() : '';
+        if (body.indexOf("times new roman") !== -1) return "'Times New Roman', Times, serif";
+        if (body.indexOf("georgia") !== -1) return "Georgia, 'Times New Roman', serif";
+        if (body.indexOf("public sans") !== -1 || body.indexOf("helvetica") !== -1) return "'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+        if (body.indexOf("iowan") !== -1 || body.indexOf("palatino") !== -1) return "'Iowan Old Style', Palatino, Georgia, serif";
+        return '';
       },
       // Union bounding box of the multi-selection, as page-relative
       // percentages, for rendering ONE group selection box. Derived from
@@ -3469,6 +3665,12 @@
       },
       panelMode: function (m) {
         var self = this;
+        // New selection -> reset group scale/rotate bases so each fresh group
+        // starts at 100% / 0deg.
+        this._groupScaleBase = null;
+        this._groupRotateBase = null;
+        this.groupScalePct = 100;
+        this.groupRotateDeg = 0;
         this.$nextTick(function () { self.positionTextPanel(); self.updateGroupBox(); });
       },
       // When the active page changes (or its body is replaced by undo),
@@ -3529,7 +3731,7 @@
       // gap to its right (flips to the left if it would run off-screen).
       // Only one panel is ever visible at a time, so we pick the present ref.
       positionTextPanel: function () {
-        var panel = this.$refs.textPanelEl || this.$refs.imagePanelEl;
+        var panel = this.$refs.floatPanelEl || this.$refs.textPanelEl || this.$refs.imagePanelEl;
         var rail = this.$refs.railEl;
         if (!panel || !rail) return;
         var rr = rail.getBoundingClientRect();
@@ -3672,4 +3874,87 @@
   };
 
   window.ZineEditor = ZineEditor;
+
+  // TEMP DEBUG: ZFDebugTB() logs the selected text box geometry + DOM rect.
+  window.ZFDebugTB = function () {
+    var app = document.querySelector("#app");
+    var s = window.ZF_STORE;
+    if (!s) return "no store";
+    var p = s.activePage();
+    if (!p || !p.activeTextBoxId) return "no active text box";
+    var box = null;
+    (p.textBoxes||[]).forEach(function(t){ if(t.id===p.activeTextBoxId) box=t; });
+    if (!box) return "box not found";
+    var domEl = document.querySelector('[data-zf-text-id="' + box.id + '"]');
+    var pageEl = document.querySelector(".zf-page.zf-mini-page");
+    var pr = pageEl ? pageEl.getBoundingClientRect() : null;
+    var dr = domEl ? domEl.getBoundingClientRect() : null;
+    return {
+      stored: { x: box.x, y: box.y, w: box.w, h: box.h, autoWidth: box.autoWidth, fontPt: box.fontPt, fontSize: box.fontSize, rot: box.rot },
+      pageRect: pr ? { left: Math.round(pr.left), top: Math.round(pr.top), w: Math.round(pr.width), h: Math.round(pr.height) } : null,
+      domRect: dr ? { left: Math.round(dr.left), top: Math.round(dr.top), w: Math.round(dr.width), h: Math.round(dr.height) } : null,
+      relToPage: (pr && dr) ? { left: Math.round(dr.left - pr.left), top: Math.round(dr.top - pr.top), w: Math.round(dr.width), h: Math.round(dr.height) } : null
+    };
+  };
+
+
+  // TEMP DEBUG: ZFDebugImages() dumps every image/icon on the active page.
+  window.ZFDebugImages = function () {
+    var s = window.ZF_STORE;
+    if (!s) return "no store";
+    var p = s.activePage();
+    if (!p) return "no page";
+    return (p.images || []).map(function (im) {
+      return { id: im.id, kind: im.kind, src: (im.src||"").slice(0,20), x: im.x, y: im.y, w: im.w, h: im.h, z: im.z, hidden: !!im.hidden, wrap: im.wrap, placeholder: !!im.placeholder };
+    });
+  };
+
+
+  // TEMP DEBUG: compact one-line-per-image summary (no truncation).
+  window.ZFDebugImages = function () {
+    var s = window.ZF_STORE; if (!s) return "no store";
+    var p = s.activePage(); if (!p) return "no page";
+    return (p.images || []).map(function (im) {
+      return [im.kind, (im.src||"").slice(0,22), "x=" + Math.round(im.x||0), "y=" + Math.round(im.y||0), "w=" + (im.w), "h=" + (im.h), "z=" + (im.z), "hid=" + (!!im.hidden), "wrap=" + (im.wrap||"")].join(" | ");
+    }).join("\n");
+  };
+
+
+  // TEMP DEBUG: all elements on the active page with geometry + z.
+  window.ZFDebugElements = function () {
+    var s = window.ZF_STORE; if (!s) return "no store";
+    var p = s.activePage(); if (!p) return "no page";
+    var lines = [];
+    (p.images || []).forEach(function (im) {
+      lines.push("IMG " + im.kind + " id=" + im.id + " x=" + Math.round(im.x||0) + " y=" + Math.round(im.y||0) + " w=" + im.w + " h=" + im.h + " z=" + im.z + " hid=" + (!!im.hidden));
+    });
+    (p.textBoxes || []).forEach(function (tb) {
+      lines.push("TB  id=" + tb.id + " x=" + Math.round(tb.x||0) + " y=" + Math.round(tb.y||0) + " w=" + tb.w + " h=" + tb.h + " z=" + tb.z + " auto=" + (!!tb.autoWidth) + " hid=" + (!!tb.hidden));
+    });
+    return lines.join("\n");
+  };
+
+
+  // TEMP DEBUG: live DOM rects of the active page text boxes + icons,
+  // relative to the page, so we see what actually covers what.
+  window.ZFDebugRects = function () {
+    var s = window.ZF_STORE; if (!s) return "no store";
+    var p = s.activePage(); if (!p) return "no page";
+    var pageEl = document.querySelector(".zf-page.zf-mini-page");
+    if (!pageEl) return "no page el";
+    var pr = pageEl.getBoundingClientRect();
+    function rel(el) { var r = el.getBoundingClientRect(); return { l: Math.round(r.left-pr.left), t: Math.round(r.top-pr.top), w: Math.round(r.width), h: Math.round(r.height) }; }
+    var out = [];
+    (p.textBoxes||[]).forEach(function(tb){
+      var d = document.querySelector('[data-zf-text-id="' + tb.id + '"]');
+      out.push("TB z=" + tb.z + " " + (d ? JSON.stringify(rel(d)) : "NO-DOM"));
+    });
+    (p.images||[]).forEach(function(im){
+      var d = document.querySelector('[data-zf-img-id="' + im.id + '"]');
+      out.push("IMG " + im.kind + " z=" + im.z + " " + (d ? JSON.stringify(rel(d)) : "NO-DOM"));
+    });
+    out.push("PAGE w=" + Math.round(pr.width) + " h=" + Math.round(pr.height));
+    return out.join("\n");
+  };
+
 })();

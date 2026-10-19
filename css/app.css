@@ -1123,7 +1123,8 @@
        Anchored to .zf-editor (position: relative), NOT a grid child, so the
        3-column grid is untouched. Hidden in print and on narrow screens. */
     .zf-text-panel,
-    .zf-image-panel {
+    .zf-image-panel,
+    .zf-float-panel {
       /* Position is driven by JS (positionTextPanel) so the panel top
          aligns with the rail top and its left sits one grid-gap to the
          right of the rail -- resize/scroll stable. These are fallbacks
@@ -1160,8 +1161,8 @@
     .zf-image-panel .zf-text-panel-align { flex-wrap: wrap; }
     .zf-text-panel-align .zf-btn,
     .zf-image-panel .zf-text-panel-align .zf-btn { flex: 1 1 auto; font-size: 0.8rem; padding: 0.25rem 0.4rem; }
-    @media (max-width: 1200px) { .zf-text-panel, .zf-image-panel { display: none !important; } }
-    @media print { .zf-text-panel, .zf-image-panel { display: none !important; } }
+    @media (max-width: 1200px) { .zf-text-panel, .zf-image-panel, .zf-float-panel { display: none !important; } }
+    @media print { .zf-text-panel, .zf-image-panel, .zf-float-panel { display: none !important; } }
 
     .zf-draw-panel {
       display: flex;

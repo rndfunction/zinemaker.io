@@ -193,7 +193,7 @@
                    :data-zf-img-id="img.id"
                    tabindex="0"
                       :class="{ 'zf-img-selected': isSelected('image', img.id), 'zf-single-selected': isSingleSelected('image', img.id), 'zf-handle-owner': active.activeImageId === img.id && !isMultiSelected, 'zf-multi-selected': isMultiSelected && isSelected('image', img.id), 'zf-image-dragging': imageDrag && imageDrag.imgId === img.id, 'zf-img-placeholder': img.placeholder, 'zf-element-hover': hoveredEl.kind === 'image' && hoveredEl.id === img.id && !isSelected('image', img.id) }"
-                   :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: ((img.w || 0.6) * 96 * imageScale * 0.85) + 'px' } : {}))"
+                   :style="Object.assign({}, imageStyle(img), (img.kind === 'icon' ? { fontSize: iconFontPx(img) + 'px' } : {}))"
                      @mousedown="onImageMouseDownItem($event, img)"
                      @click.stop="onElementClick('image', img, $event)"
                      @dblclick.stop="editDrawing(img)"
@@ -332,14 +332,8 @@
       </div>
 
       <aside class="zf-rail" ref="railEl" aria-label="Formatting and insert tools">
-        <div class="zf-rail-group" role="toolbar" aria-label="Text formatting">
-          <label class="zf-rail-btn zf-rail-color" title="Text or element color" aria-label="Color" @mousedown.prevent>
-            <iconify-icon icon="ph:palette" aria-hidden="true"></iconify-icon>
-            <input type="color" value="#1b1b1b" @mousedown.prevent @input="applyColor($event.target.value)" aria-label="Choose color" />
-          </label>
 
 
-        </div>
         <div class="zf-rail-sep" aria-hidden="true"></div>
         <div class="zf-rail-group" role="toolbar" aria-label="Add elements">
           <label class="zf-rail-btn" title="Add an image" aria-label="Add image">
@@ -400,8 +394,106 @@
            shown when a text box is selected. Not a grid child, so it cannot
            shift the canvas. Includes inline B/I/U (selected text) plus
            box-level type controls. -->
-      <aside v-if="panelMode === 'text' && !drawingMode" ref="textPanelEl" class="zf-text-panel" role="region" aria-label="Text properties">
-        <div class="zf-text-panel-head">Text</div>
+      <!-- Generic floating properties panel. One shell; body switches by
+           selection: a MULTI-selection shows group Scale/Rotation (applies to
+           ALL selected elements of any kind); a single text box shows text
+           controls; a single image shows image controls. Positioned by JS. -->
+      <aside v-if="panelMode !== 'none' && !drawingMode" ref="floatPanelEl" class="zf-float-panel" role="region" aria-label="Element properties">
+        <div class="zf-text-panel-head">{{ isMultiSelected ? 'Selection' : (panelMode === 'image' ? 'Image' : 'Text') }}</div>
+
+        <!-- ======== MULTI-SELECTION: group scale + rotation ======== -->
+        <template v-if="isMultiSelected">
+          <label class="zf-text-panel-label" for="zf-grp-scale">Scale ({{ groupScalePct }}%)</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-grp-scale" type="range" min="10" max="400" step="1"
+                   :value="groupScalePct" @input="setGroupScale($event.target.value)" style="flex:1;" aria-label="Group scale percent" />
+            <input type="number" min="10" max="400" step="1" style="width:64px;"
+                   :value="groupScalePct" @input="setGroupScale($event.target.value)" @change="setGroupScale($event.target.value)" aria-label="Group scale percent" />
+          </div>
+
+          <label class="zf-text-panel-label" for="zf-grp-color">Color</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-grp-color" type="color" :value="namedColorToHex(sharedSelectionColor) || '#1b1b1b'" @input="setSelectionColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Selection color" />
+            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setSelectionColor('')">Theme color</button>
+          </div>
+
+          <label class="zf-text-panel-label" for="zf-grp-rot">Rotation ({{ groupRotateDeg }}&deg;)</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-grp-rot" type="range" min="-180" max="180" step="1"
+                   :value="groupRotateDeg" @input="setGroupRotation($event.target.value)" style="flex:1;" aria-label="Group rotation degrees" />
+            <input type="number" min="-180" max="180" step="1" style="width:64px;"
+                   :value="groupRotateDeg" @input="setGroupRotation($event.target.value)" @change="setGroupRotation($event.target.value)" aria-label="Group rotation degrees" />
+          </div>
+
+          <!-- Shared TEXT controls: shown when EVERY selected item is a text box -->
+          <template v-if="panelMode === 'text'">
+            <label class="zf-text-panel-label" for="zf-grp-size">Font size ({{ textBoxFontPt(selectedTextBox) }} pt)</label>
+            <div class="zf-text-panel-row">
+              <input id="zf-grp-size" type="range" min="4" max="72" step="0.5" style="flex:1;"
+                     :value="textBoxFontPt(selectedTextBox)" @input="setTextBoxFontSizeAll($event.target.value)" aria-label="Font size (all text boxes)" />
+              <input type="number" min="4" max="200" step="0.5" style="width:64px;"
+                     :value="textBoxFontPt(selectedTextBox)" @input="setTextBoxFontSizeAll($event.target.value)" @change="setTextBoxFontSizeAll($event.target.value)" aria-label="Font size points (all text boxes)" />
+            </div>
+
+            <label class="zf-text-panel-label" for="zf-grp-font">Font</label>
+            <select id="zf-grp-font" class="zf-input" :value="effectiveFontFamily" @change="setTextBoxFontFamilyAll($event.target.value)">
+              <option value="">Use theme default</option>
+              <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+              <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino (serif)</option>
+              <option value="'Times New Roman', Times, serif">Times (serif)</option>
+              <option value="Garamond, 'Iowan Old Style', Georgia, serif">Garamond (serif)</option>
+              <option value="'Public Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Public Sans (sans)</option>
+              <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica (sans)</option>
+              <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">System UI (sans)</option>
+              <option value="Verdana, Geneva, Tahoma, sans-serif">Verdana (sans)</option>
+              <option value="'Trebuchet MS', 'Helvetica Neue', Helvetica, Arial, sans-serif">Trebuchet MS (sans)</option>
+              <option value="Impact, 'Arial Black', sans-serif">Impact (bold)</option>
+              <option value="'Arial Black', 'Arial Bold', Gadget, sans-serif">Arial Black (bold)</option>
+              <option value="'Courier New', Courier, monospace">Courier (mono)</option>
+              <option value="ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace">Monospace (mono)</option>
+              <option value="'Comic Sans MS', cursive">Comic (casual)</option>
+            </select>
+
+            <label class="zf-text-panel-label" for="zf-grp-lh">Line height ({{ (selectedTextBox.lineHeight || 1.35).toFixed(2) }})</label>
+            <div class="zf-text-panel-row">
+              <input id="zf-grp-lh" type="range" min="0.9" max="2.2" step="0.05"
+                     :value="selectedTextBox.lineHeight || 1.35" @input="setTextBoxLineHeightAll($event.target.value)" style="flex:1;" aria-label="Line height (all text boxes)" />
+              <input type="number" min="0.9" max="2.2" step="0.05" style="width:64px;"
+                     :value="(selectedTextBox.lineHeight || 1.35).toFixed(2)" @input="setTextBoxLineHeightAll($event.target.value)" @change="setTextBoxLineHeightAll($event.target.value)" aria-label="Line height (all text boxes)" />
+            </div>
+
+            <span class="zf-text-panel-label">Alignment</span>
+            <div class="zf-text-panel-row zf-text-panel-align">
+              <button class="zf-btn" :class="{ 'zf-btn-primary': (selectedTextBox.align === 'left' || !selectedTextBox.align) }" @click="setTextBoxAlignAll('left')">Left</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'center' }" @click="setTextBoxAlignAll('center')">Center</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'right' }" @click="setTextBoxAlignAll('right')">Right</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedTextBox.align === 'justify' }" @click="setTextBoxAlignAll('justify')">Justify</button>
+            </div>
+          </template>
+
+          <!-- Shared IMAGE controls: shown when EVERY selected item is an image -->
+          <template v-if="panelMode === 'image'">
+            <template v-if="selectedImage.kind === 'icon'">
+              <label class="zf-text-panel-label" for="zf-grp-icon-color">Icon color</label>
+              <div class="zf-text-panel-row">
+                <input id="zf-grp-icon-color" type="color" :value="selectedImage.color || '#1b1b1b'" @input="setIconColorAll($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Icon color (all)" />
+                <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setIconColorAll('')">Theme color</button>
+              </div>
+            </template>
+            <template v-if="selectedImage.kind === 'sticker'">
+              <span class="zf-text-panel-label">Shape</span>
+              <div class="zf-text-panel-row zf-text-panel-align">
+                <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'circle' || !selectedImage.shape }" @click="setStickerShapeAll('circle')">Circle</button>
+                <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'oval' }" @click="setStickerShapeAll('oval')">Oval</button>
+                <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'square' }" @click="setStickerShapeAll('square')">Square</button>
+                <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'starburst' }" @click="setStickerShapeAll('starburst')">Star</button>
+              </div>
+            </template>
+          </template>
+        </template>
+
+        <!-- ======== SINGLE TEXT BOX ======== -->
+        <template v-else-if="panelMode === 'text'">
 
         <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} {{ pageUnitLabel() }})</label>
         <div class="zf-text-panel-row">
@@ -429,7 +521,7 @@
         </div>
 
         <label class="zf-text-panel-label" for="zf-tp-font">Font</label>
-        <select id="zf-tp-font" class="zf-input" :value="selectedTextBox.fontFamily || ''" @change="setTextBoxFontFamily($event.target.value)">
+        <select id="zf-tp-font" class="zf-input" :value="effectiveFontFamily" @change="setTextBoxFontFamily($event.target.value)">
           <option value="">Use theme default</option>
           <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
           <option value="'Iowan Old Style', Palatino, Georgia, serif">Palatino (serif)</option>
@@ -477,66 +569,64 @@
 
         <label class="zf-text-panel-label" for="zf-tp-color">Color</label>
         <div class="zf-text-panel-row">
-          <input id="zf-tp-color" type="color" :value="selectedTextBox.color || '#1b1b1b'" @input="setTextBoxColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Text color" />
+          <input id="zf-tp-color" type="color" :value="activeColorHex" @input="setTextBoxColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Text color" />
           <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setTextBoxColor('')">Theme color</button>
         </div>
 
         <div class="zf-text-panel-row">
           <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetTextBox">Reset</button>
         </div>
+        </template>
+
+        <!-- ======== SINGLE IMAGE ======== -->
+        <template v-else-if="panelMode === 'image'">
+          <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} {{ pageUnitLabel() }})</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-ip-w" type="range" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step"
+                   :value="selectedImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" aria-label="Image width slider" />
+            <input type="number" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step" style="width:64px;"
+                   :value="(selectedImage.w || 1.5).toFixed(2)"
+                   @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width" />
+          </div>
+
+          <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ selectedImage.rot || 0 }}&deg;)</label>
+          <div class="zf-text-panel-row">
+            <input id="zf-ip-rot" type="range" min="-180" max="180" step="1"
+                   :value="selectedImage.rot || 0" @input="setImageRot($event.target.value)" style="flex:1;" aria-label="Image rotation slider" />
+            <input type="number" min="-180" max="180" step="1" style="width:64px;"
+                   :value="selectedImage.rot || 0"
+                   @input="setImageRot($event.target.value)" @change="setImageRot($event.target.value)" aria-label="Image rotation in degrees" />
+          </div>
+
+          <div class="zf-text-panel-row">
+            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitImage">Fit width</button>
+            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetImage">Reset</button>
+          </div>
+
+          <template v-if="selectedImage.kind === 'icon'">
+            <label class="zf-text-panel-label" for="zf-ip-icon-color">Icon color</label>
+            <div class="zf-text-panel-row">
+              <input id="zf-ip-icon-color" type="color" :value="activeColorHex" @input="setIconColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Icon color" />
+              <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setIconColor('')">Theme color</button>
+            </div>
+          </template>
+
+          <template v-if="selectedImage.kind === 'sticker'">
+            <span class="zf-text-panel-label">Shape</span>
+            <div class="zf-text-panel-row zf-text-panel-align">
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'circle' || !selectedImage.shape }" @click="setStickerShape('circle')">Circle</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'oval' }" @click="setStickerShape('oval')">Oval</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'square' }" @click="setStickerShape('square')">Square</button>
+              <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'starburst' }" @click="setStickerShape('starburst')">Star</button>
+            </div>
+          </template>
+        </template>
       </aside>
 
       <!-- Image panel: mirrors the Text panel. Same floating slot/behavior,
            shown when an image (photo/icon/tape/scrap/sticky/sticker) is
            selected. Carries the image controls that used to live only in the
            slide-out inspector. No layer buttons: z-order is served by the
-           right-click menu and the Layers list. -->
-      <aside v-if="panelMode === 'image' && !drawingMode" ref="imagePanelEl" class="zf-image-panel" role="region" aria-label="Image properties">
-        <div class="zf-text-panel-head">Image</div>
-
-        <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} {{ pageUnitLabel() }})</label>
-        <div class="zf-text-panel-row">
-          <input id="zf-ip-w" type="range" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step"
-                 :value="selectedImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" aria-label="Image width slider" />
-          <input type="number" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step" style="width:64px;"
-                 :value="(selectedImage.w || 1.5).toFixed(2)"
-                 @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width in inches" />
-        </div>
-
-        <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ selectedImage.rot || 0 }}&deg;)</label>
-        <div class="zf-text-panel-row">
-          <input id="zf-ip-rot" type="range" min="-180" max="180" step="1"
-                 :value="selectedImage.rot || 0" @input="setImageRot($event.target.value)" style="flex:1;" aria-label="Image rotation slider" />
-          <input type="number" min="-180" max="180" step="1" style="width:64px;"
-                 :value="selectedImage.rot || 0"
-                 @input="setImageRot($event.target.value)" @change="setImageRot($event.target.value)" aria-label="Image rotation in degrees" />
-        </div>
-
-        <!-- Layout row removed: 'block' mode was a leftover from the inline-\n             body era and only shoved images to the top. Free placement is the\n             only meaningful mode now. -->
-
-        <div class="zf-text-panel-row">
-          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitImage">Fit width</button>
-          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetImage">Reset</button>
-        </div>
-
-        <template v-if="selectedImage.kind === 'icon'">
-          <label class="zf-text-panel-label" for="zf-ip-icon-color">Icon color</label>
-          <div class="zf-text-panel-row">
-            <input id="zf-ip-icon-color" type="color" :value="selectedImage.color || '#1b1b1b'" @input="setIconColor($event.target.value)" style="width:44px;height:28px;border:1px solid var(--zf-border);border-radius:4px;background:#ffffff;cursor:pointer;" aria-label="Icon color" />
-            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="setIconColor('')">Theme color</button>
-          </div>
-        </template>
-
-        <template v-if="selectedImage.kind === 'sticker'">
-          <span class="zf-text-panel-label">Shape</span>
-          <div class="zf-text-panel-row zf-text-panel-align">
-            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'circle' || !selectedImage.shape }" @click="setStickerShape('circle')">Circle</button>
-            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'oval' }" @click="setStickerShape('oval')">Oval</button>
-            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'square' }" @click="setStickerShape('square')">Square</button>
-            <button class="zf-btn" :class="{ 'zf-btn-primary': selectedImage.shape === 'starburst' }" @click="setStickerShape('starburst')">Star</button>
-          </div>
-        </template>
-      </aside>
 
       <!-- Drawing tools: its OWN column to the right of the rail, shown only
            while drawing, so it neither covers the canvas nor crowds the rail.
