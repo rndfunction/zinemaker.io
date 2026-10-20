@@ -771,6 +771,153 @@ function zfRenderCalliSegment(ctx, a, b, stroke, scale, prevEdge) {
   return { L: bL, R: bR };
 }
 
+// Render an ENTIRE calligraphy stroke as one continuous filled ribbon:
+// compute per-VERTEX left/right offsets (normal = average of adjacent
+// segment directions; half-width from nib angle with a real floor), then
+// fill a single polygon down the left edge and back up the right. This
+// removes the per-segment seams/notches that made the old quads look like
+// stacked stamps.
+// Chaikin corner-cutting smoothing over a point list. `strength` is the
+// number of passes (0 = return a shallow copy unchanged). Each pass replaces
+// every segment A->B with points at 25% and 75% along it, which rounds sharp
+// corners while keeping the stroke's overall path. Endpoints are preserved on
+// each pass so the stroke still starts and ends where the user put the pen.
+// Per-point width `w` (used by speed-variable strokes) is carried along by
+// interpolating it the same way, so smoothed strokes keep their varying
+// thickness. Returns a NEW array; the input is never mutated.
+function zfSmoothPoints(pts, strength, spacing) {
+  var s = (typeof strength === 'number') ? Math.max(0, Math.min(4, Math.round(strength))) : 0;
+  var gap = (typeof spacing === 'number' && spacing > 0) ? spacing : 0;
+  var out = [];
+  if (!Array.isArray(pts)) return out;
+  // Distance decimation FIRST. The recorder saves a point roughly every
+  // 0.001in, so raw points are nearly collinear and Chaikin alone barely
+  // changes the shape (the smoothing slider felt like a no-op). Thinning so
+  // kept points are at least `gap` apart lets a corner span real distance,
+  // so the Chaikin passes below visibly round it. Endpoints are preserved.
+  if (gap > 0 && pts.length > 2) {
+    out.push(pts[0]);
+    var _lastKept = pts[0];
+    for (var _d = 1; _d < pts.length - 1; _d++) {
+      var _ddx = pts[_d].x - _lastKept.x, _ddy = pts[_d].y - _lastKept.y;
+      if ((_ddx * _ddx + _ddy * _ddy) >= gap * gap) { out.push(pts[_d]); _lastKept = pts[_d]; }
+    }
+    out.push(pts[pts.length - 1]);
+  } else {
+    for (var i = 0; i < pts.length; i++) out.push(pts[i]);
+  }
+  if (s <= 0 || out.length < 3) return out;
+  for (var pass = 0; pass < s; pass++) {
+    if (out.length < 3) break;
+    var next = [];
+    // Keep the first point anchored so the entry does not creep backward.
+    next.push(out[0]);
+    for (var k = 0; k < out.length - 1; k++) {
+      var A = out[k], B = out[k + 1];
+      var q1 = { x: A.x * 0.75 + B.x * 0.25, y: A.y * 0.75 + B.y * 0.25 };
+      var q2 = { x: A.x * 0.25 + B.x * 0.75, y: A.y * 0.25 + B.y * 0.75 };
+      if (typeof A.w === 'number' || typeof B.w === 'number') {
+        var aw = (typeof A.w === 'number') ? A.w : B.w;
+        var bw = (typeof B.w === 'number') ? B.w : A.w;
+        q1.w = aw * 0.75 + bw * 0.25;
+        q2.w = aw * 0.25 + bw * 0.75;
+      }
+      next.push(q1);
+      next.push(q2);
+    }
+    // Keep the last point anchored so the exit does not creep forward.
+    next.push(out[out.length - 1]);
+    out = next;
+  }
+  return out;
+}
+
+// Map a 0..4 smoothing strength to a minimum point-spacing distance, in the
+// same units as stroke points (page inches). 0 = no smoothing. The spacing
+// grows with strength so higher settings decimate more aggressively and the
+// smoothing is clearly visible. Values are tuned for the mini-page (~2.75in)
+// and expressed as a fraction of that, so bigger models scale naturally.
+function zfSmoothSpacingIn(strength, scalePxPerIn) {
+  var s = (typeof strength === 'number') ? Math.max(0, Math.min(4, Math.round(strength))) : 0;
+  if (s <= 0) return 0;
+  // Work in SCREEN PIXELS so smoothing looks identical on every model (a
+  // mini-8 page and a Letter page both feel "smooth" the same way). Convert
+  // the px target to inches for the point-space decimation. scalePxPerIn is
+  // px per inch (zfRenderStrokes passes exactly this).
+  var sc = (typeof scalePxPerIn === 'number' && scalePxPerIn > 0) ? scalePxPerIn : 96;
+  // Minimum spacing between kept points, in screen px, per strength.
+  var px = (s === 1) ? 2 : (s === 2) ? 5 : (s === 3) ? 9 : 14;
+  return px / sc;
+}
+
+function zfRenderCalliStroke(ctx, pts, stroke, scale) {
+  // Smooth the calligraphy CENTERLINE so the interior of a stroke flows
+  // instead of looking segmented, while leaving the true endpoints in place
+  // so the taper still comes to clean points. Calligraphy is capped at 2
+  // passes so it never rounds away the flat-nib character; the user's
+  // smoothing strength scales within that cap.
+  if (Array.isArray(pts) && pts.length >= 3) {
+    var _smRaw = (typeof stroke.smoothing === 'number') ? stroke.smoothing : 0;
+    var _smCap = Math.min(2, Math.max(0, Math.round(_smRaw)));
+    if (_smCap > 0) pts = zfSmoothPoints(pts, _smCap, zfSmoothSpacingIn(_smRaw, scale));
+  }
+  var n = pts.length;
+  if (n === 0) return;
+  var base = stroke.size * scale;
+  var theta = (stroke.nib || 0) * Math.PI / 180;
+  function hwFor(phi) {
+    // Flat nib: width depends on travel vs nib angle. Floor at 22% of the
+    // base so the nib never pinches to a hairline (reads as solid ink).
+    return Math.max((base / 2) * Math.abs(Math.sin(phi - theta)), base * 0.22);
+  }
+  function dir(i) {
+    var a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    var ax = a.x * scale, ay = a.y * scale, bx = b.x * scale, by = b.y * scale;
+    return Math.atan2(by - ay, bx - ax);
+  }
+  // Taper factor per point: 0 at the very ends (a true point), ramping to 1
+  // over a short run of points, and 1 through the body. This is what gives a
+  // calligraphy stroke its pointed entry and exit -- without it every stroke
+  // ended in a blunt, full-width chop. The taper length scales with the
+  // stroke (a few points, capped at a third of the stroke) so short flicks
+  // still taper and long strokes are not visibly thinned.
+  var taperLen = Math.max(1, Math.min(3, Math.floor(n / 3)));
+  function taperAt(i) {
+    // Very short strokes (2-3 points) cannot afford a true 0-width tip at
+    // BOTH ends or the whole ribbon collapses to a hairline. For those,
+    // taper to a visible minimum instead of an absolute point.
+    var tip = (n >= 4) ? 0 : 0.35;
+    if (i === 0 || i === n - 1) return tip;
+    var dStart = i, dEnd = (n - 1) - i;
+    var d = Math.min(dStart, dEnd);
+    if (d >= taperLen) return 1;
+    var f = d / taperLen;
+    return tip + (1 - tip) * f;
+  }
+  var left = [], right = [];
+  for (var i = 0; i < n; i++) {
+    var phi = dir(i);
+    var hw = hwFor(phi) * taperAt(i);
+    var nx = -Math.sin(phi), ny = Math.cos(phi);
+    var px = pts[i].x * scale, py = pts[i].y * scale;
+    left.push({ x: px + nx * hw, y: py + ny * hw });
+    right.push({ x: px - nx * hw, y: py - ny * hw });
+  }
+  if (n === 1) {
+    var r1 = Math.max(0.5, hwFor(dir(0)));
+    ctx.beginPath();
+    ctx.arc(pts[0].x * scale, pts[0].y * scale, r1, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (var l = 1; l < n; l++) ctx.lineTo(left[l].x, left[l].y);
+  for (var rr = n - 1; rr >= 0; rr--) ctx.lineTo(right[rr].x, right[rr].y);
+  ctx.closePath();
+  ctx.fill();
+}
+
 // Draw a full stroke list. `opts.reserve` (0..1) shrinks the rendered drawing
 // within its box (used when the box is slightly larger than the ink).
 function zfRenderStrokes(ctx, strokes, scale, opts) {
@@ -784,6 +931,17 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
     var st = strokes[s];
     var pts = st.pts || [];
     if (pts.length === 0) continue;
+    // Apply the user's smoothing strength to pen/eraser strokes before any
+    // drawing branch runs. Calligraphy has its own centerline smoothing in
+    // zfRenderCalliStroke (so its tapered tips are preserved), so skip it
+    // here. This is what makes the Smoothing control visibly change the
+    // stroke: 0 keeps the raw sampled polyline (angular), higher values
+    // round the corners via Chaikin passes. The variable-width and plain
+    // polyline branches below both consume this smoothed list.
+    if (st.tool !== 'calligraphy') {
+      var _sm = (typeof st.smoothing === 'number') ? st.smoothing : 0;
+      if (_sm > 0) pts = zfSmoothPoints(pts, _sm, zfSmoothSpacingIn(_sm, scale));
+    }
     var op = (typeof st.opacity === 'number' ? st.opacity : 1) * alpha;
     var erasing = (st.tool === 'eraser');
     if (erasing) {
@@ -798,14 +956,9 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
     }
 
     if (st.tool === 'calligraphy') {
-      var prevEdge = null;
-      for (var c = 1; c < pts.length; c++) {
-        prevEdge = zfRenderCalliSegment(ctx, pts[c-1], pts[c], st, scale, prevEdge);
-      }
-      if (pts.length === 1) {
-        // A tap: draw a small quad.
-        zfRenderCalliSegment(ctx, pts[0], { x: pts[0].x + 0.004, y: pts[0].y + 0.004 }, st, scale, null);
-      }
+      // One continuous filled ribbon for the whole stroke (no per-segment
+      // seams/notches).
+      zfRenderCalliStroke(ctx, pts, st, scale);
     } else {
       // Variable-width pen (speed-variable ink): if points carry per-point
       // width (pt.w, inches), draw tapered filled quads between them so the
@@ -853,24 +1006,14 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
         ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
         ctx.lineTo(pts[0].x * scale + 0.01, pts[0].y * scale + 0.01);
         ctx.stroke();
-      } else if (sm > 0) {
-        // Retain 3..5 points like the live editor; curve through midpoints.
-        var keep = 2 + sm;
-        var buf = [];
-        ctx.beginPath();
-        for (var q = 0; q < pts.length; q++) {
-          buf.push(pts[q]);
-          if (buf.length > keep) buf.shift();
-          if (buf.length >= 3) {
-            var p0 = buf[buf.length - 3], p1 = buf[buf.length - 2], p2 = buf[buf.length - 1];
-            var m1x = (p0.x + p1.x) / 2 * scale, m1y = (p0.y + p1.y) / 2 * scale;
-            var m2x = (p1.x + p2.x) / 2 * scale, m2y = (p1.y + p2.y) / 2 * scale;
-            if (q === 2) ctx.moveTo(m1x, m1y);
-            ctx.quadraticCurveTo(p1.x * scale, p1.y * scale, m2x, m2y);
-          }
-        }
-        ctx.stroke();
       } else {
+        // Points are already smoothed upstream (zfSmoothPoints) when the
+        // stroke's smoothing strength is above 0, so just stroke the
+        // polyline. The old midpoint-curve branch here duplicated that work
+        // (which is why the Smoothing control appeared to do nothing) and
+        // would have double-smoothed now. With this unified, strength 0
+        // yields the angular sampled polyline and higher values yield a
+        // visibly rounder stroke.
         ctx.beginPath();
         ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
         for (var p = 1; p < pts.length; p++) {

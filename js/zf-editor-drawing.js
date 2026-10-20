@@ -200,11 +200,22 @@
       var p = this._drawPos(evt);
       var last = this._drawLast || p;
 
-      // Calligraphy tool: fill a nib-shaped quad for this segment and return.
-      // (Velocity/smoothing do not apply -- width comes from direction.)
+      // Calligraphy tool: re-render the WHOLE in-progress stroke with the
+      // tapered ribbon renderer every move, so the live preview matches the
+      // committed result exactly (pointed ends and all). The old approach
+      // appended blunt per-segment quads during the drag and only tapered on
+      // release, which made the stroke visibly "snap" to points at pointer-up.
+      // Temporarily include the active stroke in the stroke list, redraw the
+      // canvas, then remove it again (it is pushed for real on pointer-up).
       if (this.drawTool === 'calligraphy') {
         this._drawRecordPoint(p);
-        this._calliSegment(ctx, last, p);
+        if (!Array.isArray(this._strokes)) this._strokes = [];
+        var _live = this._currentStroke;
+        if (_live && _live.pts && _live.pts.length) {
+          this._strokes.push(_live);
+          this._redrawCanvasFromStrokes();
+          this._strokes.pop();
+        }
         this._drawLast = p;
         return;
       }
@@ -230,27 +241,27 @@
       this._drawRecordPoint(p, _szUnit * (this.drawSize ? (width / this.drawSize) : 1));
 
       if (this.drawSmoothing > 0) {
-        // Quadratic smoothing: keep the last two points and draw a curve
-        // through the midpoint, using the previous point as the control.
-        // Strength controls how far back the smoothing reaches (more points
-        // = smoother, at the cost of a little lag).
-        var pts = this._drawPts || [last, last];
-        pts.push(p);
-        var keep = 2 + this.drawSmoothing; // 3..5 points retained
-        if (pts.length > keep) pts.shift();
-        this._drawPts = pts;
-        var n = pts.length;
-        if (n >= 3) {
-          var p0 = pts[n - 3];
-          var p1 = pts[n - 2];
-          var p2 = pts[n - 1];
-          var mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
-          var mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-          ctx.beginPath();
-          ctx.moveTo(mid1.x, mid1.y);
-          ctx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
-          this._drawStrokeStyle(ctx, width);
-          ctx.stroke();
+        // Live smoothing uses the SAME Chaikin smoother (zfSmoothPoints) as
+        // the committed renderer, so the pen stroke does not change shape on
+        // release. Keep a small rolling window of recent points, smooth it,
+        // and stroke the polyline through the smoothed points. Chaikin is
+        // affine-invariant, so smoothing here in screen px produces the same
+        // curve the committer gets after smoothing in page inches.
+        // (The old rolling-window buffer and its CSS-px-per-inch spacing math
+        // lived here. The live preview now redraws the whole in-progress
+        // stroke through _redrawCanvasFromStrokes, so those locals are gone.)
+        // Render the WHOLE in-progress stroke through the same path the
+        // commit uses (temporarily include it in _strokes, redraw, pop), so
+        // the live preview is the exact geometry that gets baked at
+        // pointer-up. The old rolling-window preview only smoothed the last
+        // few points, so a finished stroke could smooth differently than the
+        // moving preview -- the "big jump when I press Done" surprise.
+        if (!Array.isArray(this._strokes)) this._strokes = [];
+        var _livePen = this._currentStroke;
+        if (_livePen && _livePen.pts && _livePen.pts.length) {
+          this._strokes.push(_livePen);
+          this._redrawCanvasFromStrokes();
+          this._strokes.pop();
         }
       } else {
         ctx.beginPath();
@@ -268,6 +279,23 @@
       // Finalize the current vector stroke.
       if (this._currentStroke && this._currentStroke.pts.length) {
         if (!Array.isArray(this._strokes)) this._strokes = [];
+        // BAKE the smoothing into the stored points now, using the same
+        // px-per-inch the commit renderer will use, then zero the strength
+        // so the renderer passes the baked geometry through untouched. This
+        // is what keeps the finished stroke identical to the live preview:
+        // previously the live path smoothed with one spacing and the commit
+        // path re-smoothed with another, so Done produced a different (often
+        // less smoothed) stroke than the one you saw while drawing.
+        var _canvas = this.$refs.drawCanvas;
+        var _m = this.activeModel;
+        var _smBake = (typeof this._currentStroke.smoothing === 'number') ? this._currentStroke.smoothing : 0;
+        if (_smBake > 0 && _canvas && _m && _m.page && _m.page.width) {
+          var _dpr = window.devicePixelRatio || 1;
+          var _pxPerIn = (_canvas.width / _dpr) / _m.page.width;
+          var _cap = (this._currentStroke.tool === 'calligraphy') ? Math.min(2, _smBake) : _smBake;
+          this._currentStroke.pts = zfSmoothPoints(this._currentStroke.pts, _cap, zfSmoothSpacingIn(_smBake, _pxPerIn));
+          this._currentStroke.smoothing = 0;
+        }
         this._strokes.push(this._currentStroke);
       }
       this._currentStroke = null;
@@ -381,6 +409,16 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Also empty the STROKE DATA, not just the pixels. Clearing only the
+      // canvas left this._strokes intact, so the next redraw (the live
+      // calligraphy path redraws on every move) repainted every "cleared"
+      // stroke back onto the canvas. Drop the strokes and any in-progress
+      // stroke so Clear is a true reset.
+      this._strokes = [];
+      this._currentStroke = null;
+      this._drawLast = null;
+      this._drawPts = null;
+      this._calliLast = null;
     },
     stopDrawing: function () {
       var page = this.active;

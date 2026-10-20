@@ -999,8 +999,23 @@
       if (!img) return;
       this.onImageMouseDownItem(evt, img);
     },
-      onImageMouseDownItem: function (evt, img) {
-        if (!img) return;
+    // Live display helpers for the Selection panel readouts. They read the
+    // element field AND panelTick, so Vue re-evaluates them on every drag
+    // frame (panelTick bumps in onImageMouseMove). Without the panelTick
+    // read the width/rotation numbers could freeze mid-resize/mid-rotate,
+    // which made the readout look decorative and untrustworthy.
+    dispW: function (el, fallback) {
+      var _ = this.panelTick;
+      var w = (el && typeof el.w === 'number') ? el.w : fallback;
+      return (typeof w === 'number' ? w : fallback).toFixed(2);
+    },
+    dispRot: function (el) {
+      var _ = this.panelTick;
+      var r = (el && typeof el.rot === 'number') ? el.rot : 0;
+      return Math.round(r);
+    },
+    onImageMouseDownItem: function (evt, img) {
+      if (!img) return;
         evt.preventDefault();
         // Placeholder slots (from templates): clicking one asks for a
         // replacement photo instead of starting a drag. The new image
@@ -1031,7 +1046,16 @@
       }
       // Selecting an element hides the overlap picker.
       this._hideOverlapPicker();
-      if (this.active) this.active.activeImageId = img.id;
+      // If this element is already part of a multi-selection, do NOT
+      // reassign activeImageId here. Doing so changes the primary, fires the
+      // selectedImage watcher, and lets the follow-up click collapse the
+      // selection to this one element -- so a drag started on the content
+      // moved only the grabbed item and left the group box behind. When it
+      // is already selected, keep the set intact so _selectionBases() below
+      // captures every member and the multi-move branch moves them all.
+      var alreadyInMulti = this.selSet && this.selSet.length > 1 &&
+        this.isSelected('image', img.id);
+      if (this.active && !alreadyInMulti) this.active.activeImageId = img.id;
       // Focus the wrapper so Delete/Backspace reach the element handler
         // instead of being swallowed by a contenteditable elsewhere.
         try { if (evt.currentTarget && evt.currentTarget.focus) evt.currentTarget.focus({ preventScroll: true }); } catch (e) {}
@@ -1080,15 +1104,33 @@
       var dx = evt.clientX - cx;
       var dy = evt.clientY - cy;
       var startDist = Math.sqrt(dx * dx + dy * dy) || 1;
-      // Elements with an explicit height (tape, scraps, sticky notes) resize
-      // freely in both axes; photos/icons keep the locked-ratio resize.
-      var freeAxis = (typeof img.h === "number");
+      // Elements with an explicit height (tape, scraps, sticky notes,
+      // stickers) resize freely in both axes; photos/icons keep the
+      // locked-ratio resize. Photos and icons may carry an h too (e.g. after
+      // a group transform), but they still resize by width so the FRAME keeps
+      // the picture's aspect instead of collapsing into a thin sliver while
+      // the image letterboxes inside it.
+      var freeKinds = { tape: 1, scrap: 1, sticky: 1, sticker: 1 };
+      var freeAxis = (typeof img.h === "number") && !!freeKinds[img.kind || 'photo'];
       this.imageDrag = {
         imgId: img.id,
         mode: freeAxis ? "resize-free" : "resize",
         startDist: startDist,
         baseW: (typeof img.w === "number") ? img.w : 1.5,
         baseH: (typeof img.h === "number") ? img.h : 1,
+        // Whether the element actually had an explicit height at drag start.
+        // baseH defaults to 1 for h-less photos (natural-ratio sizing), so a
+        // numeric baseH alone cannot tell the two cases apart. The resize
+        // branch uses this flag to scale h ONLY when the frame truly has one,
+        // preserving its aspect without stamping an h onto natural-size photos.
+        hadH: (typeof img.h === "number"),
+        // Fixed width-ratio bounds captured ONCE at drag start. Clamping the
+        // ratio (rather than the resulting width) keeps the floor/ceiling a
+        // hard stop for the whole drag. Clamping newW against a per-frame
+        // unitScale let the bound drift frame to frame, which read as the
+        // frame springing back bigger once it reached its minimum size.
+        minRatio: (this._unitScale() * 0.25) / ((typeof img.w === "number") ? img.w : 1.5),
+        maxRatio: (this._unitScale() * 24) / ((typeof img.w === "number") ? img.w : 1.5),
         startX: evt.clientX,
         startY: evt.clientY,
         cx: cx,
@@ -1234,6 +1276,12 @@
         return;
       }
       if (!this.imageDrag) return;
+      // Force the panel readouts to recompute on every drag frame. The width
+      // and rotation labels render from the selected element's fields; a
+      // drag mutates those fields directly, and reading panelTick here (plus
+      // in the dispW/dispRot helpers) guarantees the numbers repaint live
+      // instead of freezing until some unrelated render happens.
+      this.panelTick = (this.panelTick || 0) + 1;
       // Mark ANY real drag (move / resize / rotate) as "moved" once the
       // pointer travels past a few px. onImageMouseUp uses this to suppress
       // the click that follows the drag, which would otherwise collapse a
@@ -1294,6 +1342,10 @@
           var gbay = evt.clientY - this.imageDrag.gcy;
           var gbang = Math.atan2(gbay, gbax) * 180 / Math.PI;
           var gbdelta = gbang - this.imageDrag.startAngle;
+          // Drive the panel's rotation readout live during a handle rotate.
+          // groupRotateDeg is normally set only by the panel input; without
+          // this, a group rotate drag left the number frozen.
+          this.groupRotateDeg = Math.round(gbdelta);
           // Rotate the ELEMENTS...
           this._applyGroupTransform(this.imageDrag.group, 1, gbdelta);
           // ...and rotate the BOX rigidly about its center, so the frame and
@@ -1313,6 +1365,10 @@
           var gbs = gbdist / this.imageDrag.startDist;
           if (gbs < 0.1) gbs = 0.1;
           if (gbs > 12) gbs = 12;
+          // Drive the panel's scale readout live during a handle resize.
+          // groupScalePct is normally set only by the panel input; without
+          // this, a group resize drag left the percentage frozen.
+          this.groupScalePct = Math.round(gbs * 100);
           this._applyGroupTransform(this.imageDrag.group, gbs, 0);
           this.updateGroupBox();
           return;
@@ -1348,6 +1404,12 @@
           img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
           img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
         }
+        // Keep the group bounding box glued to the selection while dragging
+        // FROM CONTENT. The multi-move branch above repositioned every
+        // element, but nothing recomputed the box, so the blue frame (and
+        // its handles) stayed put while the contents moved. updateGroupBox()
+        // re-measures the rendered rects and rewrites left/top/width/height.
+        if (this.selSet && this.selSet.length > 1) this.updateGroupBox();
       } else if (mode === "resize-free") {
         // Independent width and height: horizontal drag changes w, vertical
         // drag changes h. Uses a projection so the element grows with the
@@ -1380,13 +1442,25 @@
         var dy = evt.clientY - this.imageDrag.cy;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
         var ratio = dist / this.imageDrag.startDist;
-        var _s2 = this._unitScale();
+        // Clamp the RATIO against bounds captured once at drag start, so the
+        // minimum and maximum sizes are hard stops for the whole gesture.
+        // (Clamping the resulting width against a per-frame unit scale let
+        // the bound drift and made the frame appear to spring back bigger
+        // right at its minimum size.)
+        var _minR = (typeof this.imageDrag.minRatio === "number") ? this.imageDrag.minRatio : 0;
+        var _maxR = (typeof this.imageDrag.maxRatio === "number") ? this.imageDrag.maxRatio : Infinity;
+        if (ratio < _minR) ratio = _minR;
+        if (ratio > _maxR) ratio = _maxR;
         var newW = this.imageDrag.baseW * ratio;
-        if (newW < 0.25 * _s2) newW = 0.25 * _s2;
-        // Generous upper bound so tape (and images) can span past the page
-        // edge, the way real zine tape runs off the paper. The mini-page's
-        // overflow:hidden trims anything outside the page for print.
-        if (newW > 24 * _s2) newW = 24 * _s2;
+        // Keep the element's FRAME aspect when it carries an explicit height
+        // (e.g. after a group transform). Without scaling h by the same
+        // ratio, only w changed and the photo letterboxed inside a frame
+        // that got thinner and thinner. Elements with no explicit h derive
+        // their height from the picture's natural ratio, so leave h alone.
+        if (this.imageDrag.hadH && this.imageDrag.baseW > 0) {
+          var _ratioH = newW / this.imageDrag.baseW;
+          img.h = Math.round(this.imageDrag.baseH * _ratioH * 100) / 100;
+        }
         img.w = Math.round(newW * 100) / 100;
       } else if (mode === "resize-scaled") {
         // Group resize driven from a TEXT BOX handle: scale ALL selected
@@ -3198,6 +3272,13 @@
         dropIndex: -1,
         dropSide: null,
         imageDrag: null,
+        // Bumps once per drag frame (move/resize/rotate). Panel readouts
+        // (width, rotation) are rendered from element fields, but a drag
+        // mutates those fields on an object Vue does not always re-track
+        // mid-gesture, so the numbers could freeze until the next unrelated
+        // render. Reading panelTick in the display helpers forces the labels
+        // to recompute every frame so the numbers track the drag live.
+        panelTick: 0,
         debugFlow: false,
         iconPickerOpen: false,
         iconPickerQuery: '',
@@ -3684,6 +3765,23 @@
       document.addEventListener("keydown", this._onCtxKey);
       this._onCtxScroll = function () { self.closeContextMenu(); };
       window.addEventListener("scroll", this._onCtxScroll, true);
+      // Wire the multi-selection group box to a move drag. The box is drawn
+      // by updateGroupBox() but had no mousedown listener, so clicking the
+      // blue bounding box did nothing. Attach lazily on the next tick (the
+      // ref exists after first render) and re-attach whenever updateGroupBox
+      // positions it (the element is stable, so a guard prevents duplicates).
+      this._wireGroupBox = function () {
+        var bx = self.$refs.groupBoxEl;
+        if (!bx || bx._zfMoveWired) return;
+        bx._zfMoveWired = true;
+        bx.addEventListener("mousedown", function (evt) {
+          if (evt.button !== 0) return;
+          // Only move when a real multi-selection exists; otherwise let the
+          // event fall through (single selection uses element handles).
+          if (self.selSet && self.selSet.length > 1) self.onGroupMoveStart(evt);
+        });
+      };
+      this.$nextTick(this._wireGroupBox);
       this.syncTextBoxDom();
       // Expose editor actions for global keyboard shortcuts.
       window.ZFEditorActions = {

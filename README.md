@@ -23,6 +23,39 @@ read in order.
 Everything is client-side. Drafts autosave to `localStorage`; there is no
 backend and no account.
 
+## Recent fixes
+
+- **Multi-selection drag.** Marquee-select several elements and they now
+  move together: dragging from the blue group box moves the whole
+  selection, and dragging from any element's content moves the selection
+  and its bounding box. Previously the box could not be grabbed and a
+  content drag moved only the grabbed element, leaving the box behind.
+- **Live Selection readouts.** Width and Rotation in the Selection panel
+  now update continuously while you resize or rotate an element, instead
+  of freezing at the value the element had when it was selected.
+- **Multi-select readouts.** Group Scale % and Rotation now update live
+  while you drag a group resize or rotate handle, not just when you type
+  into the group inputs.
+- **Locked photo aspect.** Resizing a photo keeps its frame aspect ratio
+  instead of letting the frame collapse into a thin sliver. Resize now
+  also has clean hard minimum and maximum sizes with no spring-back
+  oscillation at the limits.
+- **Calligraphy taper.** Calligraphy strokes now taper to clean points at
+  both ends (with a visible minimum for very short flicks) instead of
+  ending in blunt chops, and the taper is present in the live preview --
+  no snap when the stroke commits.
+- **Working Smoothing control.** The Smoothing setting now visibly changes
+  strokes. Points are distance-decimated before Chaikin smoothing, so
+  higher settings produce noticeably rounder strokes (0 = angular). Pen,
+  eraser, and calligraphy all honor it, calligraphy smoothing only its
+  interior so its ends stay pointed.
+- **No surprise at Done.** Drawing is smoothed while you draw and the
+  result is baked into the stroke on release, so the committed element
+  matches the live preview instead of re-smoothing to a different shape.
+- **Clear actually clears.** The drawing Clear button now empties the
+  stroke data as well as the canvas pixels, so cleared ink no longer
+  reappears the next time the canvas redraws.
+
 ## Running it
 
 The app is plain HTML, CSS, and JavaScript with a few CDN dependencies

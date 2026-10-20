@@ -540,7 +540,7 @@
         <!-- ======== SINGLE TEXT BOX ======== -->
         <template v-else-if="panelMode === 'text'">
 
-        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ (selectedTextBox.w || 1.8).toFixed(2) }} {{ pageUnitLabel() }})</label>
+        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ dispW(selectedTextBox, 1.8) }} {{ pageUnitLabel() }})</label>
         <div class="zf-text-panel-row">
           <input id="zf-tp-w" type="range" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step"
                  :value="selectedTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;" aria-label="Text box width slider" />
@@ -549,7 +549,7 @@
                  @input="setTextBoxW($event.target.value)" @change="setTextBoxW($event.target.value)" aria-label="Text box width in inches" />
         </div>
 
-        <label class="zf-text-panel-label" for="zf-tp-rot">Rotation ({{ selectedTextBox.rot || 0 }}&deg;)</label>
+        <label class="zf-text-panel-label" for="zf-tp-rot">Rotation ({{ dispRot(selectedTextBox) }}&deg;)</label>
         <div class="zf-text-panel-row">
           <input id="zf-tp-rot" type="range" min="-180" max="180" step="1"
                  :value="selectedTextBox.rot || 0" @input="setTextBoxRot($event.target.value)" style="flex:1;" aria-label="Text box rotation slider" />
@@ -626,7 +626,7 @@
 
         <!-- ======== SINGLE IMAGE ======== -->
         <template v-else-if="panelMode === 'image'">
-          <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ (selectedImage.w || 1.5).toFixed(2) }} {{ pageUnitLabel() }})</label>
+          <label class="zf-text-panel-label" for="zf-ip-w">Width ({{ dispW(selectedImage, 1.5) }} {{ pageUnitLabel() }})</label>
           <div class="zf-text-panel-row">
             <input id="zf-ip-w" type="range" :min="imageWidthRange().min" :max="imageWidthRange().max" :step="imageWidthRange().step"
                    :value="selectedImage.w || 1.5" @input="setImageW($event.target.value)" style="flex:1;" aria-label="Image width slider" />
@@ -635,7 +635,7 @@
                    @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width" />
           </div>
 
-          <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ selectedImage.rot || 0 }}&deg;)</label>
+          <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ dispRot(selectedImage) }}&deg;)</label>
           <div class="zf-text-panel-row">
             <input id="zf-ip-rot" type="range" min="-180" max="180" step="1"
                    :value="selectedImage.rot || 0" @input="setImageRot($event.target.value)" style="flex:1;" aria-label="Image rotation slider" />
