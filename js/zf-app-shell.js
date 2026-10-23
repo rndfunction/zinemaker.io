@@ -13,7 +13,21 @@
     // `nowTick` bumps every second so the savedLabel computed re-evaluates.
     // Date.now() is not reactive on its own, so without this the "Saved Ns
     // ago" label froze at whatever value it had when lastSavedAt changed.
-    data: function () { return { store: store, tick: 0, nowTick: 0 }; },
+    data: function () {
+      return {
+        store: store,
+        tick: 0,
+        nowTick: 0,
+        // Share dialog visibility. Belongs in `data`, not `methods`: Vue
+        // treats a non-function entry in `methods` as a mistake ("Method
+        // 'shareOpen' has type boolean") and then cannot find the property
+        // during render. This is the ONLY state the dialog needs up front;
+        // link availability is checked on click (see shareAsLink), not
+        // precomputed, because serializing the zine to open a menu is too
+        // slow on image-heavy drafts.
+        shareOpen: false
+      };
+    },
     mounted: function () {
       var self = this;
       this._savedLabelTimer = setInterval(function () { self.nowTick++; }, 1000);
@@ -58,12 +72,6 @@
     methods: {
       onExport: function () { if (window.ZFExportJson) window.ZFExportJson(); },
     // Share dialog state. There is no precomputed link-availability field
-    // any more: building the #z= payload means serializing the whole zine
-    // (including image data URLs) and base64-encoding it, which is too slow
-    // to run just to open a menu. The link door always renders enabled; its
-    // size check happens on click, where the user expects work to happen.
-    // step) that becomes true when the serialized zine fits in a URL.
-    shareOpen: false,
     // Share dialog. Three doors to the same zine: a PDF (the modern
     // photocopy), the source file (for remixing), and a link (for small
     // zines). All three reuse machinery that already exists -- PDF is the
