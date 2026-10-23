@@ -144,9 +144,19 @@
       if (!raw) return null;
       var parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.pages) && parsed.pages.length) return parsed;
-    } catch (e) { zfLog('load failed: ' + e.message); }
+    } catch (e) { _zfStoreLog('load failed: ' + e.message); }
     return null;
   }
+
+  // Defensive: zfLog lives in util.js. Under the current load order it is
+  // always present, but a future reordering (or a failure to fetch util.js)
+  // must not be able to kill boot with a ReferenceError that leaves
+  // window.ZF_STORE unset. Fall back to a no-op so store init can proceed.
+  var _zfStoreLog = (typeof zfLog === 'function')
+    ? zfLog
+    : (typeof window !== 'undefined' && typeof window.zfLog === 'function')
+      ? window.zfLog
+      : function () {};
 
   var zfSaved = zfLoadDraft();
 
@@ -175,7 +185,7 @@
   var zfInitial = (zfSaved && zfSaved.pages && zfSaved.pages.length)
     ? zfMigrateAllPages(zfSaved.pages)
     : zfBlankPagesForModel(zfSaved && zfSaved.modelId);
-  zfLog('initial pages=' + zfInitial.length);
+  _zfStoreLog('initial pages=' + zfInitial.length);
 
   var store = Vue.reactive({
     title: zfSaved ? zfSaved.title : 'Untitled Zine',
