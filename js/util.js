@@ -264,7 +264,10 @@ function zfMigratePage(page) {
     // Flow-wrap is retired. Anything still carrying it becomes free.
     if (page.images[ii].wrap === 'flow') page.images[ii].wrap = 'free';
   }
-  if (page.heading && !page._headingMigrated) {
+  // Migrate when a legacy inline field is present. No separate "already
+  // migrated" flag is needed: the field is deleted at the end of this
+  // function, so a second pass simply finds nothing to convert.
+  if (page.heading) {
     page.textBoxes.push({
       id: zfNewTextBoxId(),
       kind: '',
@@ -282,7 +285,7 @@ function zfMigratePage(page) {
   // Legacy inline body -> one full-content-area text box, positioned where
   // the body used to render (below the title zone). Guarded by
   // _bodyMigrated so a save/load round trip never doubles it.
-  if (page.body && !page._bodyMigrated) {
+  if (page.body) {
     page.textBoxes.push({
       id: zfNewTextBoxId(),
       kind: '',
@@ -586,6 +589,15 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
     style.height = "auto";
   }
   if (el.kind === "icon" && el.color) style.color = el.color;
+  // Per-layer opacity. Absent means fully opaque, so existing elements (and
+  // the whole creation/copy path) need no change: only elements that carry a
+  // numeric opacity below 1 are affected. CSS opacity composites the element
+  // once, so this multiplies cleanly with any transparency already baked into
+  // its content (e.g. a drawing whose strokes have their own alpha) -- which
+  // is the "multiply" model, not "layer wins".
+  if (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity < 1) {
+    style.opacity = el.opacity;
+  }
   return style;
 }
 
@@ -652,6 +664,10 @@ function zfTextBoxStyle(box, pageW, pageH, margin) {
   if (box.align) style.textAlign = box.align;
   if (box.color) style.color = box.color;
   if (box.fontFamily) style.fontFamily = box.fontFamily;
+  // Per-layer opacity for text boxes, same model as elements above.
+  if (typeof box.opacity === "number" && box.opacity >= 0 && box.opacity < 1) {
+    style.opacity = box.opacity;
+  }
   return style;
 }
 
@@ -920,6 +936,31 @@ function zfRenderCalliStroke(ctx, pts, stroke, scale) {
 
 // Draw a full stroke list. `opts.reserve` (0..1) shrinks the rendered drawing
 // within its box (used when the box is slightly larger than the ink).
+// Lazily-created scratch canvas used to render a single translucent stroke at
+// full alpha before compositing it once at the stroke's opacity. Kept at
+// module scope and reused across strokes so we are not allocating a canvas
+// per stroke. `zfRenderStrokes` calls it only when op < 1 and the stroke is
+// not an eraser.
+var _zfStrokeBuffer = null;
+function zfGetStrokeBuffer(w, h) {
+  if (typeof document === 'undefined') return null;
+  if (!_zfStrokeBuffer) {
+    _zfStrokeBuffer = document.createElement('canvas');
+  }
+  if (_zfStrokeBuffer.width !== w || _zfStrokeBuffer.height !== h) {
+    _zfStrokeBuffer.width = w;
+    _zfStrokeBuffer.height = h;
+  }
+  var c = _zfStrokeBuffer.getContext('2d');
+  if (c) {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, w, h);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+  }
+  return c;
+}
+
 function zfRenderStrokes(ctx, strokes, scale, opts) {
   if (!ctx || !Array.isArray(strokes)) return;
   opts = opts || {};
@@ -944,21 +985,54 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
     }
     var op = (typeof st.opacity === 'number' ? st.opacity : 1) * alpha;
     var erasing = (st.tool === 'eraser');
+
+    // Semi-transparent strokes are rendered into an offscreen buffer at FULL
+    // alpha and then composited ONCE at `op`. Without this, every primitive
+    // in the stroke (segment quads, round join dots, line caps) composited
+    // its own alpha, so overlaps doubled up and a translucent stroke looked
+    // like a chain of darker circles. Buffering per stroke gives uniform
+    // transparency and keeps the joins invisible. Opaque strokes (op >= 1)
+    // take the direct path below unchanged -- no extra cost in the common
+    // case. The eraser also stays direct: destination-out has its own
+    // semantics and does not produce the double-composite artifact.
+    var bufferCtx = null;
+    var targetCtx = ctx;
+    if (!erasing && op < 1) {
+      bufferCtx = zfGetStrokeBuffer(ctx.canvas.width, ctx.canvas.height);
+      if (bufferCtx) {
+        targetCtx = bufferCtx;
+        bufferCtx.setTransform(1, 0, 0, 1, 0, 0);
+        bufferCtx.clearRect(0, 0, bufferCtx.canvas.width, bufferCtx.canvas.height);
+        bufferCtx.globalCompositeOperation = 'source-over';
+        bufferCtx.lineCap = 'round';
+        bufferCtx.lineJoin = 'round';
+      }
+    }
+    // `ctx` is used directly for the eraser and opaque strokes; `dctx` is
+    // whichever context the primitives should actually paint into.
+    var dctx = targetCtx;
+
     if (erasing) {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = 'rgba(0,0,0,1)';
       ctx.strokeStyle = 'rgba(0,0,0,1)';
     } else {
       ctx.globalCompositeOperation = 'source-over';
-      var col = (op >= 1) ? st.color : zfColorWithAlpha(st.color, op);
+      // Inside the buffer we always paint at full alpha (the buffer itself is
+      // composited at `op` afterward). Direct-draw only happens when op >= 1.
+      var col = (bufferCtx || op >= 1) ? st.color : zfColorWithAlpha(st.color, op);
       ctx.fillStyle = col;
       ctx.strokeStyle = col;
+      if (bufferCtx) {
+        dctx.fillStyle = st.color;
+        dctx.strokeStyle = st.color;
+      }
     }
 
     if (st.tool === 'calligraphy') {
       // One continuous filled ribbon for the whole stroke (no per-segment
       // seams/notches).
-      zfRenderCalliStroke(ctx, pts, st, scale);
+      zfRenderCalliStroke(dctx, pts, st, scale);
     } else {
       // Variable-width pen (speed-variable ink): if points carry per-point
       // width (pt.w, inches), draw tapered filled quads between them so the
@@ -970,9 +1044,9 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
         var wOf = function (pt) { return (typeof pt.w === 'number' ? pt.w : st.size) * scale; };
         if (pts.length === 1) {
           var r1 = Math.max(0.5, wOf(pts[0]) / 2);
-          ctx.beginPath();
-          ctx.arc(pts[0].x * scale, pts[0].y * scale, r1, 0, Math.PI * 2);
-          ctx.fill();
+          dctx.beginPath();
+          dctx.arc(pts[0].x * scale, pts[0].y * scale, r1, 0, Math.PI * 2);
+          dctx.fill();
         } else {
           for (var c2 = 1; c2 < pts.length; c2++) {
             var A = pts[c2 - 1], B = pts[c2];
@@ -982,30 +1056,30 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
             if (len2 < 1e-6) continue;
             var nx2 = -vy2 / len2, ny2 = vx2 / len2;
             var ha = Math.max(0.5, wOf(A) / 2), hb = Math.max(0.5, wOf(B) / 2);
-            ctx.beginPath();
-            ctx.moveTo(ax2 + nx2 * ha, ay2 + ny2 * ha);
-            ctx.lineTo(bx2 + nx2 * hb, by2 + ny2 * hb);
-            ctx.lineTo(bx2 - nx2 * hb, by2 - ny2 * hb);
-            ctx.lineTo(ax2 - nx2 * ha, ay2 - ny2 * ha);
-            ctx.closePath();
-            ctx.fill();
+            dctx.beginPath();
+            dctx.moveTo(ax2 + nx2 * ha, ay2 + ny2 * ha);
+            dctx.lineTo(bx2 + nx2 * hb, by2 + ny2 * hb);
+            dctx.lineTo(bx2 - nx2 * hb, by2 - ny2 * hb);
+            dctx.lineTo(ax2 - nx2 * ha, ay2 - ny2 * ha);
+            dctx.closePath();
+            dctx.fill();
             // Round join: small dot at each interior vertex sized to avg width.
             if (c2 < pts.length - 1) {
               var rr = Math.max(0.5, ((ha + hb) / 2));
-              ctx.beginPath();
-              ctx.arc(bx2, by2, rr, 0, Math.PI * 2);
-              ctx.fill();
+              dctx.beginPath();
+              dctx.arc(bx2, by2, rr, 0, Math.PI * 2);
+              dctx.fill();
             }
           }
         }
       } else {
-      ctx.lineWidth = st.size * scale;
+      dctx.lineWidth = st.size * scale;
       var sm = (typeof st.smoothing === 'number') ? st.smoothing : 0;
       if (pts.length === 1) {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
-        ctx.lineTo(pts[0].x * scale + 0.01, pts[0].y * scale + 0.01);
-        ctx.stroke();
+        dctx.beginPath();
+        dctx.moveTo(pts[0].x * scale, pts[0].y * scale);
+        dctx.lineTo(pts[0].x * scale + 0.01, pts[0].y * scale + 0.01);
+        dctx.stroke();
       } else {
         // Points are already smoothed upstream (zfSmoothPoints) when the
         // stroke's smoothing strength is above 0, so just stroke the
@@ -1014,14 +1088,25 @@ function zfRenderStrokes(ctx, strokes, scale, opts) {
         // would have double-smoothed now. With this unified, strength 0
         // yields the angular sampled polyline and higher values yield a
         // visibly rounder stroke.
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x * scale, pts[0].y * scale);
+        dctx.beginPath();
+        dctx.moveTo(pts[0].x * scale, pts[0].y * scale);
         for (var p = 1; p < pts.length; p++) {
-          ctx.lineTo(pts[p].x * scale, pts[p].y * scale);
+          dctx.lineTo(pts[p].x * scale, pts[p].y * scale);
         }
-        ctx.stroke();
+        dctx.stroke();
       }
       } // end else (uniform pen fallback)
+    }
+
+    // If we rendered into the offscreen buffer, composite it onto the real
+    // canvas once at the stroke's opacity. This is what makes translucent
+    // strokes uniform instead of blotchy. Reset globalAlpha afterward so
+    // subsequent strokes on the direct path are unaffected.
+    if (bufferCtx) {
+      ctx.globalAlpha = op;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(bufferCtx.canvas, 0, 0);
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();

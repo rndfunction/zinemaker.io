@@ -31,6 +31,7 @@
         var _ = this.tick;
         return window.ZFCanRedo ? window.ZFCanRedo() : false;
       },
+
       savedLabel: function () {
         // Read nowTick so this recomputes once per second (see data/mounted).
         var _ = this.nowTick;
@@ -56,6 +57,84 @@
     },
     methods: {
       onExport: function () { if (window.ZFExportJson) window.ZFExportJson(); },
+    // Share dialog state. There is no precomputed link-availability field
+    // any more: building the #z= payload means serializing the whole zine
+    // (including image data URLs) and base64-encoding it, which is too slow
+    // to run just to open a menu. The link door always renders enabled; its
+    // size check happens on click, where the user expects work to happen.
+    // step) that becomes true when the serialized zine fits in a URL.
+    shareOpen: false,
+    // Share dialog. Three doors to the same zine: a PDF (the modern
+    // photocopy), the source file (for remixing), and a link (for small
+    // zines). All three reuse machinery that already exists -- PDF is the
+    // print view, source is the export path, link is the #z= encoder.
+    openShare: function () {
+      // No serialization here. Opening a menu must feel instant; the size
+      // check for the link door happens on click (see shareAsLink), which is
+      // where a user expects a moment of work.
+      this.shareOpen = true;
+    },
+    closeShare: function () { this.shareOpen = false; },
+    shareAsPdf: function () {
+      this.shareOpen = false;
+      // Navigate to the print sheet; the user picks "Save as PDF" there.
+      // A hint on the sheet view tells them the exact dialog settings.
+      this.goSheet();
+    },
+    shareAsSource: function () {
+      this.shareOpen = false;
+      this.onExport();
+    },
+    // Build the #z= link payload from the current store. The format the reader
+    // (loadSharedZineFromHash in zf-boot.js) accepts is { t, a, p: [{tb,im}] }.
+    // We emit the rich format so all element detail survives; text boxes and
+    // images are passed as-is (zfBuildPagesFromData handles migration/fields).
+    _buildShareUrl: function () {
+      try {
+        var pages = (this.store.pages || []).map(function (p) {
+          return {
+            tb: Array.isArray(p.textBoxes) ? p.textBoxes : [],
+            im: Array.isArray(p.images) ? p.images : []
+          };
+        });
+        var payload = { t: this.store.title || '', a: this.store.author || '', p: pages };
+        var json = JSON.stringify(payload);
+        var b64 = window.zfB64EncodeUtf8 ? window.zfB64EncodeUtf8(json) : btoa(unescape(encodeURIComponent(json)));
+        var encoded = encodeURIComponent(b64);
+        var base = location.origin + location.pathname;
+        return { url: base + '#z=' + encoded, size: encoded.length };
+      } catch (e) {
+        return { url: '', size: 0, error: String(e) };
+      }
+    },
+
+    shareAsLink: function () {
+      var r = this._buildShareUrl();
+      if (!r.url) { this.store.status = 'Could not build a share link.'; return; }
+      // 1800 is a conservative ceiling: browsers vary, but ~2KB is the common
+      // practical limit for copy-pasteable URLs. Over this, base64 inflation
+      // will likely break the link in someone's chat app. Leave the dialog
+      // open on rejection so the user can choose another door without
+      // reopening the menu.
+      if (r.size > 1800) {
+        this.store.status = 'This zine is too large to share as a link. Try the PDF or source file instead.';
+        return;
+      }
+      this.shareOpen = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(r.url).then(function () {
+            this.store.status = 'Share link copied to clipboard.';
+          }.bind(this)).catch(function () {
+            this.store.status = 'Could not copy to clipboard.';
+          }.bind(this));
+        } else {
+          this.store.status = 'Clipboard not available.';
+        }
+      } catch (e) {
+        this.store.status = 'Could not copy to clipboard.';
+      }
+    },
       onSaveToLibrary: function () {
         var ok = store.saveToLibrary();
         if (ok) {

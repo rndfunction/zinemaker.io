@@ -79,7 +79,15 @@ injected print rules, which makes the sheet print at the wrong size or not
 at all.
 
 In the print dialog, set **Scale to 100%** and **Margins to None** so the
-imposition lands at its exact physical size. The sheet is sized to the
+imposition lands at its exact physical size.
+
+Print styles ask the browser to keep backgrounds and colors
+(`print-color-adjust: exact` on the page, sheet, and body) so the sheet
+prints as designed rather than in ink-saving mode. This is a request, not a
+command: if your browser's **Background graphics** option is off, the
+browser wins and colors are dropped. Turn it on for an exact match. The
+default dialog usually keeps it on, so most users get the design with no
+extra step. The sheet is sized to the
 model's real paper dimensions (e.g. 11in x 8.5in for a landscape mini zine),
 so any other scale shrinks or clips it.
 
@@ -114,18 +122,26 @@ change models -- extra pages are kept and simply won't print.
 
 ## Project structure
 
-    index.html                 App shell, every Vue component template,
-                               and the application script (all views and
-                               state live here)
+    index.html                 Thin loader: CSP, CDN dependencies, and the
+                               ordered list of local scripts.
     css/app.css                All styles, including print styles and
                                the design tokens
     js/util.js                 Shared helpers (HTML sanitizing, image
                                compression, element style computation,
-                               debug logging)
+                               drawing render, debug logging)
     js/zine-models.js          Imposition model registry
     js/zine-themes.js          Page theme registry (paper, ink, type)
     js/zine-library.js         localStorage-backed zine library
+    js/zf-store.js             Shared reactive store (the app's state)
+    js/zf-app-shell.js         Top-level layout and view switching
+    js/zf-editor*.js           Editor: layers, drawing, and the main
+                               editor component
+    js/zf-reader.js            Reader view
+    js/zf-sheet.js             Print / imposition sheet view
+    js/zf-library-view.js      Saved-zines library view
+    js/zf-boot.js              Wires everything together and mounts Vue
     js/components/ZineIconPicker.js   Icon picker modal
+    js/components/ZfErrorBoundary.js  Vue error boundary
     mockups/                   Standalone design mockups (not loaded by
                                the app): theme studies and layout
                                candidates

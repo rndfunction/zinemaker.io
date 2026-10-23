@@ -482,7 +482,16 @@
       if (cmd && !inEditable) {
         if (key === 'z' && !evt.shiftKey) {
           evt.preventDefault();
-          if (window.ZFUndo) window.ZFUndo();
+          // Drawing mode owns undo. Ctrl+Z must undo the last stroke, not
+          // revert the whole page through the global history. Without this
+          // check, undo while drawing silently restored an earlier page
+          // snapshot and discarded unrelated edits.
+          var acts = window.ZFEditorActions;
+          if (acts && acts.isDrawing && acts.isDrawing() && acts.drawUndo) {
+            acts.drawUndo();
+          } else if (window.ZFUndo) {
+            window.ZFUndo();
+          }
           return;
         } else if ((key === 'z' && evt.shiftKey) || key === 'y') {
           evt.preventDefault();

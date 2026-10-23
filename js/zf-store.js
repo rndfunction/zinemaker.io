@@ -80,6 +80,10 @@
           z: typeof im.z === 'number' ? im.z : 0,
           color: im.color || '',
           placeholder: !!im.placeholder,
+          // Per-layer opacity survives import/build so a faded element does not
+          // silently return to full opacity when a zine round-trips through a
+          // .zine.json file, a shared link, or the library. Absent = unchanged.
+          opacity: typeof im.opacity === 'number' ? im.opacity : undefined,
           hidden: !!im.hidden
         };
       });
@@ -103,6 +107,8 @@
           z: typeof tb.z === 'number' ? tb.z : 0,
           color: tb.color || '',
           overlay: !!tb.overlay,
+          // Text-box opacity, same rationale as images above.
+          opacity: typeof tb.opacity === 'number' ? tb.opacity : undefined,
           hidden: !!tb.hidden
         };
       }) : [];

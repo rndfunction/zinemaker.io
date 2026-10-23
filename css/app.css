@@ -617,6 +617,77 @@
       margin-right: 0.25rem;
     }
     .zf-page-list li.active .zf-page-grip { color: #ffffff; opacity: 0.85; }
+    /* Gradient button in the Layers row: previews the current opacity at a
+       glance and opens a popover. This replaces the inline slider (which
+       fought with row drag: the slider was in the natural grab zone). */
+    .zf-opacity-btn {
+      color: var(--zf-blue, #005ea2);
+    }
+    /* Popover that hosts the opacity slider. Fixed-position, so it appears
+       over the row rather than stretching it, and like .zf-ctx-menu it is
+       dismissed by outside-click / Escape / scroll (shared handlers). */
+    .zf-opacity-menu {
+      position: fixed;
+      z-index: 300;
+      background: #ffffff;
+      border: 1px solid var(--zf-border);
+      border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+      padding: 0.6rem 0.7rem;
+      font-family: var(--zf-font);
+    }
+    /* Slider inside the popover (was the standalone .zf-layer-opacity). */
+    .zf-layer-opacity {
+      cursor: pointer;
+      vertical-align: middle;
+      accent-color: var(--zf-blue, #005ea2);
+    }
+    .zf-layer-opacity:focus-visible {
+      outline: 2px solid var(--zf-blue, #005ea2);
+      outline-offset: 2px;
+    }
+    .zf-layer-opacity:focus-visible {
+      outline: 2px solid var(--zf-blue, #005ea2);
+      outline-offset: 2px;
+    }
+    /* Share dialog: a focused modal with three large option buttons. The
+       framing is "share," not "download" -- zines are passed along. */
+    .zf-share-backdrop {
+      position: fixed; inset: 0; background: rgba(20, 23, 26, 0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 500;
+    }
+    .zf-share-dialog {
+      background: #ffffff; border-radius: 8px; padding: 1.5rem;
+      max-width: 440px; width: calc(100% - 2rem);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); font-family: var(--zf-font);
+    }
+    .zf-share-title { margin: 0 0 0.25rem; font-size: 1.25rem; }
+    .zf-share-lead { margin: 0 0 1rem; color: var(--zf-gray-mid); font-size: 0.9rem; }
+    .zf-share-option {
+      display: block; width: 100%; text-align: left; background: #ffffff;
+      border: 1px solid var(--zf-border); border-radius: 6px;
+      padding: 0.75rem 0.9rem; margin-bottom: 0.6rem; cursor: pointer;
+      font-family: inherit; font-size: 0.9rem; color: var(--zf-ink);
+    }
+    .zf-share-option:hover:not(:disabled) { background: var(--zf-gray-light); }
+    .zf-share-option:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+    .zf-share-option:disabled strong { color: var(--zf-gray-mid); }
+    .zf-share-hint {
+      margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--zf-gray-mid);
+      font-style: italic;
+    }
+    .zf-share-option:focus-visible {
+      outline: 2px solid var(--zf-blue, #005ea2); outline-offset: 2px;
+    }
+    .zf-share-option strong { display: block; margin-bottom: 0.15rem; }
+    .zf-share-option span { color: var(--zf-gray-mid); font-size: 0.82rem; }
+    .zf-share-unavailable {
+      font-size: 0.82rem; color: var(--zf-gray-mid); margin: 0.25rem 0 0.6rem;
+      font-style: italic;
+    }
+    .zf-share-foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
     .zf-icon-btn { border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px; width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 0.9rem; padding: 0; }
     .zf-icon-btn:hover { background: var(--zf-gray-light); }
     .zf-canvas-wrap { display: flex; justify-content: center; align-items: center; gap: 1.5rem; background: var(--zf2-canvas-desk, #dedad2); padding: 1.5rem; border-radius: 6px; }
@@ -1673,15 +1744,22 @@
       html, body, #app, .zf-sheet-view, .zf-sheet, .zf-slot, .zf-mini-page {
         --zf-page-scale: 1 !important;
       }
+      /* Print the INK, not the paper. The theme's paper color is a preview
+         of the stock the user intends to print on; filling the page (or the
+         sheet and slot containers behind it) with it wastes toner and, worse,
+         leaves a visible border where the printer's unreachable margin meets
+         the fill -- which breaks the zine illusion. All three layers are
+         transparent in print: ink (text, images, decorations) prints via
+         print-color-adjust: exact below, and the real paper supplies the
+         background. Screen keeps the theme background for the editor and
+         reader previews. */
+      .zf-mini-page, .zf-sheet, .zf-slot {
+        background: transparent !important;
+        --zf-page-paper: transparent !important;
+      }
       .zf-mini-page {
         padding: var(--zf-page-margin, 0.1in) !important;
         font-size: 10pt !important;
-        /* Print on white paper regardless of the theme's paper color. Ink on
-           the whole sheet wastes toner and leaves an ugly border where the
-           printer's margin falls outside the print area. Variety should come
-           from the paper people print on, not from background fill. */
-        background: #ffffff !important;
-        --zf-page-paper: #ffffff !important;
       }
       /* In print, icons size against the physical width (in inches) that
          was set inline via --zf-icon-w-in. Screen uses the inline px value;
@@ -1790,5 +1868,16 @@
       body { background: #ffffff; margin: 0; padding: 0; }
       .zf-reader-page { box-shadow: none; border: none; padding: 0; margin: 0; page-break-after: always; }
       .zf-editor { display: block !important; padding: 0 !important; }
+      /* Deliver the design the user built. By default browsers drop
+         background colors/images for print ("economy") to save ink, which
+         is exactly wrong for a zine. "exact" asks the browser to keep the
+         page's colors and backgrounds. It is a request, not a command: the
+         user's own Background graphics setting still takes priority, which
+         is the behavior we want -- default to what they built, but never
+         take the choice away. The -webkit- prefix covers older Chrome/Safari. */
+      .zf-mini-page, .zf-reader-page, .zf-sheet, .zf-sheet-slot, body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   

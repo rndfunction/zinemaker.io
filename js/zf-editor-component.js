@@ -517,6 +517,32 @@
     closeContextMenu: function () {
       if (this.ctxMenu.open) this.ctxMenu = { open: false, x: 0, y: 0, kind: '', id: '' };
     },
+    // Opacity popover. Opens near the gradient button that triggered it, with
+    // the layer id so the slider inside knows which element to fade.
+    openOpacityMenu: function (evt, id) {
+      var r = evt.currentTarget ? evt.currentTarget.getBoundingClientRect() : { left: evt.clientX, bottom: evt.clientY };
+      this.opacityMenu = { open: true, x: Math.round(r.left), y: Math.round(r.bottom + 4), id: id };
+      // Only one popover at a time: opening opacity closes a ctx menu.
+      this.closeContextMenu();
+    },
+    closeOpacityMenu: function () {
+      if (this.opacityMenu.open) this.opacityMenu = { open: false, x: 0, y: 0, id: '' };
+    },
+    // Resolve the current opacity of the layer the popover is editing (or 1 if
+    // unset). The popover always edits the layer it was opened for.
+    opacityMenuValue: function () {
+      var id = this.opacityMenu.id;
+      var layer = this.layers.find(function (l) { return l.id === id; });
+      var v = layer && layer.el && (typeof layer.el.opacity === 'number') ? layer.el.opacity : 1;
+      return v;
+    },
+    // Write the opacity back onto the layer's live element. Because layer.el
+    // is the actual element object in the page (confirmed in the `layers`
+    // computed), this mutates real data reactively.
+    setOpacityFor: function (id, value) {
+      var layer = this.layers.find(function (l) { return l.id === id; });
+      if (layer && layer.el) layer.el.opacity = value;
+    },
     _selectElementById: function (kind, id) {
       var page = this.active;
       if (!page) return;
@@ -2508,6 +2534,13 @@
       var box = this.activeTextBox;
       if (!box) return;
       var s = this._unitScale();
+      // Setting a width is an explicit "I want this exact width" action, so
+      // stop auto-sizing. While autoWidth is true the renderer uses
+      // width: max-content and ignores `w` entirely -- which is why dragging
+      // this slider previously moved the number but not the box until a
+      // manual resize cleared the flag. Clearing it here makes the slider and
+      // the visible box agree from the first drag.
+      box.autoWidth = false;
       box.w = Math.max(0.4 * s, Math.min(8 * s, Number(v)));
     },
     setTextBoxRot: function (v) {
@@ -3322,6 +3355,10 @@
         // target element (kind + id) so an action knows what to operate on.
         // Declared here so the template + methods can safely read it.
         ctxMenu: { open: false, x: 0, y: 0, kind: '', id: '' },
+    // Opacity popover state. Parallel to ctxMenu so a right-click menu and an
+    // opacity popover can be opened/closed independently; both share the same
+    // dismiss listeners (pointerdown outside, Escape, scroll).
+    opacityMenu: { open: false, x: 0, y: 0, id: '' },
         // Overlap picker: shown on hover when 2+ elements stack under the
         // cursor, so the user can pick the one they mean by name.
         overlapPicker: { open: false, x: 0, y: 0, items: [] },
@@ -3754,6 +3791,11 @@
       document.addEventListener("mousemove", this._onHoverPicker);
       // Dismiss the context menu on any outside click / Esc / scroll.
       this._onCtxDismiss = function (evt) {
+        // Dismiss either popover on outside click. Handle both so the two do
+        // not need separate listeners.
+        var t = evt.target;
+        var insideOpacity = t && t.closest && t.closest('.zf-opacity-menu');
+        if (self.opacityMenu.open && !insideOpacity) self.closeOpacityMenu();
         if (!self.ctxMenu.open) return;
         var t = evt.target;
         var menu = self.$el ? self.$el.querySelector('.zf-ctx-menu') : null;
@@ -3761,9 +3803,13 @@
         self.closeContextMenu();
       };
       document.addEventListener("pointerdown", this._onCtxDismiss, true);
-      this._onCtxKey = function (evt) { if (evt.key === 'Escape') self.closeContextMenu(); };
+      this._onCtxKey = function (evt) {
+        if (evt.key !== 'Escape') return;
+        self.closeContextMenu();
+        self.closeOpacityMenu();
+      };
       document.addEventListener("keydown", this._onCtxKey);
-      this._onCtxScroll = function () { self.closeContextMenu(); };
+      this._onCtxScroll = function () { self.closeContextMenu(); self.closeOpacityMenu(); };
       window.addEventListener("scroll", this._onCtxScroll, true);
       // Wire the multi-selection group box to a move drag. The box is drawn
       // by updateGroupBox() but had no mousedown listener, so clicking the
@@ -3794,7 +3840,14 @@
           if (!p) return false;
           return !!(p.activeImageId || p.activeTextBoxId);
         },
-        selectAll: function () { self.selectAllOnPage(); }
+        selectAll: function () { self.selectAllOnPage(); },
+        // Drawing-aware undo. While drawing mode is active, Ctrl+Z should
+        // undo the last pen/calligraphy/eraser stroke, NOT revert the whole
+        // page via the global history (which silently restores an earlier
+        // page snapshot and loses unrelated edits -- a dangerous surprise).
+        // zf-boot's key handler asks isDrawing() first and routes here.
+        isDrawing: function () { return !!self.drawingMode; },
+        drawUndo: function () { self.drawUndo(); }
       };
       // Expose zine-level import/export so the masthead (AppShell) can call
       // them even though the logic lives on the editor component.

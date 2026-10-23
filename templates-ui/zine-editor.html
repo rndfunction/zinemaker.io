@@ -62,6 +62,15 @@
                            :aria-pressed="isGrouped(layer.id)">
                      <iconify-icon :icon="isGrouped(layer.id) ? 'ph:link-simple' : 'ph:link-simple-break'" aria-hidden="true"></iconify-icon>
                    </button>
+                   <button class="zf-icon-btn zf-opacity-btn"
+                           :style="{ background: 'linear-gradient(90deg, rgba(0,94,162,' + ((typeof layer.el.opacity === 'number' ? layer.el.opacity : 1)) + ') 0%, rgba(0,94,162,0.08) 100%)' }"
+                           @click.stop="openOpacityMenu($event, layer.id)"
+                           :title="'Layer opacity: ' + Math.round(((typeof layer.el.opacity === 'number' ? layer.el.opacity : 1)) * 100) + '%'"
+                           :aria-label="'Layer opacity: ' + Math.round(((typeof layer.el.opacity === 'number' ? layer.el.opacity : 1)) * 100) + '%'"
+                           :aria-haspopup="'true'"
+                           :aria-expanded="opacityMenu.open && opacityMenu.id === layer.id ? 'true' : 'false'">
+                     <iconify-icon icon="ph:circle-half" aria-hidden="true"></iconify-icon>
+                   </button>
                    <button class="zf-icon-btn" @click.stop="toggleLayerHidden(layer)" :title="layer.el.hidden ? 'Show layer' : 'Hide layer'" :aria-label="layer.el.hidden ? 'Show layer' : 'Hide layer'">
                      <iconify-icon :icon="layer.el.hidden ? 'ph:eye-slash' : 'ph:eye'" aria-hidden="true"></iconify-icon>
                    </button>
@@ -283,8 +292,20 @@
         </div>
         <!-- Right-click context menu for any element (everything is a layer).
              Positioned at the cursor; closes on outside click / Esc / scroll. -->
-        <div v-if="ctxMenu.open" class="zf-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
-             role="menu" @contextmenu.prevent>
+            <div v-if="opacityMenu.open" class="zf-opacity-menu"
+                 :style="{ top: opacityMenu.y + 'px', left: opacityMenu.x + 'px' }"
+                 role="dialog" aria-label="Layer opacity">
+              <label class="zf-text-panel-label" style="display:block;margin-bottom:0.25rem;">Layer opacity</label>
+              <input class="zf-layer-opacity" type="range" min="0.1" max="1" step="0.05"
+                     :value="opacityMenuValue()"
+                     @input.stop="setOpacityFor(opacityMenu.id, Number($event.target.value))"
+                     aria-label="Layer opacity" style="width:140px;" />
+              <div style="font-size:0.75rem;color:var(--zf-gray-mid);margin-top:0.15rem;text-align:right;">
+                {{ Math.round(opacityMenuValue() * 100) }}%
+              </div>
+            </div>
+            <div v-if="ctxMenu.open" class="zf-ctx-menu" :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
+                 role="menu" @contextmenu.prevent>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('front')">Bring to Front</button>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('forward')">Bring Forward</button>
           <button type="button" class="zf-ctx-item" role="menuitem" @click="ctxAction('backward')">Send Backward</button>
@@ -540,13 +561,18 @@
         <!-- ======== SINGLE TEXT BOX ======== -->
         <template v-else-if="panelMode === 'text'">
 
-        <label class="zf-text-panel-label" for="zf-tp-w">Width ({{ dispW(selectedTextBox, 1.8) }} {{ pageUnitLabel() }})</label>
+                <label class="zf-text-panel-label" for="zf-tp-w">Width (<template v-if="selectedTextBox.autoWidth">Auto</template><template v-else>{{ dispW(selectedTextBox, 1.8) }} {{ pageUnitLabel() }}</template>)</label>
         <div class="zf-text-panel-row">
-          <input id="zf-tp-w" type="range" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step"
-                 :value="selectedTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;" aria-label="Text box width slider" />
+                  <input id="zf-tp-w" type="range" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step"
+                         :value="selectedTextBox.w || 1.8" @input="setTextBoxW($event.target.value)" style="flex:1;"
+                         :title="selectedTextBox.autoWidth ? 'Box auto-sizes to its text. Adjust to set a fixed width.' : 'Text box width'"
+                         :aria-label="selectedTextBox.autoWidth ? 'Text box width slider (currently auto)' : 'Text box width slider'" />
           <input type="number" :min="textWidthRange().min" :max="textWidthRange().max" :step="textWidthRange().step" style="width:64px;"
                  :value="(selectedTextBox.w || 1.8).toFixed(2)"
                  @input="setTextBoxW($event.target.value)" @change="setTextBoxW($event.target.value)" aria-label="Text box width in inches" />
+        </div>
+        <div class="zf-text-panel-row" style="margin-top:0.15rem;">
+          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitTextBox" title="Widen this text box to the content area">Fit width</button>
         </div>
 
         <label class="zf-text-panel-label" for="zf-tp-rot">Rotation ({{ dispRot(selectedTextBox) }}&deg;)</label>
@@ -619,7 +645,6 @@
         </div>
 
         <div class="zf-text-panel-row">
-          <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitTextBox" title="Widen this text box to the content area">Fit width</button>
           <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetTextBox">Reset</button>
         </div>
         </template>
@@ -634,6 +659,9 @@
                    :value="(selectedImage.w || 1.5).toFixed(2)"
                    @input="setImageW($event.target.value)" @change="setImageW($event.target.value)" aria-label="Image width" />
           </div>
+          <div class="zf-text-panel-row" style="margin-top:0.15rem;">
+            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitImage" title="Widen this image to the content area">Fit width</button>
+          </div>
 
           <label class="zf-text-panel-label" for="zf-ip-rot">Rotation ({{ dispRot(selectedImage) }}&deg;)</label>
           <div class="zf-text-panel-row">
@@ -645,7 +673,6 @@
           </div>
 
           <div class="zf-text-panel-row">
-            <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="fitImage">Fit width</button>
             <button class="zf-btn" style="border-color:var(--zf-border);font-size:0.8rem;" @click="resetImage">Reset</button>
           </div>
 

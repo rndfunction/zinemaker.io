@@ -6,6 +6,7 @@
         <div class="zf2-masthead-titles">
           <span class="zf2-kicker">Zine &middot; {{ store.view }}</span>
           <input
+            type="text"
             class="zf2-title zf2-title-input"
             v-model="store.title"
             placeholder="Untitled Zine"
@@ -38,6 +39,7 @@
             <input type="file" accept=".json,application/json" style="display:none;" @change="onImport" />
           </label>
           <button class="zf2-ghost" @click="onExport" title="Download this zine as a JSON file">Export</button>
+        <button class="zf2-ghost" @click="openShare" title="Share this zine as a PDF, source file, or link" aria-haspopup="dialog">Share</button>
           <button class="zf2-ghost" @click="onSaveToLibrary" title="Save this zine to your library">
             <iconify-icon icon="ph:floppy-disk" aria-hidden="true" style="vertical-align:-2px;"></iconify-icon>
             Save
@@ -53,6 +55,35 @@
         <button class="zf2-tab" :aria-current="store.view === 'reader'" @click="goReader">Read</button>
         <button class="zf2-tab" :aria-current="store.view === 'sheet'" @click="goSheet">Print</button>
       </nav>
+
+      <!-- Share dialog: lives at the shell root (like the New Zine modal) so
+           it is not nested inside the <nav> tab row. -->
+      <div v-if="shareOpen" class="zf-share-backdrop" @click.self="closeShare">
+        <div class="zf-share-dialog" role="dialog" aria-modal="true" aria-labelledby="zf-share-title">
+          <h2 id="zf-share-title" class="zf-share-title">Share this zine</h2>
+          <p class="zf-share-lead">Zines are made to be passed along. Pick how you want to send it.</p>
+
+          <button class="zf-share-option" @click="shareAsPdf">
+            <strong>Print to PDF, then share</strong>
+            <span>The modern photocopy. We'll open the print view &mdash; choose <em>Save as PDF</em> in the print dialog, then send the file to anyone. Readers don't need Zine Forge.</span>
+          </button>
+          <p class="zf-share-hint">In the print dialog: <strong>Scale 100%</strong>, <strong>Margins None</strong>.</p>
+
+          <button class="zf-share-option" @click="shareAsSource">
+            <strong>Share the source</strong>
+            <span>A <code>.zine.json</code> file someone can open here to remix, or print their own copies.</span>
+          </button>
+
+          <button class="zf-share-option" @click="shareAsLink">
+            <strong>Copy a link</strong>
+            <span>Opens in Zine Forge. Best for short zines &mdash; very image-heavy ones may exceed the URL limit.</span>
+          </button>
+
+          <div class="zf-share-foot">
+            <button class="zf-btn" @click="closeShare">Cancel</button>
+          </div>
+        </div>
+      </div>
 
       <main class="zf-main">
         <div v-if="store.status" class="zf-muted" role="status" aria-live="polite">{{ store.status }}</div>
@@ -126,11 +157,11 @@
         </div>
         <div class="zf-field">
           <label class="zf-label" for="zf-zine-title">Zine title</label>
-          <input id="zf-zine-title" class="zf-input" v-model="store.title" />
+          <input type="text" id="zf-zine-title" class="zf-input" v-model="store.title" />
         </div>
         <div class="zf-field">
           <label class="zf-label" for="zf-zine-author">Author</label>
-          <input id="zf-zine-author" class="zf-input" v-model="store.author" />
+          <input type="text" id="zf-zine-author" class="zf-input" v-model="store.author" />
         </div>
       </div>
     </div>
