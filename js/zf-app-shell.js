@@ -85,9 +85,45 @@
     closeShare: function () { this.shareOpen = false; },
     shareAsPdf: function () {
       this.shareOpen = false;
-      // Navigate to the print sheet; the user picks "Save as PDF" there.
-      // A hint on the sheet view tells them the exact dialog settings.
-      this.goSheet();
+      // Stage 3a: WYSIWYG raster. The exporter needs the sheet view rendered
+      // in the DOM to photograph it. So we switch views for the duration,
+      // show a "Preparing your PDF" modal (which covers the flash), then
+      // restore the previous view. If anything fails, we fall back to the
+      // print view so the user is never stuck.
+      var self = this;
+      var exporter = window.ZFExportPdf;
+      if (typeof exporter !== 'function') { this.goSheet(); return; }
+
+      var prevView = this.store.view;
+      this.store.status = 'Preparing your PDF\u2026';
+      this.store.view = 'sheet';
+
+      // Yield once so the sheet renders into the DOM before we try to
+      // photograph it. The exporter also waits internally, but doing it here
+      // ensures the modal-over-sheet is painted in the same frame.
+      this.$nextTick().then(function () {
+        return exporter();
+      }).then(function (blob) {
+        self.store.view = prevView;
+        self.store.status = '';
+        try {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = ((self.store.title || 'zine') + '.pdf');
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          self.store.status = 'PDF ready.';
+          setTimeout(function () { if (self.store.status === 'PDF ready.') self.store.status = ''; }, 2000);
+        } catch (e) {
+          self.store.status = 'Could not save PDF.';
+        }
+      }).catch(function (err) {
+        self.store.view = prevView;
+        self.store.status = '';
+        try { if (typeof zfLog === 'function') zfLog('PDF export failed: ' + (err && err.message ? err.message : String(err))); } catch (e) {}
+        // Fall back to the print view so the user can still get a PDF.
+        self.goSheet();
+      });
     },
     shareAsSource: function () {
       this.shareOpen = false;
