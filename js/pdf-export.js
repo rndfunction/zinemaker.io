@@ -150,7 +150,15 @@
     var pdfDoc = await PDFLib.PDFDocument.create();
 
     for (var i = 0; i < sideEls.length; i++) {
-      var canvas = await _rasterizeElement(sideEls[i], paperHeightPx);
+      // Rasterize the .zf-sheet element inside the side, NOT the side itself.
+      // .zf-sheet-side is a wrapper: the sheet is centered inside a wider
+      // container (max-width: 1000px with padding), so photographing the
+      // wrapper would embed the surrounding whitespace into the PDF page as
+      // empty margins. The .zf-sheet element is sized to the paper, so it
+      // produces the correct edge-to-edge raster.
+      var sheetEl = sideEls[i].querySelector('.zf-sheet') || sideEls[i];
+      _trace('export:side-' + i + '-sheet=' + (sheetEl !== sideEls[i]));
+      var canvas = await _rasterizeElement(sheetEl, paperHeightPx);
       if (!canvas) continue;
       // Crop or pad to paper aspect. The sheet element's aspect should already
       // match the paper (it is sized from paper dimensions), but rounding
