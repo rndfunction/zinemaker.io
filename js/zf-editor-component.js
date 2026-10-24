@@ -3184,6 +3184,39 @@
       var self = store;
       setTimeout(function () { if (self.status.indexOf("Cleared ") === 0) self.status = ""; }, 2500);
     },
+    // Render an icon element as inline SVG using the shared zfIconSvg cache.
+    // Used by every page-content icon (ghost pages, editor active page) in
+    // place of <iconify-icon>, whose custom-element lifecycle caused icons to
+    // appear at zero size then jump to full size on every page mount -- a
+    // visible resize that also repeated on every ghost-page flip.
+    //
+    // Returns an <svg> string with width/height 100% so the SVG fills its
+    // wrapper (which is already sized by zfElementStyle). If the icon body
+    // isn't cached yet, returns '' and kicks off zfIconSvg.ensure(); the
+    // mounted onLoad handler bumps iconEpoch, which re-renders this method
+    // once the body arrives.
+    //
+    // Icon name is validated against the Iconify prefix:name shape before it
+    // is interpolated into the return string. Icon names can come from user-
+    // controlled data (shared links, .zine.json imports), so a malformed name
+    // must never land in the v-html output.
+    iconInline: function (img) {
+      if (!img || img.kind !== 'icon' || !img.src) return '';
+      // Vue dependency tracking: recompute when an icon body arrives.
+      var _ = this.iconEpoch;
+      var name = String(img.src);
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(name)) return '';
+      var cached = window.zfIconSvg ? window.zfIconSvg.get(name) : null;
+      if (!cached) {
+        if (window.zfIconSvg) window.zfIconSvg.ensure(name);
+        return '';
+      }
+      var safeColor = (typeof zfSafeColor === 'function') ? zfSafeColor(img.color) : (img.color || '');
+      var color = safeColor || 'currentColor';
+      return '<svg viewBox="' + cached.viewBox + '" width="100%" height="100%" ' +
+             'style="color:' + color + ';fill:currentColor;display:block;" aria-hidden="true">' +
+             cached.body + '</svg>';
+    },
     exportJson: function () {
       var payload = {
         specVersion: "1.0", app: "Zine Forge", exported: new Date().toISOString(),
@@ -3312,6 +3345,12 @@
         // render. Reading panelTick in the display helpers forces the labels
         // to recompute every frame so the numbers track the drag live.
         panelTick: 0,
+        // Bumped every time zfIconSvg finishes fetching an icon body. Read
+        // by iconInline() so Vue tracks it as a dependency; when a new icon
+        // arrives, every icon re-renders (cheap: they become inline <svg>
+        // strings, not live custom elements). This is what keeps inline-SVG
+        // icons from ever looking "half-loaded" and resizing.
+        iconEpoch: 0,
         debugFlow: false,
         iconPickerOpen: false,
         iconPickerQuery: '',
@@ -3756,6 +3795,14 @@
       this._onMouseUp = function (evt) { self.onImageMouseUp(evt); };
       window.addEventListener("mousemove", this._onMouseMove);
       window.addEventListener("mouseup", this._onMouseUp);
+      // Inline-SVG icons: bump iconEpoch whenever an icon body arrives so the
+      // six icon render sites (three pages x block/free) re-render with the
+      // <svg> instead of the empty fallback. Without this the first render of
+      // a fresh icon would stay blank; with it, the blank is momentary and
+      // then the icon appears at its final size (never resizes in place).
+      if (window.zfIconSvg && window.zfIconSvg.onLoad) {
+        window.zfIconSvg.onLoad(function () { self.iconEpoch++; });
+      }
 
       // Keep the floating text panel anchored to the rail on resize/scroll.
       this._onPanelReflow = function () { self.positionTextPanel(); };

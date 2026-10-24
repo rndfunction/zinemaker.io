@@ -103,9 +103,10 @@
                   <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
                        class="zf-mini-image zf-block-image" :src="img.src" alt=""
                        :style="ghostBlockStyle(img)" />
-                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
-                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
-                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                   <div v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                        class="zf-mini-image zf-block-image zf-block-icon"
+                        :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"
+                        v-html="iconInline(img)"></div>
                 </template>
                 <!-- inline body retired: text renders in text boxes below -->
                 <template v-for="img in (prevPage.images || [])" :key="'gpf-' + img.id">
@@ -119,9 +120,10 @@
                        class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
                   <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
                        class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
-                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
-                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
-                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                   <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                        class="zf-mini-image zf-positioned zf-positioned-icon-wrap"
+                        :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"
+                        v-html="iconInline(img)"></div>
                 </template>
                 <template v-for="box in (prevPage.textBoxes || [])" :key="'gpt-' + box.id">
                   <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"
@@ -158,10 +160,10 @@
                    class="zf-mini-image zf-block-image"
                    :src="img.src" alt="Page illustration"
                    :style="imageBlockStyle(img)" />
-              <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
-                   class="zf-mini-image zf-block-image zf-block-icon"
-                   :icon="img.src"
-                   :style="Object.assign({}, imageBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+               <div v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                    class="zf-mini-image zf-block-image zf-block-icon"
+                    :style="Object.assign({}, imageBlockStyle(img), { color: img.color || 'inherit' })"
+                    v-html="iconInline(img)"></div>
             </template>
               <!-- Inline page body retired: text lives in text boxes only. -->
 
@@ -208,7 +210,7 @@
                  <div v-else-if="img.kind === 'sticky'" class="zf-sticky" :class="'zf-sticky-' + (img.color || 'yellow')" :style="stickyStyle(img, {})" aria-hidden="true"></div>
                  <div v-else-if="img.kind === 'sticker'" class="zf-sticker" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, {})" aria-hidden="true"></div>
                  <img v-else-if="img.kind !== 'icon'" :src="img.src" alt="Page illustration" />
-                 <iconify-icon v-else class="zf-icon-element" :icon="img.src" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }"></iconify-icon>
+                  <div v-else class="zf-icon-element" :style="{ width: '100%', height: '100%', color: img.color || 'inherit' }" v-html="iconInline(img)"></div>
                 <span class="zf-img-handle zf-img-handle-resize"
                       title="Drag to resize"
                       @mousedown.stop.prevent="onResizeStart($event, img)"></span>
@@ -231,9 +233,10 @@
                   <img v-if="img.wrap === 'block' && img.kind !== 'icon'"
                        class="zf-mini-image zf-block-image" :src="img.src" alt=""
                        :style="ghostBlockStyle(img)" />
-                  <iconify-icon v-else-if="img.wrap === 'block' && img.kind === 'icon'"
-                       class="zf-mini-image zf-block-image zf-block-icon" :icon="img.src"
-                       :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                   <div v-else-if="img.wrap === 'block' && img.kind === 'icon'"
+                        class="zf-mini-image zf-block-image zf-block-icon"
+                        :style="Object.assign({}, ghostBlockStyle(img), { color: img.color || 'inherit' })"
+                        v-html="iconInline(img)"></div>
                 </template>
                 <!-- inline body retired: text renders in text boxes below -->
                 <template v-for="img in (nextPage.images || [])" :key="'gnf-' + img.id">
@@ -247,9 +250,10 @@
                        class="zf-sticker zf-positioned" :class="'zf-sticker-' + (img.shape || 'circle')" :style="stickerStyle(img, ghostFreeStyle(img))"></div>
                   <img v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind !== 'icon'"
                        class="zf-mini-image zf-positioned" :src="img.src" alt="" :style="ghostFreeStyle(img)" />
-                  <iconify-icon v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
-                       class="zf-mini-image zf-positioned zf-positioned-icon-wrap" :icon="img.src"
-                       :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"></iconify-icon>
+                   <div v-else-if="(img.wrap === 'free' || !img.wrap) && img.kind === 'icon'"
+                        class="zf-mini-image zf-positioned zf-positioned-icon-wrap"
+                        :style="Object.assign({}, ghostFreeStyle(img), { color: img.color || 'inherit' })"
+                        v-html="iconInline(img)"></div>
                 </template>
                 <template v-for="box in (nextPage.textBoxes || [])" :key="'gnt-' + box.id">
                   <div v-if="!box.hidden" class="zf-textbox zf-textbox-readonly"

@@ -586,6 +586,18 @@ function zfElementStyle(el, pageW, pageH, margin, opts) {
     // two resize axes are independent.
     style.height = (el.h / pageH * 100).toFixed(4) + "%";
   } else {
+    // No explicit height. For images whose intrinsic size is already known
+    // (populated by zfGetImageSize at creation time), set aspect-ratio so the
+    // browser reserves the correct height BEFORE the image decodes. Without
+    // this, a fresh <img> renders at zero/default height, then jumps to its
+    // natural height when the data URL decodes -- which is what made ghost
+    // pages visibly resize on every page flip (each flip remounts the images).
+    // The width above is a percentage, so aspect-ratio + height:auto lets the
+    // browser compute height from width, matching the intrinsic proportions.
+    var _cached = (typeof ZF_IMG_CACHE !== "undefined" && el.src) ? ZF_IMG_CACHE[el.src] : null;
+    if (_cached && _cached.w > 0 && _cached.h > 0) {
+      style.aspectRatio = (_cached.w / _cached.h).toFixed(4);
+    }
     style.height = "auto";
   }
   if (el.kind === "icon" && el.color) style.color = el.color;
