@@ -3763,14 +3763,24 @@
         var onscreenLong = 640;
         var screenScale = onscreenLong / longSide;
         var renderedW = w * screenScale;
-        var renderedH = h * screenScale;
         var unit = m.page.unit || "in";
         var physicalInches = unit === "mm" ? w / 25.4 : w;
         var physicalCssPx = physicalInches * 96;
         var pageScale = renderedW / physicalCssPx;
+        // Height is "auto" + aspect-ratio, NOT a fixed pixel value. Reason:
+        // the page sits in a flex row alongside optional ghost pages
+        // (.zf-ghost-page { flex: 0 0 auto; width: 130px }), so the flex
+        // layout can shrink the main page's WIDTH when ghosts are present.
+        // A fixed pixel height does not shrink with it, which made the page
+        // look squished -- a WYSIWYG violation: the on-screen page's shape
+        // stopped matching the paper's shape. With aspect-ratio, the browser
+        // derives height from width (however flex sizes the box), so the
+        // page's aspect always matches the physical page. It may be smaller
+        // when ghosts are present -- correct -- but never a different shape.
         return {
           width: Math.round(renderedW) + "px",
-          height: Math.round(renderedH) + "px",
+          height: "auto",
+          aspectRatio: w + " / " + h,
           "--zf-page-scale": pageScale,
           "--zf-page-margin": store.modelMarginIn() + "in"
         };
@@ -3988,20 +3998,16 @@
       // image) against the rail: top aligned to the rail top, left one grid
       // gap to its right (flips to the left if it would run off-screen).
       // Only one panel is ever visible at a time, so we pick the present ref.
+      // Panel positioning is now handled by CSS: .zf-float-panel is a grid
+      // child with position: sticky, so it sits in the editor's third column
+      // aligned to the rail top, and collapses to zero when panelMode is
+      // 'none' (v-if removes it from the DOM). This method used to write
+      // inline top/left every frame, which pushed the panel out of the grid
+      // and over the canvas -- the overlap the user reported. No-op now,
+      // kept so the existing call sites (mounted, $nextTick, resize handler,
+      // panelMode watch) remain valid without touching them all.
       positionTextPanel: function () {
-        var panel = this.$refs.floatPanelEl || this.$refs.textPanelEl || this.$refs.imagePanelEl;
-        var rail = this.$refs.railEl;
-        if (!panel || !rail) return;
-        var rr = rail.getBoundingClientRect();
-        var gap = 20; // .zf-editor gap: 1.25rem at 16px root
-        var panelW = panel.offsetWidth || 260;
-        var top = rr.top;
-        var left = rr.right + gap;
-        if (left + panelW > window.innerWidth - 8) {
-          left = rr.left - gap - panelW;
-        }
-        panel.style.top = Math.max(8, top) + 'px';
-        panel.style.left = Math.max(8, left) + 'px';
+        /* no-op: panel position is CSS-driven (position: sticky) */
       },
       // Position the group selection box to exactly wrap the multi-selection.
       // The box lives in .zf-canvas-wrap (unclipped), so its px are relative
