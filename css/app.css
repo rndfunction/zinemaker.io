@@ -693,6 +693,31 @@
       outline: 2px solid var(--zf-blue, #005ea2);
       outline-offset: 2px;
     }
+    /* Full-screen PDF export progress modal. Covers the sheet view (visible
+       during html2canvas raster) so the user sees "Preparing your PDF…"
+       instead of a 1-2 second flash of the print sheet. */
+    .zf-pdf-modal {
+      position: fixed; inset: 0;
+      background: rgba(20, 23, 26, 0.65);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .zf-pdf-modal-content {
+      background: #ffffff; border-radius: 8px; padding: 1.5rem 2rem;
+      text-align: center; font-family: var(--zf-font);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .zf-pdf-modal-title { margin: 0.5rem 0 0.25rem; font-size: 1.15rem; }
+    .zf-pdf-modal-text { margin: 0; color: var(--zf-gray-mid); font-size: 0.85rem; }
+    .zf-spinner {
+      width: 32px; height: 32px; margin: 0 auto;
+      border: 3px solid var(--zf-border);
+      border-top-color: var(--zf-blue, #005ea2);
+      border-radius: 50%;
+      animation: zf-spin 0.8s linear infinite;
+    }
+    @keyframes zf-spin { to { transform: rotate(360deg); } }
+
     /* Share dialog: a focused modal with three large option buttons. The
        framing is "share," not "download" -- zines are passed along. */
     .zf-share-backdrop {

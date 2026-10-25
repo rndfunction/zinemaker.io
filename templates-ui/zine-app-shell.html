@@ -120,6 +120,17 @@
           </div>
         </div>
       </div>
+      <!-- Full-screen PDF export progress modal. Blocks the app while the
+           raster runs so the user sees a progress state, not a flash of the
+           sheet view. No dismiss button: the export completes or rejects
+           on its own (with a 15s watchdog inside the exporter). -->
+      <div v-if="pdfExporting" class="zf-pdf-modal" role="dialog" aria-modal="true" aria-label="Preparing your PDF">
+        <div class="zf-pdf-modal-content">
+          <div class="zf-spinner" aria-hidden="true"></div>
+          <h2 class="zf-pdf-modal-title">Preparing your PDF\u2026</h2>
+          <p class="zf-pdf-modal-text">This may take a few seconds for image-heavy zines.</p>
+        </div>
+      </div>
       <div class="zf-settings-backdrop" v-if="store.settingsOpen" @click="store.settingsOpen = false" aria-hidden="true"></div>
       <div class="zf-settings-slide" :class="{ open: store.settingsOpen }" role="dialog" aria-label="Zine settings" @keydown.esc="store.settingsOpen = false">
         <div class="zf-settings-slide-head">

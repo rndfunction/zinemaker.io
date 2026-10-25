@@ -25,7 +25,12 @@
         // link availability is checked on click (see shareAsLink), not
         // precomputed, because serializing the zine to open a menu is too
         // slow on image-heavy drafts.
-        shareOpen: false
+    shareOpen: false,
+    // True while a PDF is being generated. Drives a full-screen "Preparing
+    // your PDF…" modal that covers the sheet view (which is visible during
+    // the html2canvas raster). Without this the sheet view flashed on screen
+    // for 1-2 seconds, which felt like a bug rather than a progress state.
+    pdfExporting: false,
       };
     },
     mounted: function () {
@@ -96,6 +101,7 @@
 
       var prevView = this.store.view;
       this.store.status = 'Preparing your PDF\u2026';
+      this.pdfExporting = true;
       this.store.view = 'sheet';
 
       // Yield once so the sheet renders into the DOM before we try to
@@ -106,6 +112,7 @@
       }).then(function (blob) {
         self.store.view = prevView;
         self.store.status = '';
+        self.pdfExporting = false;
         try {
           var url = URL.createObjectURL(blob);
           var a = document.createElement('a');
@@ -120,6 +127,7 @@
       }).catch(function (err) {
         self.store.view = prevView;
         self.store.status = '';
+        self.pdfExporting = false;
         try { if (typeof zfLog === 'function') zfLog('PDF export failed: ' + (err && err.message ? err.message : String(err))); } catch (e) {}
         // Fall back to the print view so the user can still get a PDF.
         self.goSheet();
