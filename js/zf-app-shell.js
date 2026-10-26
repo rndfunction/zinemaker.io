@@ -31,6 +31,11 @@
     // (permissions, secure-context, iframe restrictions) -- which it did,
     // silently, in earlier testing.
     shareUrl: '',
+    // Button label feedback: '' -> 'Copy', 'Copied!' for ~2s after success,
+    // 'Failed' for ~2s after failure. Shown on the Copy button itself so the
+    // click has a *visible* response even when the status line is hidden
+    // behind the modal (which it was -- that's why the button "did nothing").
+    copyFeedback: '',
     // True while a PDF is being generated. Drives a full-screen "Preparing
     // your PDF…" modal that covers the sheet view (which is visible during
     // the html2canvas raster). Without this the sheet view flashed on screen
@@ -103,8 +108,14 @@
       var self = this;
       var url = this.shareUrl;
       if (!url) return;
-      function success() { self.store.status = 'Share link copied.'; self._clearStatusLater(); }
-      function failure() { self.store.status = 'Copy failed -- select the link and press Ctrl+C.'; self._clearStatusLater(); }
+      // Feedback on the button itself, so the click has a visible effect even
+      // when the dialog is covering the global status line.
+      function flashFeedback(text) {
+        self.copyFeedback = text;
+        setTimeout(function () { if (self.copyFeedback === text) self.copyFeedback = ''; }, 2000);
+      }
+      function success() { flashFeedback('Copied!'); self.store.status = 'Share link copied.'; self._clearStatusLater(); }
+      function failure() { flashFeedback('Copy failed'); self.store.status = 'Copy failed -- select the link and press Ctrl+C.'; self._clearStatusLater(); }
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(url).then(success).catch(function () {
@@ -268,15 +279,21 @@
         this.store.status = 'Could not build a share link' + reason;
         return;
       }
-      // With LZ-string compression, most zines fit comfortably under 8000
-      // characters. 8000 is still conservative vs browser limits (~65k for
-      // Firefox, higher for Chrome), because intermediate services (chat
-      // apps, email clients) truncate much lower. Leave the dialog open on
-      // rejection so the user can choose another door without reopening the
-      // menu.
-      if (r.size > 8000) {
-        this.store.status = 'This zine is too large to share as a link (' + r.size + ' chars). Try the PDF or source file instead.';
-        return;
+      // We are no longer blocking by size. Modern browsers handle URLs in
+      // the 100,000+ character range (Chrome, Firefox, Safari all tolerate
+      // this; only the *display* of very long URLs is truncated in the
+      // omnibox, not the URL itself). The #fragment is client-side, so no
+      // server-side limit applies. Intermediate services (chat apps, email)
+      // may truncate long URLs on receipt -- that's a UX concern for the
+      // user, not a reason to refuse to generate the link. The user can
+      // always fall back to the PDF or source file if the URL doesn't fit
+      // their channel.
+      //
+      // We do log a debug warning above 100,000 chars so that if the URL
+      // becomes impractically long (e.g. because of a huge base64 image in
+      // the data), debuggers can see it. The user gets the link either way.
+      if (r.size > 100000) {
+        try { if (typeof zfLog === 'function') zfLog('share link: unusually large URL (' + r.size + ' chars)'); } catch (e) {}
       }
       // Do NOT close the dialog. Show the URL inline so the user can copy it
       // manually even if the browser's clipboard write is blocked. Clipboard
@@ -286,15 +303,20 @@
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(r.url).then(function () {
-            this.store.status = 'Share link copied to clipboard.';
+            // Genuine success: the browser actually put the URL on the
+            // clipboard. Rare in some environments but happens elsewhere.
+            this.store.status = 'Link copied to clipboard.';
           }.bind(this)).catch(function () {
-            this.store.status = 'Copy failed -- select and copy the link below.';
+            // Auto-copy is best-effort. If it fails, do NOT alarm the user:
+            // the URL field is visible and the Copy button has its own
+            // feedback. Show a neutral "ready" state instead.
+            this.store.status = 'Link ready — use the Copy button or select the URL.';
           }.bind(this));
         } else {
-          this.store.status = 'Clipboard not available -- select and copy the link below.';
+          this.store.status = 'Link ready — use the Copy button or select the URL.';
         }
       } catch (e) {
-        this.store.status = 'Copy failed -- select and copy the link below.';
+        this.store.status = 'Link ready — use the Copy button or select the URL.';
       }
     },
       onSaveToLibrary: function () {

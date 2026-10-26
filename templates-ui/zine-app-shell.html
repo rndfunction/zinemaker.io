@@ -85,9 +85,10 @@
           <div v-if="shareUrl" class="zf-share-url-block">
             <input type="text" class="zf-share-url-input" :value="shareUrl" readonly
                    @focus="$event.target.select()" aria-label="Share link" />
-            <button type="button" class="zf-btn" @click="copyShareUrl" title="Copy to clipboard">Copy</button>
+            <button type="button" class="zf-btn" @click="copyShareUrl" title="Copy to clipboard">{{ copyFeedback || 'Copy' }}</button>
           </div>
 
+          <p v-if="store.status" class="zf-share-dialog-status" role="status" aria-live="polite">{{ store.status }}</p>
           <div class="zf-share-foot">
             <button class="zf-btn" @click="closeShare">Cancel</button>
           </div>

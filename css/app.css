@@ -796,6 +796,15 @@
       font-style: italic;
     }
     .zf-share-foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    /* In-dialog status line: visible when the share dialog is open (the
+       global .zf-muted status is behind the modal and invisible while this
+       dialog is showing). Shows copy success/failure and build errors. */
+    .zf-share-dialog-status {
+      margin: 0.5rem 0 0;
+      font-size: 0.8rem;
+      color: var(--zf-gray-mid);
+      text-align: right;
+    }
     /* Inline URL display in the share dialog, shown after "Copy a link".
        Selectable input + Copy button so the user can copy manually when
        programmatic clipboard write fails (it can, silently). */
