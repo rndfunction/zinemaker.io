@@ -205,21 +205,30 @@
           };
         });
         var payload = { t: this.store.title || '', a: this.store.author || '', p: pages };
-        var json = JSON.stringify(payload);
-        // LZ-string compresses zine JSON (highly repetitive: keys, structure,
-        // default values) by ~60-80% on text-heavy zines, ~20-40% on
-        // image-heavy ones. compressToEncodedURIComponent produces
-        // URL-safe output directly -- no separate base64 or URI-encode step,
-        // which keeps the payload smaller AND the code simpler.
-        var compressed;
-        if (window.LZString) {
-          compressed = 'z2:' + window.LZString.compressToEncodedURIComponent(json);
-        } else {
-          // Fallback to the old base64 path if LZ-string failed to load.
-          // Links produced this way are still readable by the reader's
-          // legacy branch.
-          var b64 = window.zfB64EncodeUtf8 ? window.zfB64EncodeUtf8(json) : btoa(unescape(encodeURIComponent(json)));
-          compressed = encodeURIComponent(b64);
+        // Wrap the entire serialize+compress pipeline in try/catch and pass
+        // the error message back to the caller. Previously, a throw inside
+        // JSON.stringify (e.g. a circular reference introduced by state
+        // loaded from a shared link) or inside LZString was caught by the
+        // outer try/catch and returned { url: '', size: 0 } with no reason --
+        // so the user saw no feedback and no change.
+        var json, compressed;
+        try {
+          json = JSON.stringify(payload);
+        } catch (e) {
+          return { url: '', size: 0, error: 'JSON serialization failed: ' + (e && e.message ? e.message : String(e)) };
+        }
+        try {
+          if (window.LZString) {
+            compressed = 'z2:' + window.LZString.compressToEncodedURIComponent(json);
+          } else {
+            // Fallback to the old base64 path if LZ-string failed to load.
+            // Links produced this way are still readable by the reader's
+            // legacy branch.
+            var b64 = window.zfB64EncodeUtf8 ? window.zfB64EncodeUtf8(json) : btoa(unescape(encodeURIComponent(json)));
+            compressed = encodeURIComponent(b64);
+          }
+        } catch (e2) {
+          return { url: '', size: 0, error: 'Compression failed: ' + (e2 && e2.message ? e2.message : String(e2)) };
         }
         // Build the base URL. In the FORGE preview, this app is served from
         // a srcdoc iframe whose origin is "null" (per the browser spec); the
@@ -241,8 +250,24 @@
     },
 
     shareAsLink: function () {
-      var r = this._buildShareUrl();
-      if (!r.url) { this.store.status = 'Could not build a share link.'; return; }
+      // Clear any previous URL first, so a failure on this attempt shows an
+      // EMPTY field rather than leaving a stale URL from an earlier share.
+      // (Previously, a failed rebuild left the old URL visible, which is why
+      // a second share -- e.g. when collaborating -- looked like "the button
+      // did nothing.")
+      this.shareUrl = '';
+      var r;
+      try {
+        r = this._buildShareUrl();
+      } catch (e) {
+        this.store.status = 'Could not build a share link: ' + (e && e.message ? e.message : String(e));
+        return;
+      }
+      if (!r || !r.url) {
+        var reason = r && r.error ? (': ' + r.error) : '';
+        this.store.status = 'Could not build a share link' + reason;
+        return;
+      }
       // With LZ-string compression, most zines fit comfortably under 8000
       // characters. 8000 is still conservative vs browser limits (~65k for
       // Firefox, higher for Chrome), because intermediate services (chat
@@ -250,7 +275,7 @@
       // rejection so the user can choose another door without reopening the
       // menu.
       if (r.size > 8000) {
-        this.store.status = 'This zine is too large to share as a link. Try the PDF or source file instead.';
+        this.store.status = 'This zine is too large to share as a link (' + r.size + ' chars). Try the PDF or source file instead.';
         return;
       }
       // Do NOT close the dialog. Show the URL inline so the user can copy it
