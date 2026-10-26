@@ -242,6 +242,80 @@ function zfClampNumber(value, min, max, fallback) {
   return Math.round(n * 100) / 100;
 }
 
+// -------- Snap helpers (drag-time edge/center alignment) --------
+// Snap primitives. All inputs and outputs are in PAGE UNITS (the same units
+// the element's x/y/w/h are stored in), and the threshold is caller-provided
+// in those same units -- callers convert from screen pixels using the
+// rendered page width so the feel is consistent at any zoom or page size.
+//
+// The behavior is deliberate: "snap if within threshold, otherwise leave
+// alone." Because the threshold is small, a fast drag passes through it
+// without sticking -- crossing the line requires intent. That's the exact
+// design brief: the easy path (aligning to a line) is a snap away; the wrong
+// path (crossing a line by accident) is avoided because you have to move
+// deliberately to get there.
+
+// Snap a single scalar value toward the nearest target within `threshold`.
+// Returns the original value if no target is close enough, so a zero-effect
+// call is indistinguishable from "no snap."
+function zfSnapOne(value, targets, threshold) {
+  var best = value, bestDist = threshold;
+  for (var i = 0; i < targets.length; i++) {
+    var d = Math.abs(value - targets[i]);
+    if (d < bestDist) { bestDist = d; best = targets[i]; }
+  }
+  return best;
+}
+
+// Snap an element's x/y position to the page's alignment targets.
+// Targets: left margin, page horizontal center, right margin (x axis);
+// top margin, page vertical center, bottom margin (y axis).
+// Tries three anchor points per axis (start, center, end) and returns the
+// nearest nonzero snap as an offset to add to the caller's position.
+//
+// `h` is optional: elements without an explicit height (e.g. photos sized
+// by intrinsic aspect) skip bottom-edge and vertical-center snapping,
+// because those depend on knowing the rendered height. Top-edge snapping
+// still works.
+function zfSnapElement(x, y, w, h, pageW, pageH, margin, threshold) {
+  var hasH = (typeof h === 'number' && h > 0);
+  // Targets include the page EDGE (0, pageW) as well as the margin (inset)
+  // and center. Element edges can align to any of them: a left edge can
+  // snap to the page's left edge (x=0), to the left margin line, or to the
+  // page center. Same for the right edge. This is why adding page edges
+  // matters: snapping to a "left side" now means the actual left edge of
+  // the paper, not just the inset margin line.
+  // Two targets per axis: the margin lines (safe boundary) and the page
+  // center. Page EDGES are deliberately not snap targets -- full-bleed
+  // placement is achieved by dragging to the edge, which the user can see
+  // visually. Snapping to margins and center matches the primary intents:
+  // "keep content inside the safe area" and "center this element."
+  var xTargets = [margin, pageW / 2, pageW - margin];
+  var yTargets = [margin, pageH / 2, pageH - margin];
+
+  var bestDx = 0, bestXDist = threshold, bestTargetX = null;
+  for (var i = 0; i < 3; i++) {
+    var aX = (i === 0) ? x : (i === 1) ? x + w / 2 : x + w;
+    var sX = zfSnapOne(aX, xTargets, threshold);
+    var dX = Math.abs(sX - aX);
+    if (sX !== aX && dX < bestXDist) { bestXDist = dX; bestDx = sX - aX; bestTargetX = sX; }
+  }
+
+  var bestDy = 0, bestYDist = threshold, bestTargetY = null;
+  var yAnchors = hasH ? [y, y + h / 2, y + h] : [y];
+  for (var j = 0; j < yAnchors.length; j++) {
+    var aY = yAnchors[j];
+    var sY = zfSnapOne(aY, yTargets, threshold);
+    var dY = Math.abs(sY - aY);
+    if (sY !== aY && dY < bestYDist) { bestYDist = dY; bestDy = sY - aY; bestTargetY = sY; }
+  }
+
+  // targetX / targetY: the snapped-to position on each axis, or null if no
+  // snap occurred. Used by the drag handler to render a guideline showing
+  // what the element is aligned with.
+  return { dx: bestDx, dy: bestDy, targetX: bestTargetX, targetY: bestTargetY };
+}
+
 // -------- Page migration --------
 function zfMigratePage(page) {
   if (!page) return page;

@@ -188,11 +188,26 @@
   // -------- Shared-link loader --------
   function loadSharedZineFromHash() {
     var hash = location.hash || '';
-    var m = hash.match(/(?:^#|&)z=([^&]+)/);
-    if (!m) return;
-    try {
-      var parsed = JSON.parse(zfB64DecodeUtf8(m[1]));
-      if (!parsed || !Array.isArray(parsed.p)) return;
+      var m = hash.match(/(?:^#|&)z=([^&]+)/);
+      if (!m) return;
+      try {
+        // Two formats:
+        //   - "z2:" prefix: LZ-string compressed (current writer format).
+        //   - no prefix: legacy base64 (old links still work).
+        // The reader prefers compressed when the prefix is present, and
+        // falls back to base64 otherwise, so old shared links never break.
+        var raw = decodeURIComponent(m[1]);
+        var json;
+        if (raw.indexOf('z2:') === 0) {
+          var compressed = raw.slice(3);
+          if (!window.LZString) { zfLog('share link: LZString not loaded'); return; }
+          json = window.LZString.decompressFromEncodedURIComponent(compressed);
+          if (!json) { zfLog('share link: decompress failed'); return; }
+        } else {
+          json = zfB64DecodeUtf8(raw);
+        }
+        var parsed = JSON.parse(json);
+        if (!parsed || !Array.isArray(parsed.p)) return;
       // BUILD FIRST, ASSIGN SECOND. Previously we mutated store.title and
       // store.author before calling zfBuildPagesFromData; if that call
       // threw, we'd end up with the shared title on the user's old pages

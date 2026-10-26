@@ -137,6 +137,34 @@
             </div>
           </div>
           <div class="zf-page zf-mini-page" ref="miniPage" :style="Object.assign({}, pageStyle, pageThemeStyle)" @mousedown="onBodyMouseDown">
+            <!-- Static target guides: dashed lines showing WHERE an element
+                 can snap. Visible whenever snap is enabled and the user has
+                 not turned guidelines off. This is the "here are your options"
+                 layer, distinct from the active snap line below which shows
+                 which target the element is CURRENTLY aligned to. -->
+            <template v-if="store.snapEnabled && store.showSnapGuide && activeModel">
+              <div v-for="(xT, xi) in snapXTargets"
+                   :key="'stx-' + xi"
+                   class="zf-snap-target zf-snap-target-x"
+                   :style="{ left: (100 * xT / activeModel.page.width) + '%' }"
+                   aria-hidden="true"></div>
+              <div v-for="(yT, yi) in snapYTargets"
+                   :key="'sty-' + yi"
+                   class="zf-snap-target zf-snap-target-y"
+                   :style="{ top: (100 * yT / activeModel.page.height) + '%' }"
+                   aria-hidden="true"></div>
+            </template>
+            <!-- Active snap line: brighter, visible only during a drag that is
+                 currently snapped. Shows exactly which target the element
+                 aligned to. -->
+            <div v-if="store.snapEnabled && store.showSnapGuide && snapGuideX !== null && activeModel"
+                 class="zf-snap-guide zf-snap-guide-x"
+                 :style="{ left: (100 * snapGuideX / activeModel.page.width) + '%' }"
+                 aria-hidden="true"></div>
+            <div v-if="store.snapEnabled && store.showSnapGuide && snapGuideY !== null && activeModel"
+                 class="zf-snap-guide zf-snap-guide-y"
+                 :style="{ top: (100 * snapGuideY / activeModel.page.height) + '%' }"
+                 aria-hidden="true"></div>
             <template v-for="g in safeGuides" :key="g.key">
               <div class="zf-mini-safe-guide" :style="g.style"></div>
             </template>
@@ -174,13 +202,14 @@
                       :class="[{ 'zf-textbox-selected': isSelected('textBox', box.id), 'zf-single-selected': isSingleSelected('textBox', box.id), 'zf-handle-owner': active.activeTextBoxId === box.id && !isMultiSelected, 'zf-multi-selected': isMultiSelected && isSelected('textBox', box.id), 'zf-stamp': box.kind === 'stamp', 'zf-panel': box.kind === 'panel', 'zf-textbox-overlay': box.overlay, 'zf-element-hover': hoveredEl.kind === 'textBox' && hoveredEl.id === box.id && !isSelected('textBox', box.id) }]"
                    :data-zf-text-id="box.id"
                    :style="textStyle(box)"
-                     @mousedown="onTextBoxMouseDown($event, box)"
-                     @click.stop="onElementClick('textBox', box, $event)"
-                     @contextmenu.prevent.stop="openContextMenu($event, 'textBox', box.id)"
-                    @keydown="onTextBoxKeydown($event, box)">
+                      @mousedown="onTextBoxMouseDown($event, box)"
+                      @click.stop="onElementClick('textBox', box, $event)"
+                      @contextmenu="onTextBoxContextMenu($event, box)"
+                      @keydown="onTextBoxKeydown($event, box)">
                 <div class="zf-textbox-content"
                      :data-zf-text-content-id="box.id"
                      contenteditable="true"
+                     spellcheck="true"
                      @input="onTextBoxInput($event, box)"
                      @paste="onTextBoxPaste($event, box)"
                      @mousedown.stop></div>

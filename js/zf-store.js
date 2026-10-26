@@ -214,8 +214,19 @@
     marginIn: (zfSaved && typeof zfSaved.marginIn === "number") ? zfSaved.marginIn : 0.1,
     printerSafetyIn: (zfSaved && typeof zfSaved.printerSafetyIn === "number") ? zfSaved.printerSafetyIn : 0.2,
     safeEdgeIn: (zfSaved && typeof zfSaved.safeEdgeIn === "number") ? zfSaved.safeEdgeIn : 0.4,
-    showFoldLines: (zfSaved && typeof zfSaved.showFoldLines === "boolean") ? zfSaved.showFoldLines : true,
-    showCutLines: (zfSaved && typeof zfSaved.showCutLines === "boolean") ? zfSaved.showCutLines : false,
+          showFoldLines: (zfSaved && typeof zfSaved.showFoldLines === "boolean") ? zfSaved.showFoldLines : true,
+          showCutLines: (zfSaved && typeof zfSaved.showCutLines === "boolean") ? zfSaved.showCutLines : false,
+          // Snap to page edges/centers while dragging. Default ON: aligning
+          // to the margin, page edge, or page center should be the easy path;
+          // pushing past one requires intent (keep dragging through the small
+          // snap zone). Threshold is in SCREEN PIXELS, converted to page units
+          // per drag using the rendered page width, so the feel is consistent
+          // at any zoom or page size.
+          snapEnabled: (zfSaved && typeof zfSaved.snapEnabled === "boolean") ? zfSaved.snapEnabled : false,
+          snapThresholdPx: (zfSaved && typeof zfSaved.snapThresholdPx === "number") ? zfSaved.snapThresholdPx : 10,
+          // Show a guideline when an element snaps. Independent of snapEnabled:
+          // some users want the magnetic behavior without the visual cue.
+          showSnapGuide: (zfSaved && typeof zfSaved.showSnapGuide === "boolean") ? zfSaved.showSnapGuide : true,
 
     activePage: function () {
       var id = this.activePageId;
@@ -327,9 +338,12 @@
           marginIn: this.marginIn,
           printerSafetyIn: this.printerSafetyIn,
           safeEdgeIn: this.safeEdgeIn,
-          showFoldLines: this.showFoldLines,
-          showCutLines: this.showCutLines
-        }));
+            showFoldLines: this.showFoldLines,
+            showCutLines: this.showCutLines,
+            snapEnabled: this.snapEnabled,
+            snapThresholdPx: this.snapThresholdPx,
+            showSnapGuide: this.showSnapGuide
+          }));
         this.lastSavedAt = Date.now();
       } catch (e) {
         console.warn("saveDraft failed", e);
@@ -351,6 +365,20 @@
 
     setSafeEdge: function (v) {
       this.safeEdgeIn = zfClampNumber(v, 0, 0.75, this.safeEdgeIn);
+    },
+    // Toggle snap behavior. Boolean only -- no clamp needed.
+    setSnapEnabled: function (v) {
+      this.snapEnabled = !!v;
+    },
+    // Snap threshold in screen pixels. 1-30 is the useful range: below 1 is
+    // too tight to feel (sub-pixel snaps), above 30 would pull elements from
+    // across the page. Rounds to an integer pixel.
+    setSnapThresholdPx: function (v) {
+      var n = zfClampNumber(v, 1, 30, this.snapThresholdPx);
+      this.snapThresholdPx = Math.round(n);
+    },
+    setShowSnapGuide: function (v) {
+      this.showSnapGuide = !!v;
     },
 
     // True when the current draft has meaningful content worth saving to

@@ -59,7 +59,7 @@
     },
     onModelChange: function (evt) { store.setModel(evt.target.value); },
     onThemeChange: function (evt) { store.setTheme(evt.target.value); },
-    imageStyle: function (img) {
+      imageStyle: function (img) {
       if (!img) return {};
       var m = this.activeModel;
       if (!m) return {};
@@ -607,6 +607,25 @@
     // ONLY when the wrapper itself is focused (the element is "selected").
     // When the inner contenteditable is focused (you are typing), the event
     // is left alone so the browser edits text normally.
+    // Context menu for text boxes: native menu inside the editable text area,
+    // custom menu elsewhere on the box. The native menu is important for
+    // spellcheck ("Add to dictionary", "Look Up" on macOS, spelling
+    // suggestions in Chrome), paste-as-plain-text, and other text-editing
+    // actions that our custom menu doesn't provide. Everywhere else on the
+    // text box (border, handles, padding between text and border), the custom
+    // menu opens so delete/duplicate/z-order stay a right-click away.
+    onTextBoxContextMenu: function (evt, box) {
+      var t = evt.target;
+      var inContent = t && t.closest && t.closest('.zf-textbox-content');
+      if (inContent) {
+        // Let the browser show its native text-editing menu. Do NOT
+        // preventDefault and do NOT stopPropagation.
+        return;
+      }
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.openContextMenu(evt, 'textBox', box.id);
+    },
     onTextBoxKeydown: function (evt, box) {
       if (evt.key !== 'Delete' && evt.key !== 'Backspace') return;
       var t = evt.target;
@@ -1427,8 +1446,38 @@
             }
           }
         } else {
-          img.x = Math.round((this.imageDrag.baseX + dxIn) * 100) / 100;
-          img.y = Math.round((this.imageDrag.baseY + dyIn) * 100) / 100;
+          // Snap to page-level targets (margins, page centers) before
+          // committing. The threshold is expressed in SCREEN PIXELS in the
+          // store, converted to page units via pageUnitsPerPx so the feel is
+          // the same at any zoom. Snap is deliberately "easy to align,
+          // deliberate to cross": the small threshold means a normal drag
+          // passes through, so going past a line requires intent.
+          var rawX = this.imageDrag.baseX + dxIn;
+          var rawY = this.imageDrag.baseY + dyIn;
+          if (this.store.snapEnabled && typeof zfSnapElement === 'function') {
+            var snapMargin = this.store.modelMarginIn();
+            var snapThreshold = this.store.snapThresholdPx * pageUnitsPerPx;
+            var snap = zfSnapElement(
+              rawX, rawY,
+              (typeof img.w === 'number') ? img.w : 1.5,
+              (typeof img.h === 'number') ? img.h : undefined,
+              m.page.width, m.page.height,
+              snapMargin,
+              snapThreshold
+            );
+            rawX += snap.dx;
+            rawY += snap.dy;
+            // Record which target the element snapped to, so the template
+            // can draw a guideline. targetX/Y is null when nothing snapped.
+            this.snapGuideX = snap.targetX;
+            this.snapGuideY = snap.targetY;
+          } else {
+            // Snap is off: clear the guideline.
+            this.snapGuideX = null;
+            this.snapGuideY = null;
+          }
+          img.x = Math.round(rawX * 100) / 100;
+          img.y = Math.round(rawY * 100) / 100;
         }
         // Keep the group bounding box glued to the selection while dragging
         // FROM CONTENT. The multi-move branch above repositioned every
@@ -1564,6 +1613,9 @@
       var wasText = this.imageDrag && this.imageDrag.isText;
       var moved = !!(this.imageDrag && this.imageDrag.moved);
       this.imageDrag = null;
+      // Clear snap guidelines once the drag ends.
+      this.snapGuideX = null;
+      this.snapGuideY = null;
       if (wasDragging && !wasText) {
         var self = this;
       }
@@ -3345,6 +3397,17 @@
         // render. Reading panelTick in the display helpers forces the labels
         // to recompute every frame so the numbers track the drag live.
         panelTick: 0,
+        // The current snapped target positions (page units), or null. Set
+        // every drag frame by onImageMouseMove from zfSnapElement's targetX
+        // and targetY, cleared on mouseup. Drives the visual guideline that
+        // shows which edge/center the element has snapped to.
+        // NOTE: no leading underscore here. Vue reserves `_` and `$` prefixes
+        // for its own internals, and using them in data fields breaks the
+        // reactive proxy (the field is silently dropped from the render
+        // context, which threw "snapGuideX is not defined" in the template
+        // before the rename).
+      snapGuideX: null,
+      snapGuideY: null,
         // Bumped every time zfIconSvg finishes fetching an icon body. Read
         // by iconInline() so Vue tracks it as a dependency; when a new icon
         // arrives, every icon re-renders (cheap: they become inline <svg>
@@ -3417,6 +3480,25 @@
     },
     computed: {
       active: function () { return store.activePage(); },
+      // Snap target lists (page units) for the visual guide layer. Must match
+      // what zfSnapElement uses: page edges (0, pageW/H), margins, centers.
+      // (These were mistakenly inserted into the shared methods object at the
+      // top of the file by an earlier patch; they belong here, as computeds,
+      // so v-for can iterate the arrays rather than the function references.)
+      snapXTargets: function () {
+        var m = this.activeModel;
+        if (!m) return [];
+        var pw = m.page.width;
+        var margin = this.store.modelMarginIn();
+        return [margin, pw / 2, pw - margin];
+      },
+      snapYTargets: function () {
+        var m = this.activeModel;
+        if (!m) return [];
+        var ph = m.page.height;
+        var margin = this.store.modelMarginIn();
+        return [margin, ph / 2, ph - margin];
+      },
       activeIndex: function () {
         var id = store.activePageId;
         return store.pages.findIndex(function (p) { return p.id === id; });

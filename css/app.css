@@ -718,6 +718,46 @@
     }
     @keyframes zf-spin { to { transform: rotate(360deg); } }
 
+    /* Static snap target lines: show WHERE the user can snap. Subtle so
+       they don't clutter the page, but always visible when snap is on and
+       guidelines are on. */
+    .zf-snap-target {
+      position: absolute;
+      pointer-events: none;
+      z-index: 140;
+    }
+    .zf-snap-target-x {
+      top: 0; bottom: 0;
+      width: 0;
+      border-left: 1px dashed var(--zf-gray-mid, #71767a);
+      opacity: 0.3;
+    }
+    .zf-snap-target-y {
+      left: 0; right: 0;
+      height: 0;
+      border-top: 1px dashed var(--zf-gray-mid, #71767a);
+      opacity: 0.3;
+    }
+    /* Active snap line: brighter, drawn on top of static targets when the
+       element is currently snapped to that specific target. */
+    .zf-snap-guide {
+      position: absolute;
+      pointer-events: none;
+      z-index: 150;
+    }
+    .zf-snap-guide-x {
+      top: 0; bottom: 0;
+      width: 0;
+      border-left: 1.5px solid var(--zf-blue, #005ea2);
+      opacity: 0.9;
+    }
+    .zf-snap-guide-y {
+      left: 0; right: 0;
+      height: 0;
+      border-top: 1.5px solid var(--zf-blue, #005ea2);
+      opacity: 0.9;
+    }
+
     /* Share dialog: a focused modal with three large option buttons. The
        framing is "share," not "download" -- zines are passed along. */
     .zf-share-backdrop {
@@ -756,6 +796,25 @@
       font-style: italic;
     }
     .zf-share-foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    /* Inline URL display in the share dialog, shown after "Copy a link".
+       Selectable input + Copy button so the user can copy manually when
+       programmatic clipboard write fails (it can, silently). */
+    .zf-share-url-block {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+      align-items: stretch;
+    }
+    .zf-share-url-input {
+      flex: 1;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--zf-border);
+      border-radius: 4px;
+      font-family: var(--zf-font);
+      font-size: 0.8rem;
+      color: var(--zf-ink);
+      background: var(--zf-gray-light);
+    }
     .zf-icon-btn { border: 1px solid var(--zf-border); background: #ffffff; border-radius: 4px; width: 26px; height: 26px; line-height: 1; cursor: pointer; font-size: 0.9rem; padding: 0; }
     .zf-icon-btn:hover { background: var(--zf-gray-light); }
     /* The canvas-wrap is the gray "desk" the page sits on. It should feel like
